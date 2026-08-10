@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <link rel="manifest" href="manifest.json">
+<meta charset="UTF-8">
+<title>Meu Painel da Faculdade</title>
+<link rel="stylesheet" href="css/styles.css">
+
+    <meta name="theme-color" content="#0F172A">
+</head>
+<body>
+<div id="toastHost"></div>
+
+<div class="switcher-overlay" id="switcherOverlay">
+  <div class="switcher-modal">
+    <h2>Escolha um painel</h2>
+    <div class="sub">Cada painel guarda os próprios dados — trocar não apaga nada.</div>
+    <div class="switcher-grid" id="switcherGrid"></div>
+    <button class="switcher-close" id="switcherClose">Fechar</button>
+  </div>
+</div>
+
+<div class="app">
+
+  <div class="rail">
+    <div class="brand" id="brandBtn" title="Trocar painel" style="cursor:pointer;">✦</div>
+
+    <!-- ===== FACULDADE ===== -->
+    <button data-workspace="faculdade" data-page="inicio" class="active" title="Início">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>
+      Início
+    </button>
+    <button data-workspace="faculdade" data-page="materias" title="Matérias">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><path d="M4 9h16M9 4v16"/></svg>
+      Matérias
+    </button>
+    <button data-workspace="faculdade" data-page="progresso" title="Meu progresso">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 15l4-5 3 3 5-7"/></svg>
+      Progresso
+    </button>
+    <button data-workspace="faculdade" data-page="trabalhos" title="Trabalhos e provas">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3 8-8"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+      Prazos
+    </button>
+    <button data-workspace="faculdade" data-page="calendario" title="Calendário">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+      Calend.
+    </button>
+    <button data-workspace="faculdade" data-page="anotacoes" title="Anotações">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h13l3 3v13H4z"/><path d="M8 9h9M8 13h9M8 17h5"/></svg>
+      Notas
+    </button>
+    <button data-workspace="faculdade" data-page="playlist" title="Playlist">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+      Playlist
+    </button>
+
+    <!-- ===== PROJETOS ===== -->
+    <button data-workspace="projetos" data-page="proj-inicio" title="Início" style="display:none;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>
+      Início
+    </button>
+    <button data-workspace="projetos" data-page="proj-projetos" title="Projetos" style="display:none;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7l3-4h6l3 4"/><rect x="3" y="7" width="18" height="13" rx="2"/></svg>
+      Projetos
+    </button>
+    <button data-workspace="projetos" data-page="proj-entregas" title="Entregas" style="display:none;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3 8-8"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+      Entregas
+    </button>
+    <button data-workspace="projetos" data-page="proj-anotacoes" title="Anotações" style="display:none;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h13l3 3v13H4z"/><path d="M8 9h9M8 13h9M8 17h5"/></svg>
+      Notas
+    </button>
+    <button data-workspace="projetos" data-page="proj-progresso" title="Progresso" style="display:none;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 15l4-5 3 3 5-7"/></svg>
+      Progresso
+    </button>
+
+    <!-- ===== LEITURAS ===== -->
+    <button data-workspace="leituras" data-page="leit-inicio" title="Início" style="display:none;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>
+      Início
+    </button>
+    <button data-workspace="leituras" data-page="leit-lista" title="Minhas leituras" style="display:none;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+      Leituras
+    </button>
+    <button data-workspace="leituras" data-page="leit-anotacoes" title="Anotações" style="display:none;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h13l3 3v13H4z"/><path d="M8 9h9M8 13h9M8 17h5"/></svg>
+      Notas
+    </button>
+    <button data-workspace="leituras" data-page="leit-progresso" title="Progresso" style="display:none;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 15l4-5 3 3 5-7"/></svg>
+      Progresso
+    </button>
+
+    <!-- ===== COMPARTILHADO ===== -->
+    <button data-workspace="all" data-page="habitos" title="Hábitos">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-4.5-9.5-9A5.5 5.5 0 0112 6a5.5 5.5 0 019.5 6c-2.5 4.5-9.5 9-9.5 9z"/></svg>
+      Hábitos
+    </button>
+  </div>
+
+  <main>
+
+    <!-- ============ INÍCIO ============ -->
+    <section class="page active" id="page-inicio">
+      <div class="topbar">
+        <div><h1>Oi! Bem-vinda de volta ✦</h1><div class="sub">Aqui está o resumo do seu semestre hoje.</div></div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <div class="chip-today" id="syncStatus" style="color:var(--gold-dk);">☁️ conectando...</div>
+          <div class="chip-today" id="todayChip">—</div>
+        </div>
+      </div>
+
+      <div id="nextClassCard" class="next-class">
+        <div class="icon">📚</div>
+        <div class="info">
+          <div class="label">Próxima aula</div>
+          <h3 id="nextClassName">—</h3>
+          <p id="nextClassWhen">—</p>
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="card">
+          <h2>Tarefas rápidas de hoje</h2>
+          <p class="card-sub">Coisas pequenas — leituras, e-mails, recados.</p>
+          <div class="qt-add">
+            <input type="text" id="qtInput" placeholder="Adicionar tarefa rápida...">
+            <button id="qtAddBtn">+</button>
+          </div>
+          <div class="qt-list" id="qtList"></div>
+        </div>
+
+        <div class="card">
+          <h2>Prazos mais próximos</h2>
+          <p class="card-sub">Seus 3 trabalhos/provas mais urgentes.</p>
+          <div id="miniDeadlines"></div>
+        </div>
+      </div>
+
+      <div class="grid2" style="margin-top:18px;">
+        <div class="card">
+          <h2>Hábitos de hoje</h2>
+          <p class="card-sub">Marcar rapidinho — o detalhe completo fica na aba Hábitos.</p>
+          <div class="qt-list" id="habitToday"></div>
+        </div>
+        <div class="card">
+          <h2>Playlist para estudar</h2>
+          <p class="card-sub">Sua trilha sonora favorita, sempre à mão.</p>
+          <div id="playlistMini"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ MATÉRIAS ============ -->
+    <section class="page" id="page-materias">
+      <div class="topbar">
+        <div><h1>Minhas Matérias</h1><div class="sub">Turma 3001 (presencial) e 9001 (on-line)</div></div>
+      </div>
+      <div class="grid3" id="courseGrid"></div>
+      <div class="week-grid" id="weekGrid"></div>
+    </section>
+
+    <!-- ============ PROGRESSO ============ -->
+    <section class="page" id="page-progresso">
+      <div class="topbar">
+        <div><h1>Meu Progresso</h1><div class="sub">Marque aulas e atividades conforme for concluindo — cada clique conta.</div></div>
+        <div class="chip-today" id="semesterCountdown">—</div>
+      </div>
+
+      <div id="continueCard"></div>
+
+      <div class="grid3" id="progressGrid" style="margin-top:16px;"></div>
+    </section>
+
+    <!-- ============ TRABALHOS E PROVAS ============ -->
+    <section class="page" id="page-trabalhos">
+      <div class="topbar">
+        <div><h1>Trabalhos &amp; Provas</h1><div class="sub">Adicione a data de entrega e eu monto um plano até lá.</div></div>
+      </div>
+
+      <div class="card">
+        <h2>Novo trabalho ou prova</h2>
+        <div class="add-assignment">
+          <input type="text" id="asTitle" placeholder="Ex: Trabalho final de Redação">
+          <select id="asSubject"></select>
+          <select id="asType">
+            <option value="trabalho">Trabalho</option>
+            <option value="prova">Prova</option>
+          </select>
+          <input type="date" id="asDue">
+          <button id="asAddBtn">Criar plano</button>
+        </div>
+      </div>
+
+      <div id="assignList" style="margin-top:18px;"></div>
+    </section>
+
+    <!-- ============ CALENDÁRIO ============ -->
+    <section class="page" id="page-calendario">
+      <div class="topbar">
+        <div><h1>Calendário</h1><div class="sub">Datas oficiais do Calendário Acadêmico 2026.2 (Ao Vivo)</div></div>
+      </div>
+      <div class="grid2">
+        <div class="card">
+          <div class="cal-header">
+            <button id="calPrev">‹</button>
+            <div class="cal-title" id="calTitle">—</div>
+            <button id="calNext">›</button>
+          </div>
+          <div class="cal-grid" id="calGrid"></div>
+        </div>
+        <div class="card">
+          <h2>Linha do tempo</h2>
+          <div class="filter-row" id="filterRow">
+            <button data-cat="all" class="on">Tudo</button>
+            <button data-cat="prazo">Prazos</button>
+            <button data-cat="prova">Provas</button>
+            <button data-cat="evento">Eventos</button>
+            <button data-cat="feriado">Feriados</button>
+          </div>
+          <div id="timeline" style="max-height:420px;overflow:auto;"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ ANOTAÇÕES ============ -->
+    <section class="page" id="page-anotacoes">
+      <div class="topbar">
+        <div><h1>Anotações</h1><div class="sub">Registre o que achar interessante em cada matéria.</div></div>
+      </div>
+
+      <div class="note-form">
+        <textarea id="noteText" placeholder="Escreva sua anotação..."></textarea>
+        <div class="note-form-row">
+          <select id="noteSubject"></select>
+          <button id="noteAddBtn">Salvar anotação</button>
+        </div>
+      </div>
+
+      <div class="notes-toolbar">
+        <span style="font-size:12.5px;color:var(--muted);">Filtrar:</span>
+        <select id="noteFilterSubject"><option value="all">Todas as matérias</option></select>
+        <button id="noteFavFilter">⭐ Só favoritas</button>
+      </div>
+
+      <div class="notes-grid" id="notesGrid"></div>
+    </section>
+
+    <!-- ============ PLAYLIST ============ -->
+    <section class="page" id="page-playlist">
+      <div class="topbar">
+        <div><h1>Playlist para estudar</h1><div class="sub">Cole o link de uma playlist pública de vídeos do YouTube.</div></div>
+      </div>
+      <div class="playlist-card">
+        <div class="playlist-input-row">
+          <input type="text" id="playlistInput" placeholder="https://www.youtube.com/playlist?list=...">
+          <button id="playlistSaveBtn">Salvar</button>
+        </div>
+        <div class="playlist-frame-wrap" id="playlistFrame"></div>
+      </div>
+    </section>
+
+    <!-- ============ PROJETOS: INÍCIO ============ -->
+    <section class="page" id="page-proj-inicio">
+      <div class="topbar">
+        <div><h1>Painel de Projetos ✦</h1><div class="sub">Resumo dos seus projetos de trabalho hoje.</div></div>
+        <div class="chip-today" id="projTodayChip">—</div>
+      </div>
+
+      <div id="projContinueCard"></div>
+
+      <div class="grid2" style="margin-top:18px;">
+        <div class="card">
+          <h2>Tarefas rápidas</h2>
+          <p class="card-sub">Pendências pequenas dos seus projetos.</p>
+          <div class="qt-add">
+            <input type="text" id="projQtInput" placeholder="Adicionar tarefa rápida...">
+            <button id="projQtAddBtn">+</button>
+          </div>
+          <div class="qt-list" id="projQtList"></div>
+        </div>
+        <div class="card">
+          <h2>Entregas mais próximas</h2>
+          <p class="card-sub">Seus 3 marcos mais urgentes.</p>
+          <div id="projMiniDeadlines"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ PROJETOS: LISTA ============ -->
+    <section class="page" id="page-proj-projetos">
+      <div class="topbar">
+        <div><h1>Meus Projetos</h1><div class="sub">Organize seus projetos de trabalho ativos.</div></div>
+      </div>
+      <div class="grid3" id="projGrid"></div>
+    </section>
+
+    <!-- ============ PROJETOS: ENTREGAS ============ -->
+    <section class="page" id="page-proj-entregas">
+      <div class="topbar">
+        <div><h1>Entregas &amp; Marcos</h1><div class="sub">Adicione o prazo e eu monto um plano até lá.</div></div>
+      </div>
+      <div class="card">
+        <h2>Nova entrega</h2>
+        <div class="add-assignment">
+          <input type="text" id="projAsTitle" placeholder="Ex: Protótipo v1">
+          <select id="projAsProject"></select>
+          <select id="projAsType">
+            <option value="entrega">Entrega</option>
+            <option value="reuniao">Reunião</option>
+          </select>
+          <input type="date" id="projAsDue">
+          <button id="projAsAddBtn">Criar plano</button>
+        </div>
+      </div>
+      <div id="projAssignList" style="margin-top:18px;"></div>
+    </section>
+
+    <!-- ============ PROJETOS: ANOTAÇÕES ============ -->
+    <section class="page" id="page-proj-anotacoes">
+      <div class="topbar">
+        <div><h1>Anotações de Projetos</h1><div class="sub">Registre decisões, ideias e recados de cada projeto.</div></div>
+      </div>
+      <div class="note-form">
+        <textarea id="projNoteText" placeholder="Escreva sua anotação..."></textarea>
+        <div class="note-form-row">
+          <select id="projNoteProject"></select>
+          <button id="projNoteAddBtn">Salvar anotação</button>
+        </div>
+      </div>
+      <div class="notes-toolbar">
+        <span style="font-size:12.5px;color:var(--muted);">Filtrar:</span>
+        <select id="projNoteFilterProject"><option value="all">Todos os projetos</option></select>
+        <button id="projNoteFavFilter">⭐ Só favoritas</button>
+      </div>
+      <div class="notes-grid" id="projNotesGrid"></div>
+    </section>
+
+    <!-- ============ PROJETOS: PROGRESSO ============ -->
+    <section class="page" id="page-proj-progresso">
+      <div class="topbar">
+        <div><h1>Progresso dos Projetos</h1><div class="sub">Marque etapas conforme for avançando.</div></div>
+      </div>
+      <div class="grid3" id="projProgressGrid"></div>
+    </section>
+
+    <!-- ============ LEITURAS: INÍCIO ============ -->
+    <section class="page" id="page-leit-inicio">
+      <div class="topbar">
+        <div><h1>Painel de Leituras ✦</h1><div class="sub">O que você está lendo e explorando agora.</div></div>
+        <div class="chip-today" id="leitTodayChip">—</div>
+      </div>
+
+      <div id="leitContinueCard"></div>
+
+      <div class="grid2" style="margin-top:18px;">
+        <div class="card">
+          <h2>Quero anotar / pesquisar</h2>
+          <p class="card-sub">Termos, referências e ideias para depois.</p>
+          <div class="qt-add">
+            <input type="text" id="leitQtInput" placeholder="Adicionar item rápido...">
+            <button id="leitQtAddBtn">+</button>
+          </div>
+          <div class="qt-list" id="leitQtList"></div>
+        </div>
+        <div class="card">
+          <h2>Fila de leitura</h2>
+          <p class="card-sub">O que você quer ler em seguida.</p>
+          <div id="leitQueueList"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ LEITURAS: LISTA ============ -->
+    <section class="page" id="page-leit-lista">
+      <div class="topbar">
+        <div><h1>Minhas Leituras</h1><div class="sub">Livros, artigos e outras leituras que você acompanha.</div></div>
+      </div>
+      <div class="grid3" id="leitGrid"></div>
+    </section>
+
+    <!-- ============ LEITURAS: ANOTAÇÕES ============ -->
+    <section class="page" id="page-leit-anotacoes">
+      <div class="topbar">
+        <div><h1>Anotações de Leitura</h1><div class="sub">Trechos, citações e assuntos interessantes.</div></div>
+      </div>
+      <div class="note-form">
+        <textarea id="leitNoteText" placeholder="Escreva sua anotação..."></textarea>
+        <div class="note-form-row">
+          <select id="leitNoteReading"></select>
+          <button id="leitNoteAddBtn">Salvar anotação</button>
+        </div>
+      </div>
+      <div class="notes-toolbar">
+        <span style="font-size:12.5px;color:var(--muted);">Filtrar:</span>
+        <select id="leitNoteFilterReading"><option value="all">Todas as leituras</option></select>
+        <button id="leitNoteFavFilter">⭐ Só favoritas</button>
+      </div>
+      <div class="notes-grid" id="leitNotesGrid"></div>
+    </section>
+
+    <!-- ============ LEITURAS: PROGRESSO ============ -->
+    <section class="page" id="page-leit-progresso">
+      <div class="topbar">
+        <div><h1>Progresso de Leitura</h1><div class="sub">Acompanhe páginas lidas em cada leitura ativa.</div></div>
+        <div class="chip-today" id="leitStatsChip">—</div>
+      </div>
+      <div class="grid3" id="leitProgressGrid"></div>
+    </section>
+
+    <!-- ============ HÁBITOS ============ -->
+    <section class="page" id="page-habitos">
+      <div class="topbar">
+        <div><h1>Hábitos da semana</h1><div class="sub">Pequenas rotinas que ajudam o semestre inteiro.</div></div>
+      </div>
+      <div class="card">
+        <div class="habit-add">
+          <input type="text" id="habitInput" placeholder="Adicionar hábito, ex: Revisar anotações">
+          <button id="habitAddBtn">Adicionar</button>
+        </div>
+        <table class="habit-table" id="habitTable"></table>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<div class="item-modal-overlay" id="projModalOverlay">
+  <div class="item-modal">
+    <h2>Novo projeto</h2>
+    <label>Nome do projeto</label>
+    <input type="text" id="projModalName" placeholder="Ex: Site institucional">
+    <label>Cliente / contexto</label>
+    <input type="text" id="projModalClient" placeholder="Ex: Cliente X, interno...">
+    <label>Total de etapas planejadas</label>
+    <input type="number" id="projModalSteps" min="1" value="10">
+    <label>Status</label>
+    <div class="status-row" id="projModalStatusRow">
+      <button data-status="ativo" class="on">Ativo</button>
+      <button data-status="pausado">Pausado</button>
+      <button data-status="concluido">Concluído</button>
+    </div>
+    <div class="im-actions">
+      <button class="im-cancel" id="projModalCancel">Cancelar</button>
+      <button class="im-save" id="projModalSave">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<div class="item-modal-overlay" id="leitModalOverlay">
+  <div class="item-modal">
+    <h2>Nova leitura</h2>
+    <label>Título</label>
+    <input type="text" id="leitModalTitle" placeholder="Ex: A Sutil Arte de Ligar o F*da-se">
+    <label>Autor / fonte</label>
+    <input type="text" id="leitModalAuthor" placeholder="Ex: Mark Manson">
+    <label>Tipo</label>
+    <select id="leitModalType">
+      <option value="livro">Livro</option>
+      <option value="artigo">Artigo</option>
+      <option value="podcast">Podcast</option>
+      <option value="curso">Curso</option>
+      <option value="video">Vídeo</option>
+    </select>
+    <label>Total de páginas (ou minutos/episódios)</label>
+    <input type="number" id="leitModalTotal" min="1" value="200">
+    <label>Status</label>
+    <div class="status-row" id="leitModalStatusRow">
+      <button data-status="quero-ler" class="on">Quero ler</button>
+      <button data-status="lendo">Lendo</button>
+      <button data-status="concluido">Concluído</button>
+      <button data-status="pausado">Pausado</button>
+    </div>
+    <div class="im-actions">
+      <button class="im-cancel" id="leitModalCancel">Cancelar</button>
+      <button class="im-save" id="leitModalSave">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+
+</body>
+</html>
