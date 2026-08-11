@@ -1,45 +1,21 @@
 
 /* ============================================================
-   PRISMA — RESPONSIVE LAYOUT
-   Camada separada do CSS principal.
-   Não apagar/substituir o styles.css original.
+   PRISMA — MOBILE EXPERIENCE v2
+   O Prisma deixa de parecer um site comprimido e passa a
+   funcionar como uma sequência de telas horizontais.
+   O styles.css original permanece intacto.
 ============================================================ */
 
-/* TABLET */
-@media (max-width: 980px){
-  main{
-    padding:22px 24px 55px;
-  }
+@media (max-width: 700px){
 
-  .grid2,
-  .grid3{
-    gap:14px;
-  }
-
-  .topbar{
-    margin-bottom:20px;
-  }
-
-  .week-grid{
-    overflow-x:auto;
-    min-width:650px;
-  }
-
-  #page-materias{
-    overflow-x:auto;
-  }
-
-  .add-assignment{
-    grid-template-columns:1fr 1fr;
-  }
-}
-
-/* CELULAR */
-@media (max-width:700px){
-  html,body{
+  html, body{
     width:100%;
     min-width:0;
     overflow-x:hidden;
+  }
+
+  body{
+    overscroll-behavior-x:none;
   }
 
   .app{
@@ -47,7 +23,10 @@
     min-height:100vh;
   }
 
-  /* Sidebar vira navegação inferior */
+  /* ----------------------------------------------------------
+     NAVEGAÇÃO MOBILE
+     Fica compacta na parte inferior, como app.
+  ---------------------------------------------------------- */
   .rail{
     position:fixed;
     z-index:900;
@@ -58,29 +37,34 @@
     height:72px;
     padding:7px 8px calc(7px + env(safe-area-inset-bottom));
     border-right:none;
-    border-top:1px solid var(--line);
+    border-top:1px solid var(--line-hi);
+    background:rgba(15,23,42,.96);
+    backdrop-filter:blur(18px);
+    -webkit-backdrop-filter:blur(18px);
     flex-direction:row;
     align-items:center;
     justify-content:flex-start;
     gap:5px;
     overflow-x:auto;
     overflow-y:hidden;
-    -webkit-overflow-scrolling:touch;
     scrollbar-width:none;
   }
 
-  .rail::-webkit-scrollbar{
-    display:none;
-  }
+  .rail::-webkit-scrollbar{display:none;}
 
   .rail .brand{
-    display:none;
+    display:flex;
+    flex:0 0 44px;
+    width:44px;
+    height:44px;
+    margin:0 3px 0 0;
+    border-radius:14px;
   }
 
   .rail button{
-    flex:0 0 58px;
-    width:58px;
-    height:58px;
+    flex:0 0 55px;
+    width:55px;
+    height:55px;
     border-radius:15px;
     font-size:8.5px;
     gap:2px;
@@ -94,7 +78,7 @@
   main{
     width:100%;
     max-width:none;
-    padding:18px 14px calc(92px + env(safe-area-inset-bottom));
+    padding:16px 0 calc(88px + env(safe-area-inset-bottom));
   }
 
   .page{
@@ -102,29 +86,289 @@
     min-width:0;
   }
 
-  .topbar{
+  /* ----------------------------------------------------------
+     CABEÇALHO DA HOME
+  ---------------------------------------------------------- */
+  #page-inicio > .topbar{
+    padding:0 16px;
+    margin-bottom:14px;
     align-items:flex-start;
-    gap:9px;
+  }
+
+  #page-inicio > .topbar h1{
+    font-size:24px;
+    line-height:1.05;
+  }
+
+  #page-inicio > .topbar .sub{
+    font-size:11px;
+    margin-top:4px;
+  }
+
+  #page-inicio > .topbar > div:last-child{
+    width:auto;
+    gap:5px !important;
+    flex-wrap:wrap;
+    justify-content:flex-end;
+  }
+
+  #page-inicio > .topbar .chip-today{
+    font-size:8.5px;
+    padding:6px 8px;
+  }
+
+  /* ----------------------------------------------------------
+     A HOME VIRA UM CARROSSEL
+
+     A ordem natural passa a ser:
+     1. Jornada
+     2. Próxima aula
+     3. Tarefas
+     4. Prazos
+     5. Hábitos
+     6. Playlist
+  ---------------------------------------------------------- */
+
+  #page-inicio{
+    display:block;
+    overflow:hidden;
+  }
+
+  #page-inicio > #prismaJourneyCard,
+  #page-inicio > #nextClassCard,
+  #page-inicio > .grid2{
+    margin-left:14px;
+    margin-right:14px;
+  }
+
+  #page-inicio > #prismaJourneyCard{
+    width:calc(100% - 28px);
+    margin-bottom:0 !important;
+  }
+
+  /*
+    O grid deixa de ser uma caixa e seus cards passam a ser
+    slides individuais do carrossel.
+  */
+  #page-inicio > .grid2{
+    display:contents;
+  }
+
+  #page-inicio > #prismaJourneyCard,
+  #page-inicio > #nextClassCard,
+  #page-inicio > .grid2 > .card{
+    width:calc(100vw - 28px);
+    min-width:calc(100vw - 28px);
+    max-width:calc(100vw - 28px);
+    box-sizing:border-box;
+  }
+
+  #page-inicio > #prismaJourneyCard{
+    margin-left:14px;
+    margin-right:14px;
+  }
+
+  #page-inicio > #nextClassCard{
+    margin-left:14px;
+    margin-right:14px;
+  }
+
+  #page-inicio > .grid2 > .card{
+    margin-left:14px;
+    margin-right:14px;
+  }
+
+  /*
+    Criamos uma faixa horizontal com os elementos da Home.
+    O cabeçalho fica fora dela.
+  */
+  #page-inicio{
+    --home-slide-width:calc(100vw - 28px);
+  }
+
+  #page-inicio > #prismaJourneyCard{
+    /* primeira tela */
+    display:block;
+  }
+
+  /*
+    O truque abaixo usa o próprio fluxo horizontal:
+    todos os blocos da Home são posicionados lado a lado.
+  */
+  #page-inicio{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:flex-start;
+  }
+
+  #page-inicio > .topbar{
+    flex:0 0 100%;
+    width:100%;
+  }
+
+  #page-inicio > #prismaJourneyCard,
+  #page-inicio > #nextClassCard,
+  #page-inicio > .grid2 > .card{
+    flex:0 0 var(--home-slide-width);
+  }
+
+  #page-inicio > #prismaJourneyCard,
+  #page-inicio > #nextClassCard,
+  #page-inicio > .grid2 > .card{
+    margin-top:0;
+    margin-bottom:0;
+  }
+
+  /*
+    A faixa horizontal precisa ser um contêiner próprio.
+    Como o HTML atual possui os cards como irmãos, usamos
+    scroll-snap no próprio main apenas para a área da Home.
+  */
+  #page-inicio{
+    overflow-x:auto;
+    overflow-y:visible;
+    flex-wrap:wrap;
+    scroll-snap-type:x mandatory;
+    scrollbar-width:none;
+    -webkit-overflow-scrolling:touch;
+    padding-bottom:12px;
+  }
+
+  #page-inicio::-webkit-scrollbar{
+    display:none;
+  }
+
+  #page-inicio > #prismaJourneyCard,
+  #page-inicio > #nextClassCard,
+  #page-inicio > .grid2 > .card{
+    scroll-snap-align:start;
+  }
+
+  /*
+    Mantém o cabeçalho no topo e os slides em uma linha.
+    O JavaScript/HTML existente continua funcionando.
+  */
+  #page-inicio > .topbar{
+    position:sticky;
+    left:0;
+    z-index:20;
+    background:var(--bg);
+    padding-top:2px;
+    padding-bottom:12px;
+  }
+
+  /* ----------------------------------------------------------
+     JORNADA
+  ---------------------------------------------------------- */
+  #prismaJourneyCard > div{
+    min-height:330px;
+    padding:22px !important;
+    border-radius:22px !important;
+    display:flex;
+    align-items:flex-end;
+  }
+
+  #prismaJourneyCard [style*="grid-template-columns:repeat(4"]{
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+  }
+
+  #prismaJourneyCard [style*="font-size:28px"]{
+    font-size:30px !important;
+  }
+
+  /* ----------------------------------------------------------
+     PRÓXIMA AULA
+  ---------------------------------------------------------- */
+  #nextClassCard{
+    min-height:330px;
+    border-radius:22px;
+    padding:24px;
+    align-items:flex-end;
+  }
+
+  #nextClassCard .icon{
+    width:58px;
+    height:58px;
+    border-radius:17px;
+    font-size:25px;
+  }
+
+  #nextClassCard .info h3{
+    font-size:23px;
+  }
+
+  #nextClassCard .info p{
+    font-size:12px;
+  }
+
+  /* ----------------------------------------------------------
+     CARDS DOS SLIDES
+  ---------------------------------------------------------- */
+  #page-inicio > .grid2 > .card{
+    min-height:330px;
+    border-radius:22px;
+    padding:22px;
+    display:flex;
+    flex-direction:column;
+    justify-content:flex-start;
+  }
+
+  #page-inicio > .grid2 > .card h2{
+    font-size:20px;
+    margin-bottom:5px;
+  }
+
+  #page-inicio > .grid2 > .card .card-sub{
+    font-size:11.5px;
+    margin-bottom:18px;
+  }
+
+  /* Tarefas */
+  #qtInput{
+    font-size:13px;
+    min-width:0;
+  }
+
+  #qtAddBtn{
+    min-width:44px;
+    min-height:42px;
+  }
+
+  /* Hábitos */
+  #habitToday{
+    gap:8px;
+  }
+
+  /* ----------------------------------------------------------
+     INDICAÇÃO VISUAL DE CARROSSEL
+  ---------------------------------------------------------- */
+  #page-inicio::after{
+    content:'deslize →';
+    flex:0 0 100%;
+    text-align:center;
+    margin-top:10px;
+    color:var(--muted);
+    font-family:'JetBrains Mono',monospace;
+    font-size:9px;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    opacity:.7;
+  }
+
+  /* ----------------------------------------------------------
+     DEMAIS PÁGINAS
+  ---------------------------------------------------------- */
+  .topbar{
+    padding:0 14px;
     margin-bottom:18px;
   }
 
   .topbar h1{
     font-size:24px;
-    line-height:1.08;
   }
 
   .topbar .sub{
-    font-size:12px;
-    line-height:1.35;
-  }
-
-  .topbar > div:first-child{
-    min-width:0;
-    flex:1;
-  }
-
-  .topbar > div:last-child{
-    flex-wrap:wrap;
+    font-size:11.5px;
   }
 
   .grid2,
@@ -134,57 +378,29 @@
   }
 
   .card{
+    border-radius:18px;
     padding:16px;
-    border-radius:16px;
   }
 
-  .card h2{
-    font-size:16px;
+  /* Grade de matérias pode deslizar horizontalmente */
+  #page-materias{
+    overflow-x:hidden;
+    padding-left:14px;
+    padding-right:14px;
   }
 
-  /* Próxima aula */
-  .next-class{
-    padding:16px;
-    gap:12px;
-    border-radius:16px;
+  #page-materias .topbar{
+    padding-left:0;
+    padding-right:0;
   }
 
-  .next-class .icon{
-    width:44px;
-    height:44px;
-    border-radius:13px;
-    font-size:19px;
+  #weekGrid{
+    overflow-x:auto;
+    min-width:650px;
+    max-width:calc(100vw - 28px);
   }
 
-  .next-class .info h3{
-    font-size:17px;
-  }
-
-  .next-class .info p{
-    font-size:11.5px;
-  }
-
-  /* Visão da jornada criada pelo app.js */
-  #prismaJourneyCard{
-    margin-bottom:14px !important;
-  }
-
-  #prismaJourneyCard > div{
-    padding:18px !important;
-    border-radius:18px !important;
-  }
-
-  #prismaJourneyCard [style*="grid-template-columns:repeat(4"]{
-    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
-  }
-
-  /* Formulários */
-  .qt-add,
-  .habit-add,
-  .playlist-input-row{
-    width:100%;
-  }
-
+  /* Trabalhos */
   .add-assignment{
     grid-template-columns:1fr !important;
   }
@@ -196,38 +412,14 @@
     min-width:0;
   }
 
-  /* Grade de horários */
-  #page-materias{
-    overflow-x:hidden;
-  }
-
-  #weekGrid{
-    overflow-x:auto;
-    min-width:650px;
-    max-width:calc(100vw - 28px);
-  }
-
   /* Calendário */
   .cal-grid{
     gap:3px;
   }
 
-  .cal-day{
-    font-size:10.5px;
-  }
-
-  /* Anotações */
-  .notes-toolbar{
-    align-items:stretch;
-  }
-
-  .notes-toolbar select,
-  .notes-toolbar button{
-    min-height:40px;
-  }
-
-  .note-form{
-    padding:12px;
+  /* Notas */
+  .notes-grid{
+    grid-template-columns:1fr;
   }
 
   .note-form-row{
@@ -238,10 +430,6 @@
   .note-form-row select,
   .note-form-row button{
     width:100%;
-  }
-
-  .notes-grid{
-    grid-template-columns:1fr;
   }
 
   /* Playlist */
@@ -267,24 +455,7 @@
     min-width:620px;
   }
 
-  /* Modais */
-  .switcher-overlay,
-  .item-modal-overlay{
-    padding:12px;
-  }
-
-  .switcher-modal,
-  .item-modal{
-    max-height:calc(100vh - 24px);
-    overflow-y:auto;
-    border-radius:18px;
-  }
-
-  .switcher-grid{
-    grid-template-columns:1fr;
-  }
-
-  /* Toast acima da barra inferior */
+  /* Toast acima da navegação */
   #toastHost{
     left:14px;
     right:14px;
@@ -295,21 +466,35 @@
   .toast{
     max-width:none;
   }
+
+  /* Modais */
+  .switcher-overlay,
+  .item-modal-overlay{
+    padding:12px;
+  }
+
+  .switcher-modal,
+  .item-modal{
+    max-height:calc(100vh - 24px);
+    overflow-y:auto;
+    border-radius:20px;
+  }
 }
 
-/* CELULARES PEQUENOS */
-@media (max-width:380px){
-  main{
-    padding-left:11px;
-    padding-right:11px;
+/* Telas muito estreitas */
+@media(max-width:380px){
+  #page-inicio > .topbar{
+    padding-left:12px;
+    padding-right:12px;
   }
 
-  .rail button{
-    flex-basis:54px;
-    width:54px;
-  }
-
-  .topbar h1{
-    font-size:22px;
+  #page-inicio > #prismaJourneyCard,
+  #page-inicio > #nextClassCard,
+  #page-inicio > .grid2 > .card{
+    width:calc(100vw - 24px);
+    min-width:calc(100vw - 24px);
+    max-width:calc(100vw - 24px);
+    margin-left:12px;
+    margin-right:12px;
   }
 }
