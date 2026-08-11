@@ -63,6 +63,25 @@ const monthAbbr = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
 function fmtDDMM(iso){ const [y,m,d]=iso.split('-'); return `${d}/${m}`; }
 function escapeHtml(s){ const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+async function loadUserName(){
+  try{
+    const r = await remoteStorage.get('user-name');
+    let name = r && r.value ? String(r.value).trim() : '';
+
+    if(!name){
+      name = prompt('Como podemos chamar você?')?.trim() || '';
+      if(name) await remoteStorage.set('user-name', name);
+    }
+
+    const greeting = document.getElementById('userGreeting');
+    if(greeting) greeting.textContent = name ? `Bom dia, ${name}` : 'Bom dia';
+  }catch(err){
+    console.error('Erro ao carregar nome do usuário:', err);
+    const greeting = document.getElementById('userGreeting');
+    if(greeting) greeting.textContent = 'Bom dia';
+  }
+}
+
 function todayISO(){ return new Date().toISOString().slice(0,10); }
 
 /* ============================================================
@@ -260,6 +279,7 @@ async function loadQuickTasks(){
   try{ const r = await remoteStorage.get('quicktasks'); quickTasks = r? JSON.parse(r.value):[]; }
   catch(e){ quickTasks = []; }
   renderQuickTasks();
+  renderPrismaHome();
 }
 async function saveQuickTasks(){
   try{ await remoteStorage.set('quicktasks', JSON.stringify(quickTasks)); }catch(e){}
@@ -611,6 +631,7 @@ async function loadHabits(){
   try{ const r2 = await remoteStorage.get('habits-checks:'+getWeekKey()); habitChecks = r2? JSON.parse(r2.value): {}; }
   catch(e){ habitChecks = {}; }
   renderHabitTable(); renderHabitToday();
+  renderPrismaHome();
 }
 async function saveHabitNames(){ try{ await remoteStorage.set('habits-config', JSON.stringify(habitNames)); }catch(e){} }
 async function saveHabitChecks(){ try{ await remoteStorage.set('habits-checks:'+getWeekKey(), JSON.stringify(habitChecks)); }catch(e){} }
@@ -756,6 +777,7 @@ async function loadCourseProgress(){
     if(!courseProgress[code]) courseProgress[code] = {...defaultProgress[code]};
   });
   renderProgressPage();
+  renderPrismaHome();
 }
 async function saveCourseProgress(){
   try{ await remoteStorage.set('course-progress', JSON.stringify(courseProgress)); }catch(e){}
@@ -1220,6 +1242,7 @@ async function loadReadings(){
   renderLeitContinueCard();
   renderLeitQueue();
   updateLeitStatsChip();
+  renderPrismaHome();
 }
 async function saveReadings(){ try{ await remoteStorage.set('leit-list', JSON.stringify(readings)); }catch(e){} }
 
@@ -1474,6 +1497,244 @@ document.getElementById('leitNotesGrid').addEventListener('click', async e=>{
   const b = document.getElementById('leitTodayChip'); if(b) b.textContent = str;
 })();
 
+
+
+/* ============================================================
+   PRISMA — REGISTRO DE EVOLUÇÃO
+============================================================ */
+let evolutionLogs = [];
+
+async function loadEvolutionLogs(){
+  try{
+    const r = await remoteStorage.get('evolution-log');
+    evolutionLogs = r && r.value ? JSON.parse(r.value) : [];
+    if(!Array.isArray(evolutionLogs)) evolutionLogs = [];
+  }catch(err){
+    console.error('Erro ao carregar registros de evolução:', err);
+    evolutionLogs = [];
+  }
+}
+
+async function saveEvolutionLogs(){
+  try{
+    await remoteStorage.set('evolution-log', JSON.stringify(evolutionLogs));
+  }catch(err){
+    console.error('Erro ao salvar registro de evolução:', err);
+  }
+}
+
+function openEvolutionModal(){
+  let modal = document.getElementById('prismaEvolutionModal');
+
+  if(!modal){
+    modal = document.createElement('div');
+    modal.id = 'prismaEvolutionModal';
+    modal.innerHTML = `
+      <div id="prismaEvolutionBackdrop" style="
+        position:fixed;inset:0;background:rgba(10,14,20,.72);backdrop-filter:blur(6px);
+        z-index:9998;display:flex;align-items:center;justify-content:center;padding:18px;
+      ">
+        <div role="dialog" aria-modal="true" style="
+          width:min(520px,100%);background:#F3F3ED;color:#1d2833;border-radius:24px;
+          box-shadow:0 25px 80px rgba(0,0,0,.30);padding:24px;
+        ">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+            <div>
+              <div style="font-family:'JetBrains Mono';font-size:10px;letter-spacing:.10em;text-transform:uppercase;color:#C51F5D;">✦ REGISTRAR</div>
+              <h2 style="font-family:'Baloo 2';font-size:28px;line-height:1;margin:6px 0 4px;">Um passo de cada vez.</h2>
+              <div style="font-size:12px;color:#68727c;">Registre algo que você fez hoje.</div>
+            </div>
+            <button id="prismaEvolutionClose" type="button" style="
+              border:0;background:rgba(29,40,51,.08);border-radius:12px;width:34px;height:34px;
+              font-size:18px;cursor:pointer;color:#1d2833;
+            ">×</button>
+          </div>
+
+          <label style="display:block;font-family:'JetBrains Mono';font-size:10px;letter-spacing:.06em;text-transform:uppercase;margin:22px 0 7px;">Categoria</label>
+          <select id="prismaEvolutionCategory" style="
+            width:100%;padding:12px 13px;border-radius:12px;border:1px solid rgba(29,40,51,.14);
+            background:#fff;font-family:'Nunito';font-size:13px;color:#1d2833;
+          ">
+            <option value="Estudos">📚 Estudos</option>
+            <option value="Trabalho">💼 Trabalho</option>
+            <option value="Vida">🌱 Vida</option>
+            <option value="Hábitos">🔥 Hábitos</option>
+            <option value="Outro">✨ Outro</option>
+          </select>
+
+          <label style="display:block;font-family:'JetBrains Mono';font-size:10px;letter-spacing:.06em;text-transform:uppercase;margin:16px 0 7px;">O que você fez?</label>
+          <textarea id="prismaEvolutionText" rows="4" maxlength="240" placeholder="Ex.: Estudei 30 minutos para a prova de História." style="
+            width:100%;box-sizing:border-box;resize:vertical;padding:13px;border-radius:12px;
+            border:1px solid rgba(29,40,51,.14);background:#fff;font-family:'Nunito';font-size:13px;
+            color:#1d2833;outline:none;
+          "></textarea>
+
+          <div style="display:flex;justify-content:flex-end;gap:9px;margin-top:16px;">
+            <button id="prismaEvolutionCancel" type="button" style="
+              border:0;background:transparent;padding:10px 13px;border-radius:10px;
+              font-family:'Nunito';font-weight:700;cursor:pointer;color:#68727c;
+            ">Cancelar</button>
+            <button id="prismaEvolutionSave" type="button" style="
+              border:0;background:#C51F5D;color:#fff;padding:11px 16px;border-radius:12px;
+              font-family:'Nunito';font-weight:800;cursor:pointer;box-shadow:0 8px 20px rgba(197,31,93,.22);
+            ">Registrar evolução</button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    const close = ()=>{
+      modal.style.display='none';
+      const field=document.getElementById('prismaEvolutionText');
+      if(field) field.value='';
+    };
+
+    document.getElementById('prismaEvolutionClose').onclick = close;
+    document.getElementById('prismaEvolutionCancel').onclick = close;
+    document.getElementById('prismaEvolutionBackdrop').addEventListener('click', e=>{
+      if(e.target.id==='prismaEvolutionBackdrop') close();
+    });
+
+    document.getElementById('prismaEvolutionSave').onclick = async ()=>{
+      const field = document.getElementById('prismaEvolutionText');
+      const category = document.getElementById('prismaEvolutionCategory').value;
+      const textValue = (field.value || '').trim();
+      if(!textValue){
+        field.focus();
+        return;
+      }
+
+      evolutionLogs.unshift({
+        id: Date.now(),
+        category,
+        text: textValue,
+        createdAt: new Date().toISOString()
+      });
+
+      evolutionLogs = evolutionLogs.slice(0, 100);
+      await saveEvolutionLogs();
+      close();
+      renderPrismaHome();
+      showToast('✨ Evolução registrada!');
+    };
+  }
+
+  modal.style.display='block';
+  setTimeout(()=>{
+    const field=document.getElementById('prismaEvolutionText');
+    if(field) field.focus();
+  },50);
+}
+
+/* ============================================================
+   PRISMA — HOME / VISÃO DA JORNADA
+============================================================ */
+function renderPrismaHome(){
+  const home = document.getElementById('page-inicio');
+  const anchor = document.getElementById('nextClassCard');
+  if(!home || !anchor) return;
+
+  let box = document.getElementById('prismaJourneyCard');
+
+  const courseStats = Object.values(courseProgress || {});
+  const courseTotal = courseStats.reduce((sum,p)=>sum + (p.aulasTotal||0) + (p.ativTotal||0), 0);
+  const courseDone = courseStats.reduce((sum,p)=>sum + (p.aulas||0) + (p.ativ||0), 0);
+  const studyPct = courseTotal ? Math.round((courseDone/courseTotal)*100) : 0;
+
+  const pendingTasks = (quickTasks || []).filter(t=>!t.done).length;
+  const pendingAssignments = (assignments || []).filter(a=>{
+    const total = (a.milestones||[]).length;
+    const done = (a.milestones||[]).filter(m=>m.done).length;
+    return total ? done < total : true;
+  }).length;
+
+  const habitKeys = Object.keys(habitChecks || {});
+  const habitDone = habitKeys.filter(k=>habitChecks[k]).length;
+  const habitTotal = Math.max(1, (habitNames||[]).length * 7);
+  const habitPct = Math.round((habitDone/habitTotal)*100);
+
+  const activeReading = (readings||[]).filter(r=>r.status==='lendo').length;
+
+  const overall = Math.round(
+    (studyPct * 0.60) +
+    (Math.min(100, pendingTasks===0 ? 100 : Math.max(0, 100-pendingTasks*10)) * 0.15) +
+    (Math.min(100, pendingAssignments===0 ? 100 : Math.max(0, 100-pendingAssignments*8)) * 0.15) +
+    (habitPct * 0.10)
+  );
+
+  if(!box){
+    box = document.createElement('section');
+    box.id = 'prismaJourneyCard';
+    box.style.cssText = 'margin:0 0 18px;';
+    anchor.insertAdjacentElement('beforebegin', box);
+  }
+
+  box.innerHTML = `
+    <div style="
+      position:relative;overflow:hidden;border-radius:22px;padding:24px;
+      background:linear-gradient(135deg,#243447 0%,#3b1028 58%,#580E2A 100%);
+      border:1px solid rgba(243,243,237,.12);color:#F3F3ED;
+      box-shadow:0 18px 45px rgba(20,29,38,.16);
+    ">
+      <div style="position:absolute;width:180px;height:180px;border-radius:50%;right:-70px;top:-80px;background:rgba(197,31,93,.20);"></div>
+      <div style="position:relative;z-index:1;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;">
+          <div>
+            <div style="font-family:'JetBrains Mono';font-size:10px;letter-spacing:.10em;text-transform:uppercase;color:#DC2368;margin-bottom:5px;">
+              ✦ SUA JORNADA
+            </div>
+        <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;">
+          <div>
+            <div style="font-family:'Baloo 2';font-size:28px;font-weight:700;line-height:1.05;">Como está sua evolução?</div>
+            <div style="font-size:12.5px;color:rgba(243,243,237,.68);margin-top:6px;">
+              Pequenos passos também constroem grandes mudanças.
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <button type="button" onclick="openEvolutionModal()" style="
+              border:1px solid rgba(243,243,237,.18);background:rgba(243,243,237,.09);color:#F3F3ED;
+              padding:10px 13px;border-radius:12px;font-family:'Nunito';font-size:12px;font-weight:800;cursor:pointer;
+            ">＋ Registrar evolução</button>
+            <div style="font-family:'JetBrains Mono';font-size:28px;font-weight:700;">${overall}%</div>
+          </div>
+        </div>
+        <div style="height:8px;background:rgba(243,243,237,.12);border-radius:99px;overflow:hidden;margin:18px 0 16px;">
+          <div style="height:100%;width:${overall}%;background:linear-gradient(90deg,#DC2368,#D36991);border-radius:99px;transition:width .4s ease;"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;">
+          <div style="background:rgba(243,243,237,.07);border-radius:13px;padding:11px;">
+            <div style="font-size:17px;">🎯</div>
+            <div style="font-family:'JetBrains Mono';font-size:16px;font-weight:700;margin-top:3px;">${pendingTasks + pendingAssignments}</div>
+            <div style="font-size:10px;color:rgba(243,243,237,.62);">pendências</div>
+          </div>
+          <div style="background:rgba(243,243,237,.07);border-radius:13px;padding:11px;">
+            <div style="font-size:17px;">📚</div>
+            <div style="font-family:'JetBrains Mono';font-size:16px;font-weight:700;margin-top:3px;">${studyPct}%</div>
+            <div style="font-size:10px;color:rgba(243,243,237,.62);">estudos</div>
+          </div>
+          <div style="background:rgba(243,243,237,.07);border-radius:13px;padding:11px;">
+            <div style="font-size:17px;">🔥</div>
+            <div style="font-family:'JetBrains Mono';font-size:16px;font-weight:700;margin-top:3px;">${habitDone}</div>
+            <div style="font-size:10px;color:rgba(243,243,237,.62);">hábitos marcados</div>
+          </div>
+          <div style="background:rgba(243,243,237,.07);border-radius:13px;padding:11px;">
+            <div style="font-size:17px;">📖</div>
+            <div style="font-family:'JetBrains Mono';font-size:16px;font-weight:700;margin-top:3px;">${activeReading}</div>
+            <div style="font-size:10px;color:rgba(243,243,237,.62);">leituras ativas</div>
+          </div>
+        </div>
+        ${evolutionLogs.length ? `
+          <div style="margin-top:14px;padding-top:13px;border-top:1px solid rgba(243,243,237,.10);font-size:11px;color:rgba(243,243,237,.72);">
+            <span style="font-family:'JetBrains Mono';font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:rgba(243,243,237,.48);">Último registro</span>
+            <div style="margin-top:5px;color:#F3F3ED;">${evolutionLogs[0].text}</div>
+          </div>
+        ` : ''}
+      </div>
+    </div>
+  `;
+}
+
 /* ============================================================
    INIT
 ============================================================ */
@@ -1500,3 +1761,7 @@ loadLeitTasks();
 loadLeitNotes();
 
 initWorkspace();
+
+loadUserName();
+renderPrismaHome();
+loadEvolutionLogs().then(()=>renderPrismaHome());
