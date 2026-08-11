@@ -1,0 +1,315 @@
+
+/* ============================================================
+   PRISMA — RESPONSIVE LAYOUT
+   Camada separada do CSS principal.
+   Não apagar/substituir o styles.css original.
+============================================================ */
+
+/* TABLET */
+@media (max-width: 980px){
+  main{
+    padding:22px 24px 55px;
+  }
+
+  .grid2,
+  .grid3{
+    gap:14px;
+  }
+
+  .topbar{
+    margin-bottom:20px;
+  }
+
+  .week-grid{
+    overflow-x:auto;
+    min-width:650px;
+  }
+
+  #page-materias{
+    overflow-x:auto;
+  }
+
+  .add-assignment{
+    grid-template-columns:1fr 1fr;
+  }
+}
+
+/* CELULAR */
+@media (max-width:700px){
+  html,body{
+    width:100%;
+    min-width:0;
+    overflow-x:hidden;
+  }
+
+  .app{
+    display:block;
+    min-height:100vh;
+  }
+
+  /* Sidebar vira navegação inferior */
+  .rail{
+    position:fixed;
+    z-index:900;
+    left:0;
+    right:0;
+    bottom:0;
+    width:100%;
+    height:72px;
+    padding:7px 8px calc(7px + env(safe-area-inset-bottom));
+    border-right:none;
+    border-top:1px solid var(--line);
+    flex-direction:row;
+    align-items:center;
+    justify-content:flex-start;
+    gap:5px;
+    overflow-x:auto;
+    overflow-y:hidden;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+  }
+
+  .rail::-webkit-scrollbar{
+    display:none;
+  }
+
+  .rail .brand{
+    display:none;
+  }
+
+  .rail button{
+    flex:0 0 58px;
+    width:58px;
+    height:58px;
+    border-radius:15px;
+    font-size:8.5px;
+    gap:2px;
+  }
+
+  .rail button svg{
+    width:18px;
+    height:18px;
+  }
+
+  main{
+    width:100%;
+    max-width:none;
+    padding:18px 14px calc(92px + env(safe-area-inset-bottom));
+  }
+
+  .page{
+    width:100%;
+    min-width:0;
+  }
+
+  .topbar{
+    align-items:flex-start;
+    gap:9px;
+    margin-bottom:18px;
+  }
+
+  .topbar h1{
+    font-size:24px;
+    line-height:1.08;
+  }
+
+  .topbar .sub{
+    font-size:12px;
+    line-height:1.35;
+  }
+
+  .topbar > div:first-child{
+    min-width:0;
+    flex:1;
+  }
+
+  .topbar > div:last-child{
+    flex-wrap:wrap;
+  }
+
+  .grid2,
+  .grid3{
+    grid-template-columns:1fr !important;
+    gap:12px;
+  }
+
+  .card{
+    padding:16px;
+    border-radius:16px;
+  }
+
+  .card h2{
+    font-size:16px;
+  }
+
+  /* Próxima aula */
+  .next-class{
+    padding:16px;
+    gap:12px;
+    border-radius:16px;
+  }
+
+  .next-class .icon{
+    width:44px;
+    height:44px;
+    border-radius:13px;
+    font-size:19px;
+  }
+
+  .next-class .info h3{
+    font-size:17px;
+  }
+
+  .next-class .info p{
+    font-size:11.5px;
+  }
+
+  /* Visão da jornada criada pelo app.js */
+  #prismaJourneyCard{
+    margin-bottom:14px !important;
+  }
+
+  #prismaJourneyCard > div{
+    padding:18px !important;
+    border-radius:18px !important;
+  }
+
+  #prismaJourneyCard [style*="grid-template-columns:repeat(4"]{
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+  }
+
+  /* Formulários */
+  .qt-add,
+  .habit-add,
+  .playlist-input-row{
+    width:100%;
+  }
+
+  .add-assignment{
+    grid-template-columns:1fr !important;
+  }
+
+  .add-assignment input,
+  .add-assignment select,
+  .add-assignment button{
+    width:100%;
+    min-width:0;
+  }
+
+  /* Grade de horários */
+  #page-materias{
+    overflow-x:hidden;
+  }
+
+  #weekGrid{
+    overflow-x:auto;
+    min-width:650px;
+    max-width:calc(100vw - 28px);
+  }
+
+  /* Calendário */
+  .cal-grid{
+    gap:3px;
+  }
+
+  .cal-day{
+    font-size:10.5px;
+  }
+
+  /* Anotações */
+  .notes-toolbar{
+    align-items:stretch;
+  }
+
+  .notes-toolbar select,
+  .notes-toolbar button{
+    min-height:40px;
+  }
+
+  .note-form{
+    padding:12px;
+  }
+
+  .note-form-row{
+    flex-direction:column;
+    align-items:stretch;
+  }
+
+  .note-form-row select,
+  .note-form-row button{
+    width:100%;
+  }
+
+  .notes-grid{
+    grid-template-columns:1fr;
+  }
+
+  /* Playlist */
+  .playlist-input-row{
+    flex-direction:column;
+  }
+
+  .playlist-input-row input,
+  .playlist-input-row button{
+    width:100%;
+  }
+
+  .playlist-frame-wrap iframe{
+    height:250px;
+  }
+
+  /* Hábitos */
+  #page-habitos .card{
+    overflow-x:auto;
+  }
+
+  .habit-table{
+    min-width:620px;
+  }
+
+  /* Modais */
+  .switcher-overlay,
+  .item-modal-overlay{
+    padding:12px;
+  }
+
+  .switcher-modal,
+  .item-modal{
+    max-height:calc(100vh - 24px);
+    overflow-y:auto;
+    border-radius:18px;
+  }
+
+  .switcher-grid{
+    grid-template-columns:1fr;
+  }
+
+  /* Toast acima da barra inferior */
+  #toastHost{
+    left:14px;
+    right:14px;
+    bottom:calc(84px + env(safe-area-inset-bottom));
+    align-items:stretch;
+  }
+
+  .toast{
+    max-width:none;
+  }
+}
+
+/* CELULARES PEQUENOS */
+@media (max-width:380px){
+  main{
+    padding-left:11px;
+    padding-right:11px;
+  }
+
+  .rail button{
+    flex-basis:54px;
+    width:54px;
+  }
+
+  .topbar h1{
+    font-size:22px;
+  }
+}
