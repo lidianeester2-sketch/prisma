@@ -115,6 +115,15 @@
         </div>
       </div>
 
+      <!-- Prisma Mobile: os blocos abaixo são reorganizados em telas horizontais no celular. -->
+      <div id="homeMobileCarousel" class="home-mobile-carousel" aria-label="Resumo do Prisma">
+        <div class="home-mobile-panel" data-home-panel="journey" id="homePanelJourney"></div>
+        <div class="home-mobile-panel" data-home-panel="today" id="homePanelToday"></div>
+        <div class="home-mobile-panel" data-home-panel="deadlines" id="homePanelDeadlines"></div>
+        <div class="home-mobile-panel" data-home-panel="habits" id="homePanelHabits"></div>
+        <div class="home-mobile-panel" data-home-panel="playlist" id="homePanelPlaylist"></div>
+      </div>
+
       <div id="nextClassCard" class="next-class">
         <div class="icon">📚</div>
         <div class="info">
@@ -484,6 +493,119 @@
 </div>
 
 <script src="js/app.js"></script>
+
+<script>
+/* ============================================================
+   PRISMA MOBILE SHELL
+   Mantém os mesmos IDs/funcionalidades e apenas reorganiza a
+   Home em telas horizontais no celular.
+============================================================ */
+(function(){
+  function buildMobileHome(){
+    const page = document.getElementById('page-inicio');
+    const carousel = document.getElementById('homeMobileCarousel');
+    if(!page || !carousel || carousel.dataset.ready === '1') return;
+
+    const journey = document.getElementById('prismaJourneyCard');
+    const next = document.getElementById('nextClassCard');
+    const grids = page.querySelectorAll(':scope > .grid2');
+    const firstGrid = grids[0];
+    const secondGrid = grids[1];
+
+    if(!next || !firstGrid || !secondGrid) return;
+
+    const quick = firstGrid.children[0];
+    const deadlines = firstGrid.children[1];
+    const habits = secondGrid.children[0];
+    const playlist = secondGrid.children[1];
+
+    if(journey) document.getElementById('homePanelJourney').appendChild(journey);
+
+    const today = document.getElementById('homePanelToday');
+    today.appendChild(next);
+    if(quick) today.appendChild(quick);
+
+    const deadlinePanel = document.getElementById('homePanelDeadlines');
+    if(deadlines) deadlinePanel.appendChild(deadlines);
+
+    const habitPanel = document.getElementById('homePanelHabits');
+    if(habits) habitPanel.appendChild(habits);
+
+    const playlistPanel = document.getElementById('homePanelPlaylist');
+    if(playlist) playlistPanel.appendChild(playlist);
+
+    firstGrid.remove();
+    secondGrid.remove();
+
+    carousel.dataset.ready = '1';
+    updateHomeDots();
+  }
+
+  function updateHomeDots(){
+    const c = document.getElementById('homeMobileCarousel');
+    if(!c) return;
+    let dots = document.getElementById('homeMobileDots');
+    if(!dots){
+      dots = document.createElement('div');
+      dots.id = 'homeMobileDots';
+      dots.className = 'home-mobile-dots';
+      dots.innerHTML = '<span class="on"></span><span></span><span></span><span></span><span></span>';
+      c.after(dots);
+    }
+    const panels = c.querySelectorAll('.home-mobile-panel');
+    const update = ()=>{
+      const index = Math.round(c.scrollLeft / Math.max(1, c.clientWidth));
+      dots.querySelectorAll('span').forEach((d,i)=>d.classList.toggle('on', i===index));
+    };
+    c.addEventListener('scroll', update, {passive:true});
+    update();
+  }
+
+  function addDesktopCollapse(){
+    const rail = document.querySelector('.rail');
+    if(!rail || document.getElementById('railCollapseBtn')) return;
+    const btn = document.createElement('button');
+    btn.id = 'railCollapseBtn';
+    btn.type = 'button';
+    btn.className = 'rail-collapse-btn';
+    btn.title = 'Minimizar navegação';
+    btn.setAttribute('aria-label','Minimizar navegação');
+    btn.innerHTML = '<span>‹</span><b>Minimizar</b>';
+    rail.appendChild(btn);
+    btn.addEventListener('click', ()=>{
+      document.querySelector('.app')?.classList.toggle('rail-collapsed');
+      const collapsed = document.querySelector('.app')?.classList.contains('rail-collapsed');
+      btn.title = collapsed ? 'Expandir navegação' : 'Minimizar navegação';
+      btn.setAttribute('aria-label', btn.title);
+      btn.querySelector('span').textContent = collapsed ? '›' : '‹';
+      const label = btn.querySelector('b');
+      if(label) label.textContent = collapsed ? 'Expandir' : 'Minimizar';
+    });
+  }
+
+  function init(){
+    buildMobileHome();
+    addDesktopCollapse();
+
+    /* A Jornada é criada dinamicamente pelo app.js. Observamos a Home
+       até ela aparecer, sem alterar a lógica do aplicativo. */
+    const page = document.getElementById('page-inicio');
+    if(page && !document.getElementById('prismaJourneyCard')){
+      const observer = new MutationObserver(()=>{
+        if(document.getElementById('prismaJourneyCard')){
+          buildMobileHome();
+          observer.disconnect();
+        }
+      });
+      observer.observe(page,{childList:true,subtree:true});
+      setTimeout(()=>observer.disconnect(),5000);
+    }
+  }
+
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
+</script>
 
 </body>
 </html>
