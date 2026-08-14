@@ -109,50 +109,90 @@
     <!-- ============ INÍCIO ============ -->
     <section class="page active" id="page-inicio">
       <div class="topbar">
-        <div><h1 id="userGreeting">Bom dia</h1><div class="sub">Aqui está o resumo do seu semestre hoje.</div></div>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <div class="chip-today" id="syncStatus" style="color:var(--gold-dk);">☁️ conectando...</div>
-          <div class="chip-today" id="todayChip">—</div>
-        </div>
-      </div>
-
-      <div id="nextClassCard" class="next-class">
-        <div class="icon">📚</div>
-        <div class="info">
-          <div class="label">Próxima aula</div>
-          <h3 id="nextClassName">—</h3>
-          <p id="nextClassWhen">—</p>
-        </div>
-      </div>
-
-      <div class="grid2">
-        <div class="card">
-          <h2>Tarefas rápidas de hoje</h2>
-          <p class="card-sub">Coisas pequenas — leituras, e-mails, recados.</p>
-          <div class="qt-add">
-            <input type="text" id="qtInput" placeholder="Adicionar tarefa rápida...">
-            <button id="qtAddBtn">+</button>
+        <div><h1 id="userGreeting">Bom dia</h1><div class="sub">Aqui está o resumo do seu semestre hoje.</div>
+      <div class="home-carousel" id="homeCarousel" aria-label="Resumo do Prisma">
+        <div class="home-slide home-slide-journey" data-slide-label="Sua jornada">
+          <div class="home-slide-inner" id="journeySlideInner">
+            <div class="home-slide-kicker">✦ DESLIZE PARA CONTINUAR</div>
           </div>
-          <div class="qt-list" id="qtList"></div>
         </div>
 
-        <div class="card">
-          <h2>Prazos mais próximos</h2>
-          <p class="card-sub">Seus 3 trabalhos/provas mais urgentes.</p>
-          <div id="miniDeadlines"></div>
+        <div class="home-slide" data-slide-label="Hoje">
+          <div class="home-slide-inner">
+            <div class="home-slide-heading">Hoje</div>
+            <div class="home-slide-sub">O que importa agora.</div>
+            <div class="home-slide-stack">
+              <div id="mobileNextClassSlot"></div>
+              <div class="card home-mobile-card" id="mobileQuickTasksSlot"></div>
+            </div>
+          </div>
         </div>
-      </div>
 
-      <div class="grid2" style="margin-top:18px;">
-        <div class="card">
-          <h2>Hábitos de hoje</h2>
-          <p class="card-sub">Marcar rapidinho — o detalhe completo fica na aba Hábitos.</p>
-          <div class="qt-list" id="habitToday"></div>
+        <div class="home-slide" data-slide-label="Prazos">
+          <div class="home-slide-inner">
+            <div class="home-slide-heading">Seus próximos passos</div>
+            <div class="home-slide-sub">O que merece sua atenção.</div>
+            <div class="card home-mobile-card" id="mobileDeadlinesSlot"></div>
+          </div>
         </div>
-        <div class="card">
-          <h2>Playlist para estudar</h2>
-          <p class="card-sub">Sua trilha sonora favorita, sempre à mão.</p>
-          <div id="playlistMini"></div>
+
+        <div class="home-slide" data-slide-label="Hábitos">
+          <div class="home-slide-inner">
+            <div class="home-slide-heading">Sua consistência</div>
+            <div class="home-slide-sub">Pequenos hábitos constroem grandes mudanças.</div>
+            <div class="card home-mobile-card" id="mobileHabitsSlot"></div>
+          </div>
+        </div>
+
+        <div class="home-slide" data-slide-label="Playlist">
+          <div class="home-slide-inner">
+            <div class="home-slide-heading">Sua trilha sonora</div>
+            <div class="home-slide-sub">Estude no seu ritmo.</div>
+            <div class="card home-mobile-card" id="mobilePlaylistSlot"></div>
+          </div>
+        </div>
+
+        <!-- Conteúdo original: preservado para desktop e como fonte dos componentes -->
+        <div class="home-original-content" id="homeOriginalContent">
+          <div id="nextClassCard" class="next-class">
+            <div class="icon">📚</div>
+            <div class="info">
+              <div class="label">Próxima aula</div>
+              <h3 id="nextClassName">—</h3>
+              <p id="nextClassWhen">—</p>
+            </div>
+          </div>
+
+          <div class="grid2">
+            <div class="card">
+              <h2>Tarefas rápidas de hoje</h2>
+              <p class="card-sub">Coisas pequenas — leituras, e-mails, recados.</p>
+              <div class="qt-add">
+                <input type="text" id="qtInput" placeholder="Adicionar tarefa rápida...">
+                <button id="qtAddBtn">+</button>
+              </div>
+              <div class="qt-list" id="qtList"></div>
+            </div>
+
+            <div class="card">
+              <h2>Prazos mais próximos</h2>
+              <p class="card-sub">Seus 3 trabalhos/provas mais urgentes.</p>
+              <div id="miniDeadlines"></div>
+            </div>
+          </div>
+
+          <div class="grid2" style="margin-top:18px;">
+            <div class="card">
+              <h2>Hábitos de hoje</h2>
+              <p class="card-sub">Marcar rapidinho — o detalhe completo fica na aba Hábitos.</p>
+              <div class="qt-list" id="habitToday"></div>
+            </div>
+            <div class="card">
+              <h2>Playlist para estudar</h2>
+              <p class="card-sub">Sua trilha sonora favorita, sempre à mão.</p>
+              <div id="playlistMini"></div>
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -483,6 +523,76 @@
     </div>
   </div>
 </div>
+
+
+<script>
+(function(){
+  const carousel = document.getElementById('homeCarousel');
+  if(!carousel) return;
+
+  function moveContent(){
+    const original = document.getElementById('homeOriginalContent');
+    const journey = document.getElementById('prismaJourneyCard');
+    const next = document.getElementById('nextClassCard');
+    const quick = document.getElementById('qtInput')?.closest('.card');
+    const deadlines = document.getElementById('miniDeadlines')?.closest('.card');
+    const habits = document.getElementById('habitToday')?.closest('.card');
+    const playlist = document.getElementById('playlistMini')?.closest('.card');
+
+    if(!original || !next || !quick || !deadlines || !habits || !playlist) return;
+
+    const journeyInner = document.getElementById('journeySlideInner');
+    const nextSlot = document.getElementById('mobileNextClassSlot');
+    const quickSlot = document.getElementById('mobileQuickTasksSlot');
+    const deadlineSlot = document.getElementById('mobileDeadlinesSlot');
+    const habitSlot = document.getElementById('mobileHabitsSlot');
+    const playlistSlot = document.getElementById('mobilePlaylistSlot');
+
+    if(journey && journey.parentElement !== journeyInner) journeyInner.appendChild(journey);
+    if(next.parentElement !== nextSlot) nextSlot.appendChild(next);
+    if(quick.parentElement !== quickSlot) quickSlot.appendChild(quick);
+    if(deadlines.parentElement !== deadlineSlot) deadlineSlot.appendChild(deadlines);
+    if(habits.parentElement !== habitSlot) habitSlot.appendChild(habits);
+    if(playlist.parentElement !== playlistSlot) playlistSlot.appendChild(playlist);
+
+    if(original.childElementCount === 0) original.remove();
+  }
+
+  function setupDots(){
+    if(document.getElementById('homeDots')) return;
+    const dots = document.createElement('div');
+    dots.id='homeDots';
+    dots.className='home-dots';
+    const slides=[...carousel.querySelectorAll('.home-slide')];
+    slides.forEach((_,i)=>{
+      const b=document.createElement('button');
+      b.type='button';
+      b.setAttribute('aria-label','Ir para tela '+(i+1));
+      b.addEventListener('click',()=>slides[i].scrollIntoView({behavior:'smooth',inline:'start'}));
+      dots.appendChild(b);
+    });
+    carousel.parentElement.appendChild(dots);
+
+    const io=new IntersectionObserver(entries=>{
+      entries.forEach(e=>{
+        if(e.isIntersecting){
+          const i=slides.indexOf(e.target);
+          [...dots.children].forEach((d,j)=>d.classList.toggle('active',i===j));
+        }
+      });
+    },{root:carousel,threshold:.65});
+    slides.forEach(s=>io.observe(s));
+  }
+
+  function init(){
+    moveContent();
+    setupDots();
+  }
+
+  window.addEventListener('load', init);
+  setTimeout(init, 1200);
+})();
+</script>
 
 <script src="js/app.js"></script>
 
