@@ -1,7 +1,7 @@
 /* ============================================================
    DADOS BASE
 ============================================================ */
-const subjects = [
+const defaultSubjects = [
   {code:'VIV0106', name:'Inovação e Empreendedorismo', day:'Sexta', dayIdx:4, time:'20:50–22:30', bg:'var(--c-yellow-bg)', fg:'var(--c-yellow-fg)', icon:'💡', type:'presencial'},
   {code:'VIV0481', name:'Profissões em Comunicação', day:'Terça', dayIdx:1, time:'19:00–20:40', bg:'var(--c-mint-bg)', fg:'var(--c-mint-fg)', icon:'🎙️', type:'presencial'},
   {code:'VIV0727', name:'História da Mídia', day:'Quarta', dayIdx:2, time:'19:00–20:40', bg:'var(--c-pink-bg)', fg:'var(--c-pink-fg)', icon:'📺', type:'presencial'},
@@ -9,6 +9,8 @@ const subjects = [
   {code:'ARA6403', name:'LABVIDA Publicidade e Propaganda 1', day:'—', dayIdx:null, time:'On-line', bg:'var(--c-lav-bg)', fg:'var(--c-lav-fg)', icon:'🎨', type:'online'},
   {code:'ARA1739', name:'Língua Portuguesa', day:'—', dayIdx:null, time:'On-line', bg:'var(--c-peach-bg)', fg:'var(--c-peach-fg)', icon:'📖', type:'online'},
 ];
+let subjects = JSON.parse(JSON.stringify(defaultSubjects));
+let archivedSubjects = [];
 
 const events = [
   ['2026-04-03','feriado','Sexta-feira Santa'],
@@ -63,25 +65,6 @@ const monthAbbr = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
 function fmtDDMM(iso){ const [y,m,d]=iso.split('-'); return `${d}/${m}`; }
 function escapeHtml(s){ const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
-async function loadUserName(){
-  try{
-    const r = await remoteStorage.get('user-name');
-    let name = r && r.value ? String(r.value).trim() : '';
-
-    if(!name){
-      name = prompt('Como podemos chamar você?')?.trim() || '';
-      if(name) await remoteStorage.set('user-name', name);
-    }
-
-    const greeting = document.getElementById('userGreeting');
-    if(greeting) greeting.textContent = name ? `Bom dia, ${name}` : 'Bom dia';
-  }catch(err){
-    console.error('Erro ao carregar nome do usuário:', err);
-    const greeting = document.getElementById('userGreeting');
-    if(greeting) greeting.textContent = 'Bom dia';
-  }
-}
-
 function todayISO(){ return new Date().toISOString().slice(0,10); }
 
 /* ============================================================
@@ -141,10 +124,105 @@ document.querySelectorAll('.rail button').forEach(btn=>{
   });
 });
 
-(function(){
+/* ============================================================
+   SAUDAÇÃO + PERSONALIDADE DO PRISMA
+============================================================ */
+const prismaPhrases = [
+  'Bom dia. Infelizmente, o semestre continua.',
+  'Você abriu o Prisma. Isso já conta como planejamento.',
+  'Seu futuro agradece. Seu presente queria estar dormindo.',
+  'Mais um dia fingindo que temos controle da situação.',
+  'Respira. A planilha não vai se preencher sozinha.',
+  'Tudo sob controle. Exceto aquilo que claramente não está.',
+  'Você não veio até aqui para entregar qualquer coisa.',
+  'Hoje você tem duas opções: fazer ou continuar pensando em fazer.',
+  'O caos pode até existir. Mas aqui ele tem calendário.',
+  'Não precisa dominar o mundo hoje. Só a próxima tarefa.',
+  'Faça direito. Depois você reclama.',
+  'Você vai conseguir. E depois vai fazer com que as pessoas achem que foi fácil.',
+  'Você pediu uma vida organizada. Agora aguenta.',
+  'Bom dia. Seu café ainda não está cadastrado no sistema.',
+  'Você estudou. Ou pelo menos abriu o material.',
+  'Mais uma oportunidade de descobrir que o trabalho era para hoje.',
+  'Seu semestre mandou lembranças. E alguns prazos.',
+  'A faculdade não vai se formar sozinha.',
+  'Parabéns por abrir o aplicativo antes do colapso.',
+  'Vamos descobrir o que está pegando fogo hoje.',
+  'Você não está atrasada. Está trabalhando com uma margem estratégica questionável.',
+  'Produtividade é fazer a coisa certa antes de começar outra coisa completamente diferente.',
+  'O plano perfeito continua sendo inferior ao plano que você realmente executa.',
+  'Organizar a vida não resolve tudo. Mas deixa o caos mais apresentável.',
+  'Seu cérebro pediu férias. Seu calendário abriu uma reunião.',
+  'Não é procrastinação se você estiver organizando a procrastinação.',
+  'Aparentemente, ter um plano não impede imprevistos. Quem diria.',
+  'Tudo parece mais administrável quando está em cards bonitos.',
+  'Boa noite. Sobreviver ao dia também foi uma entrega.',
+  'Encerrando o expediente. O cérebro já pediu demissão.',
+  'Hoje acabou. Amanhã a gente finge que começa renovada.',
+  'Você fez o que deu. O que não deu fica para a versão de amanhã.',
+  'Boa noite. O prazo continua lá amanhã, infelizmente. Mas por enquanto, vamos resolver o que der.',
+  'Hora de descansar antes que você comece a estudar por culpa.',
+  'Bem-vinda de volta. Temos algumas coisas para resolver.',
+  'Prisma online. Sua organização está oficialmente sob supervisão.',
+  'Tudo bem. O Prisma está aqui. Pode parar de fingir que lembra de tudo.',
+  'Você trouxe os problemas. Eu trouxe os cards.',
+  'Vamos transformar esse caos em alguma coisa apresentável.',
+  'Prisma aberto. Agora parece que existe um plano.',
+  'Hora de pensar o que o Naruto faria...',
+  'Taylor Swift ficaria orgulhosa!'
+];
+
+function prismaRandomPhrase(){
+  let phrase = randomFrom(prismaPhrases);
+  try{
+    const last = localStorage.getItem('prisma-last-phrase');
+    if(prismaPhrases.length > 1 && phrase === last){
+      do { phrase = randomFrom(prismaPhrases); } while(phrase === last);
+    }
+    localStorage.setItem('prisma-last-phrase', phrase);
+  }catch(err){}
+  return phrase;
+}
+
+function updatePrismaGreeting(name=''){
   const now = new Date();
-  document.getElementById('todayChip').textContent = 'Hoje · ' + now.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric'});
-})();
+  const hour = now.getHours();
+  let greeting;
+
+  if(hour >= 5 && hour < 12) greeting = 'Bom dia';
+  else if(hour >= 12 && hour < 18) greeting = 'Boa tarde';
+  else greeting = 'Boa noite';
+
+  const greetingEl = document.getElementById('userGreeting');
+  if(greetingEl) greetingEl.textContent = name ? `${greeting}, ${name}!` : greeting;
+
+  const phraseEl = document.getElementById('dailyPhrase');
+  if(phraseEl) phraseEl.textContent = prismaRandomPhrase();
+
+  const todayEl = document.getElementById('todayChip');
+  if(todayEl){
+    todayEl.textContent = 'Hoje · ' + now.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric'});
+  }
+}
+
+async function loadPrismaGreeting(){
+  let name = '';
+  try{
+    const saved = await remoteStorage.get('user-name');
+    name = saved && saved.value ? String(saved.value).trim() : '';
+
+    if(!name){
+      name = (prompt('Como podemos chamar você?') || '').trim();
+      if(name) await remoteStorage.set('user-name', name);
+    }
+  }catch(err){
+    console.error('Erro ao carregar nome do usuário:', err);
+  }
+
+  updatePrismaGreeting(name);
+}
+
+loadPrismaGreeting();
 
 /* ============================================================
    SELETOR DE PAINÉIS (WORKSPACES)
@@ -206,17 +284,204 @@ const dynPaletteBg = ['var(--c-yellow-bg)','var(--c-mint-bg)','var(--c-pink-bg)'
 const dynPaletteFg = ['var(--c-yellow-fg)','var(--c-mint-fg)','var(--c-pink-fg)','var(--c-sky-fg)','var(--c-lav-fg)','var(--c-peach-fg)'];
 function dynColor(idx){ return {bg:dynPaletteBg[idx%6], fg:dynPaletteFg[idx%6]}; }
 
+
+/* ============================================================
+   MATÉRIAS — cadastro e arquivamento
+============================================================ */
+async function loadSubjects(){
+  try{
+    const r = await remoteStorage.get('subjects-list');
+    subjects = r ? JSON.parse(r.value) : JSON.parse(JSON.stringify(defaultSubjects));
+    const ar = await remoteStorage.get('subjects-archived');
+    archivedSubjects = ar ? JSON.parse(ar.value) : [];
+  }catch(e){
+    subjects = JSON.parse(JSON.stringify(defaultSubjects));
+    archivedSubjects = [];
+  }
+}
+async function saveSubjects(){
+  try{ await remoteStorage.set('subjects-list', JSON.stringify(subjects)); }catch(e){}
+}
+async function saveArchivedSubjects(){
+  try{ await remoteStorage.set('subjects-archived', JSON.stringify(archivedSubjects)); }catch(e){}
+}
+function newSubjectProgress(aulasTotal=null, ativTotal=null){
+  return {
+    aulas:0,
+    aulasTotal:Number.isFinite(Number(aulasTotal)) && Number(aulasTotal)>=0 ? Number(aulasTotal) : null,
+    ativ:0,
+    ativTotal:Number.isFinite(Number(ativTotal)) && Number(ativTotal)>=0 ? Number(ativTotal) : null,
+    updated:0,
+    lastAction:null
+  };
+}
+
+function parseSubjectTotal(value, label){
+  const v = String(value ?? '').trim().toLowerCase();
+  if(v === '' || v === 'não sei' || v === 'nao sei' || v === 'n/a' || v === '?') return null;
+  const n = Number(v);
+  if(!Number.isInteger(n) || n < 0){
+    showToast(`Informe um número válido para ${label} ou escolha “não sei”.`);
+    return undefined;
+  }
+  return n;
+}
+async function addSubject(){
+  const name = prompt('Nome da nova matéria:');
+  if(!name || !name.trim()) return;
+
+  const codeInput = prompt('Código da matéria (opcional):');
+  const code = (codeInput && codeInput.trim()
+    ? codeInput.trim().toUpperCase()
+    : 'MAT-'+Date.now().toString().slice(-4));
+
+  if(subjects.some(s=>s.code===code)){
+    showToast('Já existe uma matéria com esse código.');
+    return;
+  }
+
+  const aulasInput = prompt('Quantas aulas essa matéria terá no semestre?\n\nDigite um número ou “não sei”.');
+  if(aulasInput === null) return;
+  const aulasTotal = parseSubjectTotal(aulasInput, 'aulas');
+  if(aulasTotal === undefined) return;
+
+  const ativInput = prompt('Quantas atividades essa matéria terá no semestre?\n\nDigite um número ou “não sei”.');
+  if(ativInput === null) return;
+  const ativTotal = parseSubjectTotal(ativInput, 'atividades');
+  if(ativTotal === undefined) return;
+
+  if(aulasTotal === null && ativTotal === null){
+    showToast('Você pode deixar os dois como “não sei”, mas o progresso percentual ficará indisponível até definir pelo menos um total.');
+  }
+  if(aulasTotal === 0 && ativTotal === 0){
+    showToast('Defina pelo menos 1 aula ou atividade, ou use “não sei”.');
+    return;
+  }
+
+  const online = confirm('É uma matéria on-line? Clique em OK para On-line ou Cancelar para presencial.');
+  const idx = subjects.length;
+  const color = dynColor(idx);
+
+  const subject = {
+    code,
+    name:name.trim(),
+    day:online?'—':'—',
+    dayIdx:null,
+    time:online?'On-line':'A definir',
+    bg:color.bg,
+    fg:color.fg,
+    icon:'📚',
+    type:online?'online':'presencial'
+  };
+
+  subjects.push(subject);
+  courseProgress[code] = newSubjectProgress(aulasTotal, ativTotal);
+
+  await saveSubjects();
+  await saveCourseProgress();
+
+  buildCourseGrid();
+  buildWeekGrid();
+  populateSubjectSelects();
+  renderProgressPage();
+  renderJourneyProgress();
+  showToast(`"${subject.name}" criada com ${aulasTotal} aula(s) e ${ativTotal} atividade(s). ✦`);
+}
+
+async function editSubject(code){
+  const subject = subjects.find(s=>s.code===code);
+  const p = courseProgress[code] || newSubjectProgress();
+  if(!subject) return;
+
+  const nameInput = prompt('Nome da matéria:', subject.name);
+  if(nameInput === null) return;
+  const name = nameInput.trim();
+  if(!name){ showToast('O nome da matéria não pode ficar vazio.'); return; }
+
+  const codeInput = prompt('Código da matéria:', subject.code);
+  if(codeInput === null) return;
+  const newCode = codeInput.trim().toUpperCase() || subject.code;
+  if(newCode !== subject.code && subjects.some(s=>s.code===newCode)){
+    showToast('Já existe uma matéria com esse código.'); return;
+  }
+
+  const aulasInput = prompt(`Quantas aulas? Atual: ${p.aulasTotal == null ? 'não sei' : p.aulasTotal}\n\nDigite um número ou “não sei”.`, p.aulasTotal == null ? 'não sei' : String(p.aulasTotal));
+  if(aulasInput === null) return;
+  const aulasTotal = parseSubjectTotal(aulasInput, 'aulas');
+  if(aulasTotal === undefined) return;
+  if(aulasTotal !== null && aulasTotal < p.aulas){
+    showToast(`O total de aulas não pode ser menor que ${p.aulas}, que já foram registradas.`); return;
+  }
+
+  const ativInput = prompt(`Quantas atividades? Atual: ${p.ativTotal == null ? 'não sei' : p.ativTotal}\n\nDigite um número ou “não sei”.`, p.ativTotal == null ? 'não sei' : String(p.ativTotal));
+  if(ativInput === null) return;
+  const ativTotal = parseSubjectTotal(ativInput, 'atividades');
+  if(ativTotal === undefined) return;
+  if(ativTotal !== null && ativTotal < p.ativ){
+    showToast(`O total de atividades não pode ser menor que ${p.ativ}, que já foram registradas.`); return;
+  }
+
+  subject.name = name;
+  subject.code = newCode;
+  if(newCode !== code){
+    delete courseProgress[code];
+    courseProgress[newCode] = p;
+  }
+  p.aulasTotal = aulasTotal;
+  p.ativTotal = ativTotal;
+  p.updated = Date.now();
+
+  await saveSubjects();
+  await saveCourseProgress();
+  buildCourseGrid();
+  buildWeekGrid();
+  populateSubjectSelects();
+  renderProgressPage();
+  renderJourneyProgress();
+  showToast(`“${subject.name}” atualizada. ✦`);
+}
+
+async function archiveCompletedSubject(code){
+  const subject = subjects.find(s=>s.code===code);
+  const p = courseProgress[code];
+  if(!subject || !p || progressPct(p) < 100) return;
+  if(!confirm(`Arquivar "${subject.name}"? Ela ficará fora das matérias ativas.`)) return;
+  archivedSubjects.push({...subject, archivedAt:Date.now()});
+  subjects = subjects.filter(s=>s.code!==code);
+  delete courseProgress[code];
+  await saveSubjects();
+  await saveArchivedSubjects();
+  await saveCourseProgress();
+  buildCourseGrid();
+  buildWeekGrid();
+  populateSubjectSelects();
+  renderProgressPage();
+  renderJourneyProgress();
+  showToast('Matéria arquivada. ✦');
+}
+
 /* ============================================================
    MATÉRIAS — cards + grade semanal
 ============================================================ */
 function buildCourseGrid(){
-  document.getElementById('courseGrid').innerHTML = subjects.map(s=>`
-    <div class="course-card" style="background:${s.bg};color:${s.fg};">
+  const cards = subjects.map(s=>{
+    const p = courseProgress[s.code] || newSubjectProgress();
+    const completed = progressHasKnownTotal(p) && progressPct(p) >= 100;
+    return `<div class="course-card" style="background:${s.bg};color:${s.fg};position:relative;">
+      <div style="position:absolute;top:10px;right:10px;display:flex;gap:5px;">
+        <button class="dyn-del" data-action="edit-subject" data-code="${escapeHtml(s.code)}" title="Editar matéria">✎</button>
+        ${completed ? `<button class="dyn-del" data-action="archive-subject" data-code="${escapeHtml(s.code)}" title="Arquivar matéria concluída">✕</button>` : ''}
+      </div>
       <div class="cc-icon">${s.icon}</div>
-      <h3>${s.name}</h3>
-      <div class="cc-meta">${s.code} · ${s.day!=='—' ? s.day+' '+s.time : s.time}</div>
-    </div>`).join('');
+      <h3>${escapeHtml(s.name)}</h3>
+      <div class="cc-meta">${escapeHtml(s.code)} · ${s.day!=='—' ? escapeHtml(s.day+' '+s.time) : escapeHtml(s.time)}</div>
+      <div style="margin-top:8px;font-size:11px;opacity:.8;">${escapeHtml(progressDisplay(p))}</div>
+      ${completed ? `<div style="margin-top:6px;font-size:11px;opacity:.8;">✓ concluída · toque em ✕ para arquivar</div>` : ''}
+    </div>`;
+  }).join('');
+  document.getElementById('courseGrid').innerHTML = cards + `<div class="add-item-card" id="subjectAddCard">＋ Registrar nova matéria</div>`;
 }
+
 function buildWeekGrid(){
   const grid = document.getElementById('weekGrid');
   const days = ['Seg','Ter','Qua','Qui','Sex'];
@@ -234,6 +499,23 @@ function buildWeekGrid(){
   });
   grid.innerHTML = html;
 }
+
+
+document.getElementById('courseGrid').addEventListener('click', async e=>{
+  const add = e.target.closest('#subjectAddCard');
+  if(add){ await addSubject(); return; }
+  const edit = e.target.closest('[data-action="edit-subject"]');
+  if(edit){ await editSubject(edit.dataset.code); return; }
+  const btn = e.target.closest('[data-action="archive-subject"]');
+  if(btn){ await archiveCompletedSubject(btn.dataset.code); }
+});
+
+
+document.getElementById('subjectAddTopBtn')?.addEventListener('click', addSubject);
+document.getElementById('progressAddBtn')?.addEventListener('click', ()=>{
+  document.querySelector('.rail button[data-page="progresso"]')?.click();
+  setTimeout(()=>showToast('Escolha uma matéria e registre aula ou atividade. ✦'), 100);
+});
 
 /* próxima aula */
 function computeNextClass(){
@@ -278,8 +560,7 @@ let quickTasks = [];
 async function loadQuickTasks(){
   try{ const r = await remoteStorage.get('quicktasks'); quickTasks = r? JSON.parse(r.value):[]; }
   catch(e){ quickTasks = []; }
-  renderQuickTasks();
-  renderPrismaHome();
+  renderQuickTasks(); renderJourneyProgress();
 }
 async function saveQuickTasks(){
   try{ await remoteStorage.set('quicktasks', JSON.stringify(quickTasks)); }catch(e){}
@@ -301,7 +582,7 @@ document.getElementById('qtAddBtn').addEventListener('click', async ()=>{
   if(!text) return;
   quickTasks.push({id:uid(), text, done:false});
   input.value='';
-  renderQuickTasks(); await saveQuickTasks();
+  renderQuickTasks(); renderJourneyProgress(); await saveQuickTasks();
 });
 document.getElementById('qtInput').addEventListener('keydown', e=>{ if(e.key==='Enter') document.getElementById('qtAddBtn').click(); });
 document.getElementById('qtList').addEventListener('click', async e=>{
@@ -310,7 +591,7 @@ document.getElementById('qtList').addEventListener('click', async e=>{
   const action = e.target.closest('[data-action]')?.dataset.action;
   if(action==='toggle'){ const t=quickTasks.find(t=>t.id===id); if(t) t.done=!t.done; }
   else if(action==='delete'){ quickTasks = quickTasks.filter(t=>t.id!==id); }
-  renderQuickTasks(); await saveQuickTasks();
+  renderQuickTasks(); renderJourneyProgress(); await saveQuickTasks();
 });
 
 /* ============================================================
@@ -439,7 +720,7 @@ document.getElementById('asAddBtn').addEventListener('click', async ()=>{
   assignments.push({ id:uid(), title, subject, type, due, milestones: generateMilestones(due) });
   document.getElementById('asTitle').value='';
   document.getElementById('asDue').value='';
-  renderAssignments(); renderMiniDeadlines();
+  renderAssignments(); renderMiniDeadlines(); renderJourneyProgress();
   await saveAssignments();
 });
 
@@ -455,7 +736,7 @@ document.getElementById('assignList').addEventListener('click', async e=>{
     const m = a.milestones.find(m=>m.id===msId);
     if(m) m.done = !m.done;
   } else return;
-  renderAssignments(); renderMiniDeadlines();
+  renderAssignments(); renderMiniDeadlines(); renderJourneyProgress();
   await saveAssignments();
 });
 
@@ -517,6 +798,7 @@ document.getElementById('filterRow').addEventListener('click', e=>{
 let notes = [];
 let noteFilterSubject = 'all';
 let noteFavOnly = false;
+let selectedNoteIds = new Set();
 
 async function loadNotes(){
   try{ const r = await remoteStorage.get('notes-list'); notes = r? JSON.parse(r.value):[]; }
@@ -527,6 +809,7 @@ async function saveNotes(){
   try{ await remoteStorage.set('notes-list', JSON.stringify(notes)); }catch(e){}
 }
 function renderNotes(){
+  selectedNoteIds = new Set([...selectedNoteIds].filter(id=>notes.some(n=>n.id===id)));
   let list = [...notes];
   if(noteFilterSubject!=='all') list = list.filter(n=>n.subject===noteFilterSubject);
   if(noteFavOnly) list = list.filter(n=>n.favorite);
@@ -536,7 +819,12 @@ function renderNotes(){
   grid.innerHTML = list.map(n=>{
     const subj = subjects.find(s=>s.code===n.subject);
     return `<div class="note-card" style="background:${subj?subj.bg:'var(--bg-soft)'};color:${subj?subj.fg:'var(--text)'}" data-id="${n.id}">
-      <div class="note-subject">${subj?subj.code:'geral'}</div>
+      <div class="note-subject" style="display:flex;justify-content:space-between;align-items:center;">
+        <span>${subj?subj.code:'geral'}</span>
+        <label style="font-size:11px;display:flex;align-items:center;gap:5px;">
+          <input type="checkbox" class="note-select" ${selectedNoteIds.has(n.id)?'checked':''}> selecionar
+        </label>
+      </div>
       <div class="note-text">${escapeHtml(n.text)}</div>
       <div class="note-foot">
         <span class="note-date">${fmtDDMM(n.date)}</span>
@@ -566,10 +854,34 @@ document.getElementById('notesGrid').addEventListener('click', async e=>{
   const card = e.target.closest('.note-card'); if(!card) return;
   const id = card.dataset.id;
   const n = notes.find(n=>n.id===id);
+  if(e.target.closest('.note-select')){
+    if(e.target.checked) selectedNoteIds.add(id); else selectedNoteIds.delete(id);
+    return;
+  }
   if(e.target.closest('[data-action="fav"]')) n.favorite = !n.favorite;
-  else if(e.target.closest('[data-action="del"]')) notes = notes.filter(n=>n.id!==id);
+  else if(e.target.closest('[data-action="del"]')) { notes = notes.filter(n=>n.id!==id); selectedNoteIds.delete(id); }
   else return;
   renderNotes(); await saveNotes();
+});
+
+
+document.getElementById('noteDeleteSelected').addEventListener('click', async ()=>{
+  if(!selectedNoteIds.size){ showToast('Selecione pelo menos uma anotação.'); return; }
+  if(!confirm(`Apagar ${selectedNoteIds.size} anotação(ões) selecionada(s)?`)) return;
+  notes = notes.filter(n=>!selectedNoteIds.has(n.id));
+  selectedNoteIds.clear();
+  renderNotes();
+  await saveNotes();
+  showToast('Anotações selecionadas apagadas. ✦');
+});
+document.getElementById('noteDeleteAll').addEventListener('click', async ()=>{
+  if(!notes.length){ showToast('Não há anotações para apagar.'); return; }
+  if(!confirm('Apagar todas as anotações? Essa ação não pode ser desfeita.')) return;
+  notes = [];
+  selectedNoteIds.clear();
+  renderNotes();
+  await saveNotes();
+  showToast('Todas as anotações foram apagadas. ✦');
 });
 
 /* ============================================================
@@ -630,8 +942,7 @@ async function loadHabits(){
   catch(e){ habitNames = ['Fui à aula','Estudei um pouco','Revisei anotações','Bebi água']; }
   try{ const r2 = await remoteStorage.get('habits-checks:'+getWeekKey()); habitChecks = r2? JSON.parse(r2.value): {}; }
   catch(e){ habitChecks = {}; }
-  renderHabitTable(); renderHabitToday();
-  renderPrismaHome();
+  renderHabitTable(); renderHabitToday(); renderJourneyProgress();
 }
 async function saveHabitNames(){ try{ await remoteStorage.set('habits-config', JSON.stringify(habitNames)); }catch(e){} }
 async function saveHabitChecks(){ try{ await remoteStorage.set('habits-checks:'+getWeekKey(), JSON.stringify(habitChecks)); }catch(e){} }
@@ -691,7 +1002,7 @@ document.getElementById('habitToday').addEventListener('click', async e=>{
   const item = e.target.closest('.qt-item'); if(!item) return;
   const key = item.dataset.key;
   habitChecks[key] = !habitChecks[key];
-  renderHabitTable(); renderHabitToday();
+  renderHabitTable(); renderHabitToday(); renderJourneyProgress();
   await saveHabitChecks();
 });
 document.getElementById('habitAddBtn').addEventListener('click', async ()=>{
@@ -699,7 +1010,7 @@ document.getElementById('habitAddBtn').addEventListener('click', async ()=>{
   const name = input.value.trim();
   if(!name) return;
   habitNames.push(name); input.value='';
-  renderHabitTable(); renderHabitToday();
+  renderHabitTable(); renderHabitToday(); renderJourneyProgress();
   await saveHabitNames();
 });
 document.getElementById('habitInput').addEventListener('keydown', e=>{ if(e.key==='Enter') document.getElementById('habitAddBtn').click(); });
@@ -772,21 +1083,44 @@ async function loadCourseProgress(){
   }catch(e){
     courseProgress = JSON.parse(JSON.stringify(defaultProgress));
   }
-  // garante que matérias novas entrem com valores padrão
+  // garante que matérias padrão e novas entrem com valores padrão
   Object.keys(defaultProgress).forEach(code=>{
     if(!courseProgress[code]) courseProgress[code] = {...defaultProgress[code]};
   });
+  subjects.forEach(s=>{
+    if(!courseProgress[s.code]) courseProgress[s.code] = newSubjectProgress();
+    const p = courseProgress[s.code];
+    if(p.aulasTotal !== null && !Number.isFinite(Number(p.aulasTotal))) p.aulasTotal = null;
+    if(p.ativTotal !== null && !Number.isFinite(Number(p.ativTotal))) p.ativTotal = null;
+    if(!Number.isFinite(Number(p.aulas))) p.aulas = 0;
+    if(!Number.isFinite(Number(p.ativ))) p.ativ = 0;
+    if(p.aulasTotal !== null && p.aulasTotal < 0) p.aulasTotal = 0;
+    if(p.ativTotal !== null && p.ativTotal < 0) p.ativTotal = 0;
+  });
   renderProgressPage();
-  renderPrismaHome();
+  renderJourneyProgress();
 }
 async function saveCourseProgress(){
   try{ await remoteStorage.set('course-progress', JSON.stringify(courseProgress)); }catch(e){}
 }
 
 function progressPct(p){
-  const total = p.aulasTotal + p.ativTotal;
+  let done = 0, total = 0;
+  if(Number.isFinite(Number(p.aulasTotal))){ done += Math.min(p.aulas, p.aulasTotal); total += p.aulasTotal; }
+  if(Number.isFinite(Number(p.ativTotal))){ done += Math.min(p.ativ, p.ativTotal); total += p.ativTotal; }
   if(total===0) return 0;
-  return Math.round(((p.aulas + p.ativ) / total) * 100);
+  return Math.round((done / total) * 100);
+}
+function progressHasKnownTotal(p){
+  return Number.isFinite(Number(p.aulasTotal)) || Number.isFinite(Number(p.ativTotal));
+}
+function progressDisplay(p){
+  const known=[];
+  if(Number.isFinite(Number(p.aulasTotal))) known.push(`${p.aulas}/${p.aulasTotal} aulas`);
+  else known.push(`${p.aulas} aulas registradas`);
+  if(Number.isFinite(Number(p.ativTotal))) known.push(`${p.ativ}/${p.ativTotal} atividades`);
+  else known.push(`${p.ativ} atividades registradas`);
+  return known.join(' · ');
 }
 function daysUntil(dateISO){
   const d = Math.round((new Date(dateISO+'T00:00:00') - new Date(new Date().toDateString()))/86400000);
@@ -821,7 +1155,7 @@ function renderContinueCard(){
     <div>
       <div class="cc-label">➤ Continue de onde parou</div>
       <h3>${top.s.name}</h3>
-      <p>${top.pct}% concluído · ${top.p.aulas}/${top.p.aulasTotal} aulas · ${top.p.ativ}/${top.p.ativTotal} atividades</p>
+      <p>${top.pct}% concluído · ${progressDisplay(top.p)}</p>
     </div>
     <button class="cc-arrow" data-continue="${top.s.code}">→</button>
   </div>`;
@@ -833,8 +1167,8 @@ function renderProgressGrid(){
     const p = courseProgress[s.code]; if(!p) return '';
     const pct = progressPct(p);
     const goal = subjectGoals[s.code];
-    const aulasMax = p.aulas >= p.aulasTotal;
-    const ativMax = p.ativ >= p.ativTotal;
+    const aulasMax = Number.isFinite(Number(p.aulasTotal)) && p.aulas >= p.aulasTotal;
+    const ativMax = Number.isFinite(Number(p.ativTotal)) && p.ativ >= p.ativTotal;
     return `<div class="prog-card" style="background:${s.bg};color:${s.fg};" data-code="${s.code}">
       <div class="pc-top">
         <span class="pc-type">${s.type==='online'?'Digital (EAD)':'Ao Vivo'}</span>
@@ -845,9 +1179,9 @@ function renderProgressGrid(){
       <div class="pc-pct">${pct}%</div>
       ${goal ? `<div class="pc-goal">🎯 <span><strong>${goal.label}</strong> — ${fmtGoalDays(goal.date)} (${fmtDDMM(goal.date)})</span></div>` : '<div class="pc-goal">&nbsp;</div>'}
       <div class="pc-counts">
-        <button class="pc-count-btn" data-action="inc-aula" ${aulasMax?'disabled':''}>📖 ${p.aulas}/${p.aulasTotal}</button>
-        <button class="pc-count-btn" data-action="inc-ativ" ${ativMax?'disabled':''}>✅ ${p.ativ}/${p.ativTotal}</button>
-        <button class="pc-main-btn" data-action="inc-aula" title="Marcar aula assistida" ${aulasMax?'disabled':''}>→</button>
+        <button class="pc-count-btn" data-action="inc-aula" ${aulasMax?'disabled':''}>+ Aula ${p.aulas}/${p.aulasTotal == null ? '?' : p.aulasTotal}</button>
+        <button class="pc-count-btn" data-action="inc-ativ" ${ativMax?'disabled':''}>+ Ativ. ${p.ativ}/${p.ativTotal == null ? '?' : p.ativTotal}</button>
+        <button class="pc-count-btn" data-action="undo-progress" ${!p.lastAction?'disabled':''} title="Desfazer o último registro">↶ Desfazer</button>
       </div>
     </div>`;
   }).join('');
@@ -865,19 +1199,25 @@ document.getElementById('progressGrid') && document.getElementById('progressGrid
   const p = courseProgress[code];
   const action = e.target.closest('[data-action]')?.dataset.action;
   if(action==='inc-aula' && p.aulas < p.aulasTotal){
-    p.aulas++; p.updated = Date.now();
+    p.aulas++; p.lastAction = 'aula'; p.updated = Date.now();
     finishCheck(p, code);
   } else if(action==='inc-ativ' && p.ativ < p.ativTotal){
-    p.ativ++; p.updated = Date.now();
+    p.ativ++; p.lastAction = 'ativ'; p.updated = Date.now();
     finishCheck(p, code);
+  } else if(action==='undo-progress'){
+    if(p.lastAction==='aula' && p.aulas>0) p.aulas--;
+    else if(p.lastAction==='ativ' && p.ativ>0) p.ativ--;
+    else { showToast('Não há registro recente para desfazer.'); return; }
+    p.lastAction = null; p.updated = Date.now();
+    showToast('Último registro desfeito. ✦');
   } else if(action==='reset-progress'){
-    if(confirm('Zerar o progresso desta matéria?')){
-      p.aulas = 0; p.ativ = 0; p.updated = Date.now();
+    if(confirm('Zerar todo o progresso desta matéria?')){
+      p.aulas = 0; p.ativ = 0; p.lastAction = null; p.updated = Date.now();
       renderProgressPage(); await saveCourseProgress();
     }
     return;
   } else return;
-  renderProgressPage();
+  renderProgressPage(); renderJourneyProgress();
   await saveCourseProgress();
 });
 
@@ -899,6 +1239,115 @@ function genericFinishCheck(pct){
   if(pct>=100) showToast(randomFrom(completeMessages));
   else showToast(randomFrom(hypeMessages));
 }
+
+
+/* ============================================================
+   JORNADA — progresso geral do Prisma
+   O percentual considera apenas coisas que existem e que podem
+   ser concluídas. Adicionar algo cria trabalho; marcar como feito
+   aumenta a evolução.
+============================================================ */
+function renderJourneyProgress(){
+  const pctEl = document.getElementById('journeyPct');
+  if(!pctEl) return;
+
+  // O percentual é ponderado pelo número real de coisas que podem ser feitas.
+  // Assim, adicionar uma tarefa/projeto cria algo para concluir; marcar como feito
+  // aumenta a evolução. Nada é contado como pendência só por existir no sistema.
+  let totalUnits = 0, doneUnits = 0;
+
+  // Estudos: aulas + atividades das matérias
+  let studyTotal = 0, studyDone = 0;
+  Object.values(courseProgress || {}).forEach(p=>{
+    studyTotal += Number(p.aulasTotal||0) + Number(p.ativTotal||0);
+    studyDone += Math.min(Number(p.aulas||0), Number(p.aulasTotal||0)) + Math.min(Number(p.ativ||0), Number(p.ativTotal||0));
+  });
+  const studyPct = studyTotal ? Math.round((studyDone/studyTotal)*100) : 0;
+  if(studyTotal){ totalUnits += studyTotal; doneUnits += studyDone; }
+
+  // Projetos: etapas definidas no painel de projetos.
+  let projectTotal = 0, projectDone = 0;
+  Object.values(projProgress || {}).forEach(p=>{
+    const t = Number(p.total||0);
+    const d = Math.min(Number(p.done||0), t);
+    projectTotal += t;
+    projectDone += d;
+  });
+  if(projectTotal){ totalUnits += projectTotal; doneUnits += projectDone; }
+
+  // Tarefas rápidas + tarefas rápidas de projetos.
+  const allTasks = [...(quickTasks||[]), ...(projTasks||[])];
+  const taskTotal = allTasks.length;
+  const taskDone = allTasks.filter(t=>t.done).length;
+  if(taskTotal){ totalUnits += taskTotal; doneUnits += taskDone; }
+
+  // Trabalhos/entregas: cada marco é uma unidade de execução.
+  let deliverTotal = 0, deliverDone = 0;
+  [...(assignments||[]), ...(projDeliverables||[])].forEach(a=>{
+    (a.milestones||[]).forEach(m=>{
+      deliverTotal++;
+      if(m.done) deliverDone++;
+    });
+  });
+  if(deliverTotal){ totalUnits += deliverTotal; doneUnits += deliverDone; }
+
+  // Hábitos de hoje também entram na evolução, mas não viram uma pendência
+  // permanente no card: são recorrentes e se renovam a cada dia.
+  const di = (new Date().getDay()+6)%7;
+  let habitTotal = (habitNames||[]).length;
+  let habitDone = 0;
+  (habitNames||[]).forEach((_,hi)=>{ if(habitChecks && habitChecks[hi+'-'+di]) habitDone++; });
+  if(habitTotal){ totalUnits += habitTotal; doneUnits += habitDone; }
+
+  const overall = totalUnits ? Math.round((doneUnits/totalUnits)*100) : 0;
+
+  // Pendências = somente coisas concretas que a pessoa registrou e ainda não concluiu.
+  const pendingQuick = (quickTasks||[]).filter(t=>!t.done).length;
+  const pendingProjTasks = (projTasks||[]).filter(t=>!t.done).length;
+  const pendingAssignments = (assignments||[]).filter(a=>{
+    const ms = a.milestones || [];
+    return ms.length ? ms.some(m=>!m.done) : true;
+  }).length;
+  const pendingProjDeliverables = (projDeliverables||[]).filter(a=>{
+    const ms = a.milestones || [];
+    return ms.length ? ms.some(m=>!m.done) : true;
+  }).length;
+  const pendingProjects = (projects||[]).filter(p=>p.status!=='concluido').length;
+  const pending = pendingQuick + pendingProjTasks + pendingAssignments + pendingProjDeliverables + pendingProjects;
+
+  pctEl.textContent = `${overall}%`;
+  const fill = document.getElementById('journeyProgressFill');
+  if(fill) fill.style.width = `${overall}%`;
+  const pendingEl = document.getElementById('journeyPending');
+  if(pendingEl) pendingEl.textContent = pending;
+  const studiesEl = document.getElementById('journeyStudies');
+  if(studiesEl) studiesEl.textContent = `${studyPct}%`;
+  const habitsEl = document.getElementById('journeyHabits');
+  if(habitsEl) habitsEl.textContent = `${habitDone}/${habitTotal}`;
+  const readingsEl = document.getElementById('journeyReadings');
+  if(readingsEl) readingsEl.textContent = String((readings||[]).filter(r=>!r.done).length);
+}
+
+async function registerJourneySnapshot(){
+  const entry = {
+    id: uid(),
+    at: Date.now(),
+    note: 'Registro de evolução',
+    percentage: document.getElementById('journeyPct')?.textContent || '0%',
+    pending: Number(document.getElementById('journeyPending')?.textContent || 0)
+  };
+  try{
+    const r = await remoteStorage.get('evolution-log');
+    const log = r ? JSON.parse(r.value) : [];
+    log.unshift(entry);
+    await remoteStorage.set('evolution-log', JSON.stringify(log.slice(0,100)));
+    showToast('Evolução registrada. ✦');
+  }catch(e){
+    showToast('Evolução atualizada nesta sessão. ✦');
+  }
+}
+
+document.getElementById('journeyAction')?.addEventListener('click', registerJourneySnapshot);
 
 /* ============================================================
    PAINEL DE PROJETOS
@@ -927,6 +1376,7 @@ async function initProjWorkspace(){
   await Promise.all([loadProjects(), loadProjProgress()]);
   renderProjProgressGrid();
   renderProjContinueCard();
+  renderJourneyProgress();
 }
 
 function populateProjectSelects(){
@@ -1051,7 +1501,7 @@ document.getElementById('projProgressGrid').addEventListener('click', async e=>{
     if(confirm('Zerar o progresso deste projeto?')){ prog.done=0; prog.updated=Date.now(); }
     else return;
   } else return;
-  renderProjProgressGrid(); renderProjContinueCard();
+  renderProjProgressGrid(); renderProjContinueCard(); renderJourneyProgress();
   await saveProjProgress();
 });
 
@@ -1242,7 +1692,6 @@ async function loadReadings(){
   renderLeitContinueCard();
   renderLeitQueue();
   updateLeitStatsChip();
-  renderPrismaHome();
 }
 async function saveReadings(){ try{ await remoteStorage.set('leit-list', JSON.stringify(readings)); }catch(e){} }
 
@@ -1497,271 +1946,114 @@ document.getElementById('leitNotesGrid').addEventListener('click', async e=>{
   const b = document.getElementById('leitTodayChip'); if(b) b.textContent = str;
 })();
 
-
-
-/* ============================================================
-   PRISMA — REGISTRO DE EVOLUÇÃO
-============================================================ */
-let evolutionLogs = [];
-
-async function loadEvolutionLogs(){
-  try{
-    const r = await remoteStorage.get('evolution-log');
-    evolutionLogs = r && r.value ? JSON.parse(r.value) : [];
-    if(!Array.isArray(evolutionLogs)) evolutionLogs = [];
-  }catch(err){
-    console.error('Erro ao carregar registros de evolução:', err);
-    evolutionLogs = [];
-  }
-}
-
-async function saveEvolutionLogs(){
-  try{
-    await remoteStorage.set('evolution-log', JSON.stringify(evolutionLogs));
-  }catch(err){
-    console.error('Erro ao salvar registro de evolução:', err);
-  }
-}
-
-function openEvolutionModal(){
-  let modal = document.getElementById('prismaEvolutionModal');
-
-  if(!modal){
-    modal = document.createElement('div');
-    modal.id = 'prismaEvolutionModal';
-    modal.innerHTML = `
-      <div id="prismaEvolutionBackdrop" style="
-        position:fixed;inset:0;background:rgba(10,14,20,.72);backdrop-filter:blur(6px);
-        z-index:9998;display:flex;align-items:center;justify-content:center;padding:18px;
-      ">
-        <div role="dialog" aria-modal="true" style="
-          width:min(520px,100%);background:#F3F3ED;color:#1d2833;border-radius:24px;
-          box-shadow:0 25px 80px rgba(0,0,0,.30);padding:24px;
-        ">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
-            <div>
-              <div style="font-family:'JetBrains Mono';font-size:10px;letter-spacing:.10em;text-transform:uppercase;color:#C51F5D;">✦ REGISTRAR</div>
-              <h2 style="font-family:'Baloo 2';font-size:28px;line-height:1;margin:6px 0 4px;">Um passo de cada vez.</h2>
-              <div style="font-size:12px;color:#68727c;">Registre algo que você fez hoje.</div>
-            </div>
-            <button id="prismaEvolutionClose" type="button" style="
-              border:0;background:rgba(29,40,51,.08);border-radius:12px;width:34px;height:34px;
-              font-size:18px;cursor:pointer;color:#1d2833;
-            ">×</button>
-          </div>
-
-          <label style="display:block;font-family:'JetBrains Mono';font-size:10px;letter-spacing:.06em;text-transform:uppercase;margin:22px 0 7px;">Categoria</label>
-          <select id="prismaEvolutionCategory" style="
-            width:100%;padding:12px 13px;border-radius:12px;border:1px solid rgba(29,40,51,.14);
-            background:#fff;font-family:'Nunito';font-size:13px;color:#1d2833;
-          ">
-            <option value="Estudos">📚 Estudos</option>
-            <option value="Trabalho">💼 Trabalho</option>
-            <option value="Vida">🌱 Vida</option>
-            <option value="Hábitos">🔥 Hábitos</option>
-            <option value="Outro">✨ Outro</option>
-          </select>
-
-          <label style="display:block;font-family:'JetBrains Mono';font-size:10px;letter-spacing:.06em;text-transform:uppercase;margin:16px 0 7px;">O que você fez?</label>
-          <textarea id="prismaEvolutionText" rows="4" maxlength="240" placeholder="Ex.: Estudei 30 minutos para a prova de História." style="
-            width:100%;box-sizing:border-box;resize:vertical;padding:13px;border-radius:12px;
-            border:1px solid rgba(29,40,51,.14);background:#fff;font-family:'Nunito';font-size:13px;
-            color:#1d2833;outline:none;
-          "></textarea>
-
-          <div style="display:flex;justify-content:flex-end;gap:9px;margin-top:16px;">
-            <button id="prismaEvolutionCancel" type="button" style="
-              border:0;background:transparent;padding:10px 13px;border-radius:10px;
-              font-family:'Nunito';font-weight:700;cursor:pointer;color:#68727c;
-            ">Cancelar</button>
-            <button id="prismaEvolutionSave" type="button" style="
-              border:0;background:#C51F5D;color:#fff;padding:11px 16px;border-radius:12px;
-              font-family:'Nunito';font-weight:800;cursor:pointer;box-shadow:0 8px 20px rgba(197,31,93,.22);
-            ">Registrar evolução</button>
-          </div>
-        </div>
-      </div>
-    `;
-    document.body.appendChild(modal);
-
-    const close = ()=>{
-      modal.style.display='none';
-      const field=document.getElementById('prismaEvolutionText');
-      if(field) field.value='';
-    };
-
-    document.getElementById('prismaEvolutionClose').onclick = close;
-    document.getElementById('prismaEvolutionCancel').onclick = close;
-    document.getElementById('prismaEvolutionBackdrop').addEventListener('click', e=>{
-      if(e.target.id==='prismaEvolutionBackdrop') close();
-    });
-
-    document.getElementById('prismaEvolutionSave').onclick = async ()=>{
-      const field = document.getElementById('prismaEvolutionText');
-      const category = document.getElementById('prismaEvolutionCategory').value;
-      const textValue = (field.value || '').trim();
-      if(!textValue){
-        field.focus();
-        return;
-      }
-
-      evolutionLogs.unshift({
-        id: Date.now(),
-        category,
-        text: textValue,
-        createdAt: new Date().toISOString()
-      });
-
-      evolutionLogs = evolutionLogs.slice(0, 100);
-      await saveEvolutionLogs();
-      close();
-      renderPrismaHome();
-      showToast('✨ Evolução registrada!');
-    };
-  }
-
-  modal.style.display='block';
-  setTimeout(()=>{
-    const field=document.getElementById('prismaEvolutionText');
-    if(field) field.focus();
-  },50);
-}
-
-/* ============================================================
-   PRISMA — HOME / VISÃO DA JORNADA
-============================================================ */
-function renderPrismaHome(){
-  const home = document.getElementById('page-inicio');
-  const anchor = document.getElementById('nextClassCard');
-  if(!home || !anchor) return;
-
-  let box = document.getElementById('prismaJourneyCard');
-
-  const courseStats = Object.values(courseProgress || {});
-  const courseTotal = courseStats.reduce((sum,p)=>sum + (p.aulasTotal||0) + (p.ativTotal||0), 0);
-  const courseDone = courseStats.reduce((sum,p)=>sum + (p.aulas||0) + (p.ativ||0), 0);
-  const studyPct = courseTotal ? Math.round((courseDone/courseTotal)*100) : 0;
-
-  const pendingTasks = (quickTasks || []).filter(t=>!t.done).length;
-  const pendingAssignments = (assignments || []).filter(a=>{
-    const total = (a.milestones||[]).length;
-    const done = (a.milestones||[]).filter(m=>m.done).length;
-    return total ? done < total : true;
-  }).length;
-
-  const habitKeys = Object.keys(habitChecks || {});
-  const habitDone = habitKeys.filter(k=>habitChecks[k]).length;
-  const habitTotal = Math.max(1, (habitNames||[]).length * 7);
-  const habitPct = Math.round((habitDone/habitTotal)*100);
-
-  const activeReading = (readings||[]).filter(r=>r.status==='lendo').length;
-
-  const overall = Math.round(
-    (studyPct * 0.60) +
-    (Math.min(100, pendingTasks===0 ? 100 : Math.max(0, 100-pendingTasks*10)) * 0.15) +
-    (Math.min(100, pendingAssignments===0 ? 100 : Math.max(0, 100-pendingAssignments*8)) * 0.15) +
-    (habitPct * 0.10)
-  );
-
-  if(!box){
-    box = document.createElement('section');
-    box.id = 'prismaJourneyCard';
-    box.style.cssText = 'margin:0 0 18px;';
-    anchor.insertAdjacentElement('beforebegin', box);
-  }
-
-  box.innerHTML = `
-    <div style="
-      position:relative;overflow:hidden;border-radius:22px;padding:24px;
-      background:linear-gradient(135deg,#243447 0%,#3b1028 58%,#580E2A 100%);
-      border:1px solid rgba(243,243,237,.12);color:#F3F3ED;
-      box-shadow:0 18px 45px rgba(20,29,38,.16);
-    ">
-      <div style="position:absolute;width:180px;height:180px;border-radius:50%;right:-70px;top:-80px;background:rgba(197,31,93,.20);"></div>
-      <div style="position:relative;z-index:1;">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;">
-          <div>
-            <div style="font-family:'JetBrains Mono';font-size:10px;letter-spacing:.10em;text-transform:uppercase;color:#DC2368;margin-bottom:5px;">
-              ✦ SUA JORNADA
-            </div>
-        <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;">
-          <div>
-            <div style="font-family:'Baloo 2';font-size:28px;font-weight:700;line-height:1.05;">Como está sua evolução?</div>
-            <div style="font-size:12.5px;color:rgba(243,243,237,.68);margin-top:6px;">
-              Pequenos passos também constroem grandes mudanças.
-            </div>
-          </div>
-          <div style="display:flex;align-items:center;gap:12px;">
-            <button type="button" onclick="openEvolutionModal()" style="
-              border:1px solid rgba(243,243,237,.18);background:rgba(243,243,237,.09);color:#F3F3ED;
-              padding:10px 13px;border-radius:12px;font-family:'Nunito';font-size:12px;font-weight:800;cursor:pointer;
-            ">＋ Registrar evolução</button>
-            <div style="font-family:'JetBrains Mono';font-size:28px;font-weight:700;">${overall}%</div>
-          </div>
-        </div>
-        <div style="height:8px;background:rgba(243,243,237,.12);border-radius:99px;overflow:hidden;margin:18px 0 16px;">
-          <div style="height:100%;width:${overall}%;background:linear-gradient(90deg,#DC2368,#D36991);border-radius:99px;transition:width .4s ease;"></div>
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;">
-          <div style="background:rgba(243,243,237,.07);border-radius:13px;padding:11px;">
-            <div style="font-size:17px;">🎯</div>
-            <div style="font-family:'JetBrains Mono';font-size:16px;font-weight:700;margin-top:3px;">${pendingTasks + pendingAssignments}</div>
-            <div style="font-size:10px;color:rgba(243,243,237,.62);">pendências</div>
-          </div>
-          <div style="background:rgba(243,243,237,.07);border-radius:13px;padding:11px;">
-            <div style="font-size:17px;">📚</div>
-            <div style="font-family:'JetBrains Mono';font-size:16px;font-weight:700;margin-top:3px;">${studyPct}%</div>
-            <div style="font-size:10px;color:rgba(243,243,237,.62);">estudos</div>
-          </div>
-          <div style="background:rgba(243,243,237,.07);border-radius:13px;padding:11px;">
-            <div style="font-size:17px;">🔥</div>
-            <div style="font-family:'JetBrains Mono';font-size:16px;font-weight:700;margin-top:3px;">${habitDone}</div>
-            <div style="font-size:10px;color:rgba(243,243,237,.62);">hábitos marcados</div>
-          </div>
-          <div style="background:rgba(243,243,237,.07);border-radius:13px;padding:11px;">
-            <div style="font-size:17px;">📖</div>
-            <div style="font-family:'JetBrains Mono';font-size:16px;font-weight:700;margin-top:3px;">${activeReading}</div>
-            <div style="font-size:10px;color:rgba(243,243,237,.62);">leituras ativas</div>
-          </div>
-        </div>
-        ${evolutionLogs.length ? `
-          <div style="margin-top:14px;padding-top:13px;border-top:1px solid rgba(243,243,237,.10);font-size:11px;color:rgba(243,243,237,.72);">
-            <span style="font-family:'JetBrains Mono';font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:rgba(243,243,237,.48);">Último registro</span>
-            <div style="margin-top:5px;color:#F3F3ED;">${evolutionLogs[0].text}</div>
-          </div>
-        ` : ''}
-      </div>
-    </div>
-  `;
-}
-
 /* ============================================================
    INIT
 ============================================================ */
-buildCourseGrid();
-buildWeekGrid();
-renderNextClass();
-populateSubjectSelects();
-renderCalendar();
-renderTimeline();
-loadQuickTasks();
-loadAssignments();
-loadNotes();
-loadPlaylist();
-loadHabits();
-loadCourseProgress();
+async function initPrisma(){
+  await loadSubjects();
+  buildCourseGrid();
+  buildWeekGrid();
+  renderNextClass();
+  populateSubjectSelects();
+  renderCalendar();
+  renderTimeline();
+  loadQuickTasks();
+  loadAssignments();
+  loadNotes();
+  loadPlaylist();
+  loadHabits();
+  loadCourseProgress();
 
-initProjWorkspace();
-loadProjTasks();
-loadProjDeliverables();
-loadProjNotes();
+  initProjWorkspace();
+  loadProjTasks();
+  loadProjDeliverables();
+  loadProjNotes();
 
-loadReadings();
-loadLeitTasks();
-loadLeitNotes();
+  loadReadings();
+  loadLeitTasks();
+  loadLeitNotes();
 
-initWorkspace();
+  initWorkspace();
+  setTimeout(renderJourneyProgress, 1200);
+}
 
-loadUserName();
-renderPrismaHome();
-loadEvolutionLogs().then(()=>renderPrismaHome());
+
+/* ============================================================
+   HOME MOBILE — navegação horizontal por telas
+   Reorganiza apenas a apresentação da Home. Os IDs dos elementos
+   permanecem os mesmos para não interferir na sincronização.
+============================================================ */
+function setupMobileHomeCarousel(){
+  const page = document.getElementById('page-inicio');
+  if(!page || page.dataset.mobileCarouselReady === '1') return;
+  page.dataset.mobileCarouselReady = '1';
+
+  const topbar = page.querySelector('.topbar');
+  const journey = document.getElementById('journeyCard');
+  const nextClass = document.getElementById('nextClassCard');
+  const qtList = document.getElementById('qtList');
+  const miniDeadlines = document.getElementById('miniDeadlines');
+  const habitToday = document.getElementById('habitToday');
+  const playlistMini = document.getElementById('playlistMini');
+  if(!journey || !nextClass || !qtList || !miniDeadlines || !habitToday || !playlistMini) return;
+
+  const taskCard = qtList.closest('.card');
+  const deadlineCard = miniDeadlines.closest('.card');
+  const habitCard = habitToday.closest('.card');
+  const playlistCard = playlistMini.closest('.card');
+  if(!taskCard || !deadlineCard || !habitCard || !playlistCard) return;
+
+  const oldGrids = [...page.querySelectorAll(':scope > .grid2')];
+  const carousel = document.createElement('div');
+  carousel.className = 'home-mobile-carousel';
+  carousel.id = 'homeMobileCarousel';
+
+  const makePanel = (name, ...items) => {
+    const panel = document.createElement('section');
+    panel.className = 'home-mobile-panel';
+    panel.dataset.panel = name;
+    items.forEach(item => panel.appendChild(item));
+    return panel;
+  };
+
+  carousel.appendChild(makePanel('jornada', journey));
+  carousel.appendChild(makePanel('hoje', nextClass, taskCard));
+  carousel.appendChild(makePanel('prazos', deadlineCard));
+  carousel.appendChild(makePanel('habitos', habitCard));
+  carousel.appendChild(makePanel('playlist', playlistCard));
+
+  // Remove os grids vazios que continham os cards antes da reorganização.
+  oldGrids.forEach(grid => grid.remove());
+  topbar?.insertAdjacentElement('afterend', carousel);
+
+  const dots = document.createElement('div');
+  dots.className = 'home-mobile-dots';
+  dots.setAttribute('aria-label','Navegação da página inicial');
+  for(let i=0;i<5;i++){
+    const dot = document.createElement('button');
+    dot.type = 'button';
+    dot.className = 'home-mobile-dot' + (i===0?' on':'');
+    dot.setAttribute('aria-label', `Tela ${i+1}`);
+    dot.addEventListener('click', ()=>{
+      const panel = carousel.children[i];
+      if(panel) panel.scrollIntoView({behavior:'smooth', inline:'start', block:'nearest'});
+    });
+    dots.appendChild(dot);
+  }
+  carousel.insertAdjacentElement('afterend', dots);
+
+  let ticking = false;
+  carousel.addEventListener('scroll', ()=>{
+    if(ticking) return;
+    ticking = true;
+    requestAnimationFrame(()=>{
+      const index = Math.max(0, Math.min(4, Math.round(carousel.scrollLeft / Math.max(1, carousel.clientWidth))));
+      dots.querySelectorAll('.home-mobile-dot').forEach((dot,i)=>dot.classList.toggle('on', i===index));
+      ticking = false;
+    });
+  }, {passive:true});
+}
+
+setupMobileHomeCarousel();
+
+initPrisma();
