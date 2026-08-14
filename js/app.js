@@ -1251,83 +1251,118 @@ function renderJourneyProgress(){
   const pctEl = document.getElementById('journeyPct');
   if(!pctEl) return;
 
-  // O percentual é ponderado pelo número real de coisas que podem ser feitas.
-  // Assim, adicionar uma tarefa/projeto cria algo para concluir; marcar como feito
-  // aumenta a evolução. Nada é contado como pendência só por existir no sistema.
   let totalUnits = 0, doneUnits = 0;
 
   // Estudos: aulas + atividades das matérias
   let studyTotal = 0, studyDone = 0;
   Object.values(courseProgress || {}).forEach(p=>{
-    studyTotal += Number(p.aulasTotal||0) + Number(p.ativTotal||0);
-    studyDone += Math.min(Number(p.aulas||0), Number(p.aulasTotal||0)) + Math.min(Number(p.ativ||0), Number(p.ativTotal||0));
+    const aulasTotal = Number(p.aulasTotal || 0);
+    const ativTotal = Number(p.ativTotal || 0);
+    studyTotal += aulasTotal + ativTotal;
+    studyDone += Math.min(Number(p.aulas || 0), aulasTotal) +
+                 Math.min(Number(p.ativ || 0), ativTotal);
   });
-  const studyPct = studyTotal ? Math.round((studyDone/studyTotal)*100) : 0;
+  const studyPct = studyTotal ? Math.round((studyDone / studyTotal) * 100) : 0;
   if(studyTotal){ totalUnits += studyTotal; doneUnits += studyDone; }
 
-  // Projetos: etapas definidas no painel de projetos.
+  // Projetos: etapas definidas no painel de projetos
   let projectTotal = 0, projectDone = 0;
   Object.values(projProgress || {}).forEach(p=>{
-    const t = Number(p.total||0);
-    const d = Math.min(Number(p.done||0), t);
+    const t = Number(p.total || 0);
+    const d = Math.min(Number(p.done || 0), t);
     projectTotal += t;
     projectDone += d;
   });
   if(projectTotal){ totalUnits += projectTotal; doneUnits += projectDone; }
 
-  // Tarefas rápidas + tarefas rápidas de projetos.
-  const allTasks = [...(quickTasks||[]), ...(projTasks||[])];
+  // Tarefas rápidas
+  const allTasks = [...(quickTasks || []), ...(projTasks || [])];
   const taskTotal = allTasks.length;
   const taskDone = allTasks.filter(t=>t.done).length;
   if(taskTotal){ totalUnits += taskTotal; doneUnits += taskDone; }
 
-  // Trabalhos/entregas: cada marco é uma unidade de execução.
+  // Trabalhos e entregas: cada marco é uma unidade
   let deliverTotal = 0, deliverDone = 0;
-  [...(assignments||[]), ...(projDeliverables||[])].forEach(a=>{
-    (a.milestones||[]).forEach(m=>{
+  [...(assignments || []), ...(projDeliverables || [])].forEach(a=>{
+    (a.milestones || []).forEach(m=>{
       deliverTotal++;
       if(m.done) deliverDone++;
     });
   });
   if(deliverTotal){ totalUnits += deliverTotal; doneUnits += deliverDone; }
 
-  // Hábitos de hoje também entram na evolução, mas não viram uma pendência
-  // permanente no card: são recorrentes e se renovam a cada dia.
-  const di = (new Date().getDay()+6)%7;
-  let habitTotal = (habitNames||[]).length;
+  // Hábitos de hoje
+  const di = (new Date().getDay() + 6) % 7;
+  const habitTotal = (habitNames || []).length;
   let habitDone = 0;
-  (habitNames||[]).forEach((_,hi)=>{ if(habitChecks && habitChecks[hi+'-'+di]) habitDone++; });
+  (habitNames || []).forEach((_,hi)=>{
+    if(habitChecks && habitChecks[hi+'-'+di]) habitDone++;
+  });
   if(habitTotal){ totalUnits += habitTotal; doneUnits += habitDone; }
 
-  const overall = totalUnits ? Math.round((doneUnits/totalUnits)*100) : 0;
+  const overall = totalUnits ? Math.round((doneUnits / totalUnits) * 100) : 0;
 
-  // Pendências = somente coisas concretas que a pessoa registrou e ainda não concluiu.
-  const pendingQuick = (quickTasks||[]).filter(t=>!t.done).length;
-  const pendingProjTasks = (projTasks||[]).filter(t=>!t.done).length;
-  const pendingAssignments = (assignments||[]).filter(a=>{
+  // Pendências: somente itens concretos registrados e ainda não concluídos.
+  const pendingQuick = (quickTasks || []).filter(t=>!t.done).length;
+  const pendingProjTasks = (projTasks || []).filter(t=>!t.done).length;
+  const pendingAssignments = (assignments || []).filter(a=>{
     const ms = a.milestones || [];
     return ms.length ? ms.some(m=>!m.done) : true;
   }).length;
-  const pendingProjDeliverables = (projDeliverables||[]).filter(a=>{
+  const pendingProjDeliverables = (projDeliverables || []).filter(a=>{
     const ms = a.milestones || [];
     return ms.length ? ms.some(m=>!m.done) : true;
   }).length;
-  const pendingProjects = (projects||[]).filter(p=>p.status!=='concluido').length;
-  const pending = pendingQuick + pendingProjTasks + pendingAssignments + pendingProjDeliverables + pendingProjects;
+  const pendingProjects = (projects || []).filter(p=>p.status!=='concluido').length;
+  const pending = pendingQuick + pendingProjTasks + pendingAssignments +
+                  pendingProjDeliverables + pendingProjects;
 
   pctEl.textContent = `${overall}%`;
+
   const fill = document.getElementById('journeyProgressFill');
   if(fill) fill.style.width = `${overall}%`;
+
   const pendingEl = document.getElementById('journeyPending');
   if(pendingEl) pendingEl.textContent = pending;
+
   const studiesEl = document.getElementById('journeyStudies');
   if(studiesEl) studiesEl.textContent = `${studyPct}%`;
+
   const habitsEl = document.getElementById('journeyHabits');
   if(habitsEl) habitsEl.textContent = `${habitDone}/${habitTotal}`;
-  const readingsEl = document.getElementById('journeyReadings');
-  if(readingsEl) readingsEl.textContent = String((readings||[]).filter(r=>!r.done).length);
-}
 
+  const readingsEl = document.getElementById('journeyReadings');
+  if(readingsEl) readingsEl.textContent =
+    String((readings || []).filter(r=>!r.done).length);
+
+  // Frases oficiais da evolução do Prisma.
+  const journeyPhrases = {
+    start: 'Nada registrado ainda. O caos está surpreendentemente organizado.',
+    early: 'Estamos chegando em algum lugar. Ninguém sabe exatamente onde ainda.',
+    middle: 'Mais da metade. Agora seria constrangedor desistir.',
+    late: 'Está tão perto que até dá para fingir que foi planejado.',
+    complete: 'Você fez tudo. Agora pode fingir que foi fácil.'
+  };
+
+  const statusEl = document.getElementById('journeyStatus');
+  if(statusEl){
+    let status;
+
+    if(overall <= 24){
+      status = journeyPhrases.start;
+    }else if(overall <= 49){
+      status = journeyPhrases.early;
+    }else if(overall <= 74){
+      status = journeyPhrases.middle;
+    }else if(overall <= 99){
+      status = journeyPhrases.late;
+    }else{
+      status = journeyPhrases.complete;
+    }
+
+    statusEl.textContent = status;
+  }
+}
 async function registerJourneySnapshot(){
   const entry = {
     id: uid(),
