@@ -491,3 +491,177 @@
     font-size:13px;
   }
 }
+
+
+/* ============================================================
+   PRISMA — CARD DE DETALHES DA MATÉRIA
+============================================================ */
+.subject-modal{max-width:560px;}
+.subject-modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;}
+.subject-modal-head h2{margin:0!important;}
+.modal-kicker{font-family:'JetBrains Mono';font-size:9px;letter-spacing:.08em;color:var(--pink);margin-bottom:3px;}
+.subject-edit-btn{border:0;border-radius:10px;padding:9px 11px;background:var(--pink);color:#fff;cursor:pointer;font-size:16px;font-weight:800;}
+.subject-info-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;}
+.subject-info-grid>div{padding:11px 12px;border-radius:12px;background:var(--bg-soft);border:1px solid var(--line);}
+.subject-info-grid span{display:block;font-family:'JetBrains Mono';font-size:9px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;}
+.subject-info-grid strong{display:block;font-size:13px;line-height:1.35;}
+.subject-archive-note{margin-top:11px;padding:10px 12px;border-radius:10px;background:rgba(220,35,104,.06);color:var(--muted);font-size:12px;}
+.subject-date-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.subject-archive-toggle{display:flex!important;align-items:center;gap:8px;text-transform:none!important;font-family:'Nunito'!important;font-size:12px!important;color:var(--text)!important;margin-top:14px!important;}
+.subject-archive-toggle input{width:auto!important;}
+@media(max-width:700px){
+  .subject-modal{width:calc(100vw - 28px);max-height:88vh;overflow:auto;}
+  .subject-info-grid,.subject-date-grid{grid-template-columns:1fr;}
+}
+
+
+/* ============================================================
+   PRISMA — HOME: LEITURAS + PROJETOS EM ANDAMENTO
+============================================================ */
+.home-extra-grid{
+  align-items:stretch;
+}
+
+.home-extra-card{
+  min-height:220px;
+}
+
+.home-card-heading{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+}
+
+.home-card-heading h2{
+  margin-bottom:4px;
+}
+
+.home-card-count{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:30px;
+  height:30px;
+  padding:0 9px;
+  border-radius:999px;
+  background:rgba(220,35,104,.10);
+  color:var(--pink);
+  font-family:var(--font-mono);
+  font-size:12px;
+  font-weight:800;
+}
+
+.home-progress-item{
+  padding:12px 0;
+  border-top:1px solid rgba(15,23,42,.07);
+}
+
+.home-progress-item:first-child{
+  margin-top:8px;
+}
+
+.home-progress-top{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:12px;
+}
+
+.home-progress-title{
+  min-width:0;
+}
+
+.home-progress-title strong{
+  display:block;
+  font-size:13px;
+  color:var(--text);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+.home-progress-title small{
+  display:block;
+  margin-top:3px;
+  color:var(--muted);
+  font-size:11px;
+}
+
+.home-progress-pct{
+  flex:none;
+  font-family:var(--font-mono);
+  font-size:11px;
+  color:var(--pink);
+}
+
+.home-progress-bar{
+  height:6px;
+  margin-top:8px;
+  overflow:hidden;
+  border-radius:999px;
+  background:rgba(15,23,42,.08);
+}
+
+.home-progress-bar > div{
+  height:100%;
+  border-radius:inherit;
+  background:linear-gradient(90deg,var(--pink),var(--purple));
+}
+
+.home-empty{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  min-height:130px;
+  color:var(--muted);
+}
+
+.home-empty > span{
+  font-size:25px;
+}
+
+.home-empty strong{
+  display:block;
+  color:var(--text);
+  font-size:13px;
+}
+
+.home-empty small{
+  display:block;
+  margin-top:4px;
+  font-size:11px;
+}
+
+@media (max-width:700px){
+  .home-extra-card{
+    min-height:330px;
+  }
+}
+
+/* Desktop: the 7th and 8th content cards remain normal two-column cards. */
+@media (min-width:701px){
+  .home-mobile-carousel > .home-mobile-panel:nth-child(6),
+  .home-mobile-carousel > .home-mobile-panel:nth-child(7){
+    display:block;
+  }
+  .home-mobile-carousel > .home-mobile-panel:nth-child(6) > .card,
+  .home-mobile-carousel > .home-mobile-panel:nth-child(7) > .card{
+    width:100%;
+  }
+  .home-mobile-carousel > .home-mobile-panel:nth-child(6) > .card{
+    grid-column:1;
+    grid-row:4;
+  }
+  .home-mobile-carousel > .home-mobile-panel:nth-child(7) > .card{
+    grid-column:2;
+    grid-row:4;
+  }
+}
+
+@media (max-width:700px){
+  .home-mobile-carousel > .home-mobile-panel:nth-child(6) > .card,
+  .home-mobile-carousel > .home-mobile-panel:nth-child(7) > .card{
+    min-height:330px;
+  }
+}
