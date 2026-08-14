@@ -109,19 +109,40 @@
     <!-- ============ INÍCIO ============ -->
     <section class="page active" id="page-inicio">
       <div class="topbar">
-        <div><h1 id="userGreeting">Bom dia</h1><div class="sub">Aqui está o resumo do seu semestre hoje.</div></div>
+        <div class="prisma-greeting-block"><h1 id="userGreeting">Bom dia</h1><div class="prisma-message" id="dailyPhrase">Aqui está o resumo do seu semestre hoje.</div></div>
         <div style="display:flex;gap:8px;align-items:center;">
           <div class="chip-today" id="syncStatus" style="color:var(--gold-dk);">☁️ conectando...</div>
           <div class="chip-today" id="todayChip">—</div>
         </div>
       </div>
 
-      <div id="nextClassCard" class="next-class">
-        <div class="icon">📚</div>
-        <div class="info">
-          <div class="label">Próxima aula</div>
-          <h3 id="nextClassName">—</h3>
-          <p id="nextClassWhen">—</p>
+      <div class="home-hero-grid">
+        <div class="journey-card" id="journeyCard">
+          <div class="journey-kicker">✦ SUA JORNADA <span>(sob supervisão do Prisma)</span></div>
+          <div class="journey-head">
+            <div>
+              <h2>Quanto do caos você já transformou em plano?</h2>
+              <p>Atualiza conforme você faz acontecer por aqui. ✦</p>
+            </div>
+            <div class="journey-score" id="journeyPct">0%</div>
+          </div>
+          <div class="journey-progress"><div id="journeyProgressFill" style="width:0%"></div></div>
+          <div class="journey-stats">
+            <div><span>⚠️</span><strong id="journeyPending">0</strong><small>pendências</small></div>
+            <div><span>📚</span><strong id="journeyStudies">0%</strong><small>estudos</small></div>
+            <div><span>✓</span><strong id="journeyHabits">0/0</strong><small>hábitos hoje</small></div>
+            <div><span>📖</span><strong id="journeyReadings">0</strong><small>leituras</small></div>
+          </div>
+          <button class="journey-action" id="journeyAction" type="button">Registrar evolução <span>›</span></button>
+        </div>
+
+        <div id="nextClassCard" class="next-class">
+          <div class="icon">📚</div>
+          <div class="info">
+            <div class="label">Próxima aula</div>
+            <h3 id="nextClassName">—</h3>
+            <p id="nextClassWhen">—</p>
+          </div>
         </div>
       </div>
 
@@ -161,6 +182,7 @@
     <section class="page" id="page-materias">
       <div class="topbar">
         <div><h1>Minhas Matérias</h1><div class="sub">Turma 3001 (presencial) e 9001 (on-line)</div></div>
+        <button class="journey-action" id="subjectAddTopBtn" type="button">＋ Registrar nova matéria</button>
       </div>
       <div class="grid3" id="courseGrid"></div>
       <div class="week-grid" id="weekGrid"></div>
@@ -169,8 +191,11 @@
     <!-- ============ PROGRESSO ============ -->
     <section class="page" id="page-progresso">
       <div class="topbar">
-        <div><h1>Meu Progresso</h1><div class="sub">Marque aulas e atividades conforme for concluindo — cada clique conta.</div></div>
-        <div class="chip-today" id="semesterCountdown">—</div>
+        <div><h1>Meu Progresso</h1><div class="sub">Registre o que concluiu. Se errar, desfaça o último registro.</div></div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button class="journey-action" id="progressAddBtn" type="button">＋ Registrar progresso</button>
+          <div class="chip-today" id="semesterCountdown">—</div>
+        </div>
       </div>
 
       <div id="continueCard"></div>
@@ -247,6 +272,8 @@
         <span style="font-size:12.5px;color:var(--muted);">Filtrar:</span>
         <select id="noteFilterSubject"><option value="all">Todas as matérias</option></select>
         <button id="noteFavFilter">⭐ Só favoritas</button>
+        <button id="noteDeleteSelected" type="button">Apagar selecionadas</button>
+        <button id="noteDeleteAll" type="button">Apagar todas</button>
       </div>
 
       <div class="notes-grid" id="notesGrid"></div>
