@@ -177,6 +177,30 @@
           <div id="playlistMini"></div>
         </div>
       </div>
+
+      <div class="grid2 home-extra-grid" style="margin-top:18px;">
+        <div class="card home-extra-card" id="homeReadingsCard">
+          <div class="home-card-heading">
+            <div>
+              <h2>📖 Leituras em andamento</h2>
+              <p class="card-sub">O que está ocupando sua cabeça ultimamente.</p>
+            </div>
+            <span class="home-card-count" id="homeReadingsCount">0</span>
+          </div>
+          <div id="homeReadingsList"></div>
+        </div>
+
+        <div class="card home-extra-card" id="homeProjectsCard">
+          <div class="home-card-heading">
+            <div>
+              <h2>💼 Projetos em andamento</h2>
+              <p class="card-sub">O caos profissional, agora organizado.</p>
+            </div>
+            <span class="home-card-count" id="homeProjectsCount">0</span>
+          </div>
+          <div id="homeProjectsList"></div>
+        </div>
+      </div>
     </section>
 
     <!-- ============ MATÉRIAS ============ -->
@@ -457,6 +481,50 @@
     </section>
 
   </main>
+</div>
+
+<div class="item-modal-overlay" id="subjectModalOverlay">
+  <div class="item-modal subject-modal">
+    <div class="subject-modal-head">
+      <div>
+        <div class="modal-kicker">✦ MATÉRIA</div>
+        <h2 id="subjectModalTitle">Matéria</h2>
+      </div>
+      <button class="subject-edit-btn" id="subjectModalEdit" type="button" title="Editar matéria">✎</button>
+    </div>
+
+    <div class="subject-view" id="subjectModalView">
+      <div class="subject-info-grid">
+        <div><span>Professor</span><strong id="subjectViewTeacher">Não informado</strong></div>
+        <div><span>Período</span><strong id="subjectViewDates">Não informado</strong></div>
+        <div><span>Progresso</span><strong id="subjectViewProgress">0%</strong></div>
+        <div><span>Registrado</span><strong id="subjectViewProgressDetail">0 aulas · 0 atividades</strong></div>
+      </div>
+      <div class="subject-archive-note" id="subjectViewArchive">Esta matéria está ativa.</div>
+    </div>
+
+    <div class="subject-edit-form" id="subjectModalEditForm" hidden>
+      <label>Nome da matéria</label>
+      <input type="text" id="subjectModalName">
+      <label>Código</label>
+      <input type="text" id="subjectModalCode">
+      <label>Professor</label>
+      <input type="text" id="subjectModalTeacher" placeholder="Nome do professor">
+      <div class="subject-date-grid">
+        <div><label>Data de início</label><input type="date" id="subjectModalStart"></div>
+        <div><label>Data de término</label><input type="date" id="subjectModalEnd"></div>
+      </div>
+      <div class="subject-date-grid">
+        <div><label>Total de aulas</label><input type="text" id="subjectModalAulasTotal" placeholder="Número ou não sei"></div>
+        <div><label>Total de atividades</label><input type="text" id="subjectModalAtivTotal" placeholder="Número ou não sei"></div>
+      </div>
+      <label class="subject-archive-toggle"><input type="checkbox" id="subjectModalArchive"> Quero arquivar esta matéria</label>
+      <div class="im-actions">
+        <button class="im-cancel" id="subjectModalCancel" type="button">Cancelar</button>
+        <button class="im-save" id="subjectModalSave" type="button">Salvar</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div class="item-modal-overlay" id="projModalOverlay">
