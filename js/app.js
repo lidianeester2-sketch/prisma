@@ -2,12 +2,12 @@
    DADOS BASE
 ============================================================ */
 const defaultSubjects = [
-  {code:'VIV0106', name:'Inovação e Empreendedorismo', day:'Sexta', dayIdx:4, time:'20:50–22:30', bg:'var(--c-yellow-bg)', fg:'var(--c-yellow-fg)', icon:'💡', type:'presencial'},
-  {code:'VIV0481', name:'Profissões em Comunicação', day:'Terça', dayIdx:1, time:'19:00–20:40', bg:'var(--c-mint-bg)', fg:'var(--c-mint-fg)', icon:'🎙️', type:'presencial'},
-  {code:'VIV0727', name:'História da Mídia', day:'Quarta', dayIdx:2, time:'19:00–20:40', bg:'var(--c-pink-bg)', fg:'var(--c-pink-fg)', icon:'📺', type:'presencial'},
-  {code:'VIV0750', name:'Computação Gráfica e Editoração', day:'Quinta', dayIdx:3, time:'20:50–22:30', bg:'var(--c-sky-bg)', fg:'var(--c-sky-fg)', icon:'🖥️', type:'presencial'},
-  {code:'ARA6403', name:'LABVIDA Publicidade e Propaganda 1', day:'—', dayIdx:null, time:'On-line', bg:'var(--c-lav-bg)', fg:'var(--c-lav-fg)', icon:'🎨', type:'online'},
-  {code:'ARA1739', name:'Língua Portuguesa', day:'—', dayIdx:null, time:'On-line', bg:'var(--c-peach-bg)', fg:'var(--c-peach-fg)', icon:'📖', type:'online'},
+  {startDate:'', endDate:'', teacher:'', code:'VIV0106', name:'Inovação e Empreendedorismo', day:'Sexta', dayIdx:4, time:'20:50–22:30', bg:'var(--c-yellow-bg)', fg:'var(--c-yellow-fg)', icon:'💡', type:'presencial'},
+  {startDate:'', endDate:'', teacher:'', code:'VIV0481', name:'Profissões em Comunicação', day:'Terça', dayIdx:1, time:'19:00–20:40', bg:'var(--c-mint-bg)', fg:'var(--c-mint-fg)', icon:'🎙️', type:'presencial'},
+  {startDate:'', endDate:'', teacher:'', code:'VIV0727', name:'História da Mídia', day:'Quarta', dayIdx:2, time:'19:00–20:40', bg:'var(--c-pink-bg)', fg:'var(--c-pink-fg)', icon:'📺', type:'presencial'},
+  {startDate:'', endDate:'', teacher:'', code:'VIV0750', name:'Computação Gráfica e Editoração', day:'Quinta', dayIdx:3, time:'20:50–22:30', bg:'var(--c-sky-bg)', fg:'var(--c-sky-fg)', icon:'🖥️', type:'presencial'},
+  {startDate:'', endDate:'', teacher:'', code:'ARA6403', name:'LABVIDA Publicidade e Propaganda 1', day:'—', dayIdx:null, time:'On-line', bg:'var(--c-lav-bg)', fg:'var(--c-lav-fg)', icon:'🎨', type:'online'},
+  {startDate:'', endDate:'', teacher:'', code:'ARA1739', name:'Língua Portuguesa', day:'—', dayIdx:null, time:'On-line', bg:'var(--c-peach-bg)', fg:'var(--c-peach-fg)', icon:'📖', type:'online'},
 ];
 let subjects = JSON.parse(JSON.stringify(defaultSubjects));
 let archivedSubjects = [];
@@ -292,10 +292,11 @@ async function loadSubjects(){
   try{
     const r = await remoteStorage.get('subjects-list');
     subjects = r ? JSON.parse(r.value) : JSON.parse(JSON.stringify(defaultSubjects));
+    subjects = (subjects || []).map(s=>({startDate:'', endDate:'', teacher:'', ...s}));
     const ar = await remoteStorage.get('subjects-archived');
     archivedSubjects = ar ? JSON.parse(ar.value) : [];
   }catch(e){
-    subjects = JSON.parse(JSON.stringify(defaultSubjects));
+    subjects = JSON.parse(JSON.stringify(defaultSubjects)).map(s=>({startDate:'', endDate:'', teacher:'', ...s}));
     archivedSubjects = [];
   }
 }
@@ -388,70 +389,123 @@ async function addSubject(){
   showToast(`"${subject.name}" criada com ${aulasTotal} aula(s) e ${ativTotal} atividade(s). ✦`);
 }
 
-async function editSubject(code){
+let openedSubjectCode = null;
+
+function formatSubjectDateRange(s){
+  const fmt = iso => iso ? new Date(iso+'T00:00:00').toLocaleDateString('pt-BR') : '';
+  if(!s.startDate && !s.endDate) return 'Datas não informadas';
+  if(s.startDate && s.endDate) return `${fmt(s.startDate)} → ${fmt(s.endDate)}`;
+  if(s.startDate) return `Início: ${fmt(s.startDate)}`;
+  return `Término: ${fmt(s.endDate)}`;
+}
+
+function openSubjectModal(code){
   const subject = subjects.find(s=>s.code===code);
+  if(!subject) return;
   const p = courseProgress[code] || newSubjectProgress();
+  openedSubjectCode = code;
+
+  document.getElementById('subjectModalTitle').textContent = subject.name;
+  document.getElementById('subjectViewTeacher').textContent = subject.teacher || 'Não informado';
+  document.getElementById('subjectViewDates').textContent = formatSubjectDateRange(subject);
+  document.getElementById('subjectViewProgress').textContent = progressHasKnownTotal(p) ? `${progressPct(p)}%` : 'Sem percentual';
+  document.getElementById('subjectViewProgressDetail').textContent = progressDisplay(p);
+  document.getElementById('subjectViewArchive').textContent = 'Matéria ativa — você pode arquivá-la pela edição.';
+
+  document.getElementById('subjectModalName').value = subject.name || '';
+  document.getElementById('subjectModalCode').value = subject.code || '';
+  document.getElementById('subjectModalTeacher').value = subject.teacher || '';
+  document.getElementById('subjectModalStart').value = subject.startDate || '';
+  document.getElementById('subjectModalEnd').value = subject.endDate || '';
+  document.getElementById('subjectModalAulasTotal').value = p.aulasTotal == null ? 'não sei' : String(p.aulasTotal);
+  document.getElementById('subjectModalAtivTotal').value = p.ativTotal == null ? 'não sei' : String(p.ativTotal);
+  document.getElementById('subjectModalArchive').checked = false;
+
+  document.getElementById('subjectModalView').hidden = false;
+  document.getElementById('subjectModalEditForm').hidden = true;
+  document.getElementById('subjectModalOverlay').classList.add('show');
+}
+
+function closeSubjectModal(){
+  openedSubjectCode = null;
+  document.getElementById('subjectModalOverlay').classList.remove('show');
+}
+
+function setSubjectModalEdit(on){
+  document.getElementById('subjectModalView').hidden = on;
+  document.getElementById('subjectModalEditForm').hidden = !on;
+  document.getElementById('subjectModalEdit').style.display = on ? 'none' : 'inline-flex';
+}
+
+async function saveSubjectModal(){
+  const code = openedSubjectCode;
+  const subject = subjects.find(s=>s.code===code);
   if(!subject) return;
 
-  const nameInput = prompt('Nome da matéria:', subject.name);
-  if(nameInput === null) return;
-  const name = nameInput.trim();
-  if(!name){ showToast('O nome da matéria não pode ficar vazio.'); return; }
+  const name = document.getElementById('subjectModalName').value.trim();
+  const newCode = document.getElementById('subjectModalCode').value.trim().toUpperCase() || subject.code;
+  const teacher = document.getElementById('subjectModalTeacher').value.trim();
+  const startDate = document.getElementById('subjectModalStart').value;
+  const endDate = document.getElementById('subjectModalEnd').value;
+  const aulasTotal = parseSubjectTotal(document.getElementById('subjectModalAulasTotal').value, 'aulas');
+  const ativTotal = parseSubjectTotal(document.getElementById('subjectModalAtivTotal').value, 'atividades');
+  const shouldArchive = document.getElementById('subjectModalArchive').checked;
+  const p = courseProgress[code] || newSubjectProgress();
 
-  const codeInput = prompt('Código da matéria:', subject.code);
-  if(codeInput === null) return;
-  const newCode = codeInput.trim().toUpperCase() || subject.code;
+  if(!name){ showToast('O nome da matéria não pode ficar vazio.'); return; }
+  if(aulasTotal === undefined || ativTotal === undefined) return;
+  if(aulasTotal !== null && aulasTotal < p.aulas){
+    showToast(`O total de aulas não pode ser menor que ${p.aulas}, que já foram registradas.`); return;
+  }
+  if(ativTotal !== null && ativTotal < p.ativ){
+    showToast(`O total de atividades não pode ser menor que ${p.ativ}, que já foram registradas.`); return;
+  }
+  if(startDate && endDate && startDate > endDate){
+    showToast('A data de início não pode ser depois da data de término.'); return;
+  }
   if(newCode !== subject.code && subjects.some(s=>s.code===newCode)){
     showToast('Já existe uma matéria com esse código.'); return;
   }
 
-  const aulasInput = prompt(`Quantas aulas? Atual: ${p.aulasTotal == null ? 'não sei' : p.aulasTotal}\n\nDigite um número ou “não sei”.`, p.aulasTotal == null ? 'não sei' : String(p.aulasTotal));
-  if(aulasInput === null) return;
-  const aulasTotal = parseSubjectTotal(aulasInput, 'aulas');
-  if(aulasTotal === undefined) return;
-  if(aulasTotal !== null && aulasTotal < p.aulas){
-    showToast(`O total de aulas não pode ser menor que ${p.aulas}, que já foram registradas.`); return;
-  }
-
-  const ativInput = prompt(`Quantas atividades? Atual: ${p.ativTotal == null ? 'não sei' : p.ativTotal}\n\nDigite um número ou “não sei”.`, p.ativTotal == null ? 'não sei' : String(p.ativTotal));
-  if(ativInput === null) return;
-  const ativTotal = parseSubjectTotal(ativInput, 'atividades');
-  if(ativTotal === undefined) return;
-  if(ativTotal !== null && ativTotal < p.ativ){
-    showToast(`O total de atividades não pode ser menor que ${p.ativ}, que já foram registradas.`); return;
-  }
-
   subject.name = name;
+  subject.teacher = teacher;
+  subject.startDate = startDate;
+  subject.endDate = endDate;
   subject.code = newCode;
-  if(newCode !== code){
-    delete courseProgress[code];
-    courseProgress[newCode] = p;
-  }
   p.aulasTotal = aulasTotal;
   p.ativTotal = ativTotal;
   p.updated = Date.now();
 
+  if(newCode !== code){
+    delete courseProgress[code];
+    courseProgress[newCode] = p;
+  }
+
+  if(shouldArchive){
+    archivedSubjects.push({...subject, archivedAt:Date.now()});
+    subjects = subjects.filter(s=>s.code!==newCode);
+  }
+
   await saveSubjects();
+  await saveArchivedSubjects();
   await saveCourseProgress();
   buildCourseGrid();
   buildWeekGrid();
   populateSubjectSelects();
   renderProgressPage();
   renderJourneyProgress();
-  showToast(`“${subject.name}” atualizada. ✦`);
+  closeSubjectModal();
+  showToast(shouldArchive ? 'Matéria arquivada. ✦' : 'Matéria salva. ✦');
 }
 
 async function archiveCompletedSubject(code){
   const subject = subjects.find(s=>s.code===code);
-  const p = courseProgress[code];
-  if(!subject || !p || progressPct(p) < 100) return;
+  if(!subject) return;
   if(!confirm(`Arquivar "${subject.name}"? Ela ficará fora das matérias ativas.`)) return;
   archivedSubjects.push({...subject, archivedAt:Date.now()});
   subjects = subjects.filter(s=>s.code!==code);
-  delete courseProgress[code];
   await saveSubjects();
   await saveArchivedSubjects();
-  await saveCourseProgress();
   buildCourseGrid();
   buildWeekGrid();
   populateSubjectSelects();
@@ -467,16 +521,12 @@ function buildCourseGrid(){
   const cards = subjects.map(s=>{
     const p = courseProgress[s.code] || newSubjectProgress();
     const completed = progressHasKnownTotal(p) && progressPct(p) >= 100;
-    return `<div class="course-card" style="background:${s.bg};color:${s.fg};position:relative;">
-      <div style="position:absolute;top:10px;right:10px;display:flex;gap:5px;">
-        <button class="dyn-del" data-action="edit-subject" data-code="${escapeHtml(s.code)}" title="Editar matéria">✎</button>
-        ${completed ? `<button class="dyn-del" data-action="archive-subject" data-code="${escapeHtml(s.code)}" title="Arquivar matéria concluída">✕</button>` : ''}
-      </div>
+    return `<div class="course-card subject-click-card" data-action="open-subject" data-code="${escapeHtml(s.code)}" style="background:${s.bg};color:${s.fg};position:relative;cursor:pointer;" title="Abrir detalhes da matéria">
       <div class="cc-icon">${s.icon}</div>
       <h3>${escapeHtml(s.name)}</h3>
       <div class="cc-meta">${escapeHtml(s.code)} · ${s.day!=='—' ? escapeHtml(s.day+' '+s.time) : escapeHtml(s.time)}</div>
       <div style="margin-top:8px;font-size:11px;opacity:.8;">${escapeHtml(progressDisplay(p))}</div>
-      ${completed ? `<div style="margin-top:6px;font-size:11px;opacity:.8;">✓ concluída · toque em ✕ para arquivar</div>` : ''}
+      ${completed ? `<div style="margin-top:6px;font-size:11px;opacity:.8;">✓ 100% · abra para arquivar</div>` : `<div style="margin-top:6px;font-size:11px;opacity:.7;">Toque para ver detalhes</div>`}
     </div>`;
   }).join('');
   document.getElementById('courseGrid').innerHTML = cards + `<div class="add-item-card" id="subjectAddCard">＋ Registrar nova matéria</div>`;
@@ -504,10 +554,16 @@ function buildWeekGrid(){
 document.getElementById('courseGrid').addEventListener('click', async e=>{
   const add = e.target.closest('#subjectAddCard');
   if(add){ await addSubject(); return; }
-  const edit = e.target.closest('[data-action="edit-subject"]');
-  if(edit){ await editSubject(edit.dataset.code); return; }
-  const btn = e.target.closest('[data-action="archive-subject"]');
-  if(btn){ await archiveCompletedSubject(btn.dataset.code); }
+  const card = e.target.closest('[data-action="open-subject"]');
+  if(card){ openSubjectModal(card.dataset.code); }
+});
+
+/* Card de detalhes da matéria */
+document.getElementById('subjectModalEdit')?.addEventListener('click', ()=>setSubjectModalEdit(true));
+document.getElementById('subjectModalCancel')?.addEventListener('click', ()=>closeSubjectModal());
+document.getElementById('subjectModalSave')?.addEventListener('click', saveSubjectModal);
+document.getElementById('subjectModalOverlay')?.addEventListener('click', e=>{
+  if(e.target.id==='subjectModalOverlay') closeSubjectModal();
 });
 
 
