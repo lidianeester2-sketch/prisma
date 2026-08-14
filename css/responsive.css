@@ -469,3 +469,25 @@
     padding:14px 15px;
   }
 }
+
+
+/* ============================================================
+   PRISMA — LEITURA DINÂMICA DA JORNADA
+============================================================ */
+.journey-status{
+  margin:12px 0 2px;
+  padding:10px 13px;
+  border-left:3px solid var(--pink);
+  border-radius:0 12px 12px 12px;
+  background:rgba(220,35,104,.06);
+  color:var(--muted);
+  font-size:12.5px;
+  line-height:1.45;
+}
+@media (max-width:700px){
+  .journey-status{
+    margin-top:11px;
+    padding:11px 13px;
+    font-size:13px;
+  }
+}
