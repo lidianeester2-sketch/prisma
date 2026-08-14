@@ -281,3 +281,191 @@
   }
   .app.rail-collapsed .rail-collapse-btn b{display:none;}
 }
+
+/* ============================================================
+   PRISMA — HOME MOBILE CAROUSEL v2
+   Mantém o desktop em duas colunas e transforma a Home em telas
+   horizontais no celular.
+============================================================ */
+.home-mobile-carousel{
+  display:grid;
+  grid-template-columns:1.55fr .95fr;
+  gap:18px;
+  margin-bottom:18px;
+}
+.home-mobile-panel{display:contents;}
+.home-mobile-dot{display:none;}
+.home-mobile-carousel > .home-mobile-panel > #journeyCard{grid-column:1;grid-row:1;}
+.home-mobile-carousel > .home-mobile-panel > #nextClassCard{grid-column:2;grid-row:1;min-height:220px;align-self:stretch;}
+.home-mobile-carousel > .home-mobile-panel > .card:nth-child(2){grid-column:1;grid-row:2;}
+.home-mobile-carousel > .home-mobile-panel > .card{min-width:0;}
+.home-mobile-carousel > .home-mobile-panel:nth-child(3) > .card{grid-column:2;grid-row:2;}
+.home-mobile-carousel > .home-mobile-panel:nth-child(4) > .card{grid-column:1;grid-row:3;}
+.home-mobile-carousel > .home-mobile-panel:nth-child(5) > .card{grid-column:2;grid-row:3;}
+
+@media (max-width:700px){
+  #page-inicio{overflow-x:hidden;}
+  .home-mobile-carousel{
+    display:flex;
+    width:100%;
+    gap:12px;
+    margin:0;
+    padding:0 0 4px;
+    overflow-x:auto;
+    overflow-y:hidden;
+    scroll-snap-type:x mandatory;
+    scroll-behavior:smooth;
+    overscroll-behavior-x:contain;
+    scrollbar-width:none;
+    -webkit-overflow-scrolling:touch;
+  }
+  .home-mobile-carousel::-webkit-scrollbar{display:none;}
+  .home-mobile-panel{
+    display:flex;
+    flex:0 0 100%;
+    width:100%;
+    min-width:100%;
+    flex-direction:column;
+    gap:12px;
+    scroll-snap-align:start;
+    scroll-snap-stop:always;
+  }
+  .home-mobile-carousel > .home-mobile-panel > *{
+    width:100% !important;
+    min-width:0 !important;
+    margin:0 !important;
+    grid-column:auto !important;
+    grid-row:auto !important;
+  }
+  .home-mobile-carousel > .home-mobile-panel:nth-child(1) > #journeyCard{
+    min-height:310px;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+  }
+  .home-mobile-carousel > .home-mobile-panel:nth-child(2) > #nextClassCard{
+    min-height:145px;
+  }
+  .home-mobile-carousel > .home-mobile-panel:nth-child(2) > .card{
+    min-height:215px;
+  }
+  .home-mobile-carousel > .home-mobile-panel:nth-child(3) > .card,
+  .home-mobile-carousel > .home-mobile-panel:nth-child(4) > .card,
+  .home-mobile-carousel > .home-mobile-panel:nth-child(5) > .card{
+    min-height:330px;
+  }
+  .home-mobile-dots{
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    gap:6px;
+    height:24px;
+    margin:4px 0 10px;
+  }
+  .home-mobile-dot{
+    display:block;
+    width:7px;
+    height:7px;
+    padding:0;
+    border:0;
+    border-radius:99px;
+    background:var(--muted);
+    opacity:.35;
+    cursor:pointer;
+    transition:all .18s ease;
+  }
+  .home-mobile-dot.on{
+    width:20px;
+    background:var(--pink);
+    opacity:1;
+  }
+}
+
+
+/* ============================================================
+   PRISMA — MENSAGEM DO DIA
+   A frase aparece como uma mensagem enviada pelo próprio Prisma.
+============================================================ */
+
+.prisma-greeting-block{
+  min-width:0;
+}
+
+.prisma-greeting-block .prisma-message{
+  position:relative;
+  display:block;
+  width:fit-content;
+  max-width:min(560px, 100%);
+  margin-top:10px;
+  padding:13px 17px 14px 17px;
+  border-radius:7px 18px 18px 18px;
+  background:linear-gradient(135deg, rgba(220,35,104,.12), rgba(197,31,93,.06));
+  border:1px solid rgba(220,35,104,.22);
+  color:var(--text);
+  font-family:var(--font-body);
+  font-size:14px;
+  line-height:1.45;
+  box-shadow:0 8px 24px rgba(15,23,42,.06);
+}
+
+.prisma-greeting-block .prisma-message::before{
+  content:"✦ Prisma";
+  display:block;
+  margin-bottom:4px;
+  color:var(--pink);
+  font-family:var(--font-mono);
+  font-size:9px;
+  font-weight:700;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+}
+
+.prisma-greeting-block .prisma-message::after{
+  content:"";
+  position:absolute;
+  left:-6px;
+  top:0;
+  width:12px;
+  height:12px;
+  background:rgba(220,35,104,.12);
+  border-left:1px solid rgba(220,35,104,.22);
+  border-top:1px solid rgba(220,35,104,.22);
+  transform:skewX(-28deg);
+  border-radius:2px 0 0 0;
+}
+
+@media (max-width:700px){
+  .prisma-greeting-block .prisma-message{
+    width:100%;
+    max-width:none;
+    margin-top:12px;
+    padding:15px 17px 16px;
+    border-radius:8px 20px 20px 20px;
+    font-size:15px;
+    line-height:1.5;
+    box-shadow:0 10px 26px rgba(15,23,42,.08);
+  }
+
+  .prisma-greeting-block .prisma-message::before{
+    font-size:9px;
+    margin-bottom:6px;
+  }
+
+  .prisma-greeting-block .prisma-message::after{
+    left:9px;
+    top:-6px;
+    transform:rotate(45deg);
+    border-right:1px solid rgba(220,35,104,.22);
+    border-bottom:1px solid rgba(220,35,104,.22);
+    border-left:0;
+    border-top:0;
+    background:rgba(220,35,104,.12);
+  }
+}
+
+@media (max-width:380px){
+  .prisma-greeting-block .prisma-message{
+    font-size:14px;
+    padding:14px 15px;
+  }
+}

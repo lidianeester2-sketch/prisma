@@ -40,6 +40,39 @@ body{
 }
 .app{display:flex;min-height:100vh;}
 
+
+/* ============ PRISMA — JORNADA ============ */
+.home-hero-grid{display:grid;grid-template-columns:1.55fr .95fr;gap:18px;margin-bottom:18px;}
+.journey-card{position:relative;overflow:hidden;background:linear-gradient(115deg,rgba(139,92,246,.13),rgba(236,72,153,.16) 55%,rgba(62,10,42,.92));border:1px solid rgba(236,72,153,.28);border-radius:22px;padding:22px;}
+.journey-card:after{content:"";position:absolute;width:190px;height:190px;border-radius:50%;right:-70px;top:-90px;background:rgba(236,72,153,.13);pointer-events:none;}
+.journey-kicker{position:relative;z-index:1;font-family:'JetBrains Mono';font-size:11px;letter-spacing:.08em;color:var(--pink-soft);text-transform:uppercase;}
+.journey-kicker span{font-family:'Nunito';text-transform:none;letter-spacing:0;color:var(--muted);font-size:11px;}
+.journey-head{position:relative;z-index:1;display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-top:8px;}
+.journey-head h2{font-family:'Baloo 2';font-size:24px;line-height:1.08;margin:0 0 5px;font-weight:700;}
+.journey-head p{margin:0;color:var(--muted);font-size:12.5px;}
+.journey-score{font-family:'Baloo 2';font-size:38px;font-weight:800;line-height:1;color:var(--text);white-space:nowrap;}
+.journey-progress{position:relative;z-index:1;height:9px;background:rgba(255,255,255,.12);border-radius:20px;overflow:hidden;margin:18px 0;}
+.journey-progress>div{height:100%;border-radius:20px;background:linear-gradient(90deg,var(--pink),var(--pink-soft));transition:width .35s ease;}
+.journey-stats{position:relative;z-index:1;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+.journey-stats>div{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.06);border-radius:14px;padding:11px 12px;min-width:0;}
+.journey-stats span{display:block;font-size:15px;margin-bottom:4px;}
+.journey-stats strong{display:block;font-family:'JetBrains Mono';font-size:15px;}
+.journey-stats small{display:block;color:var(--muted);font-size:10px;margin-top:2px;}
+.journey-action{position:relative;z-index:1;width:100%;margin-top:16px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:12px;color:var(--text);padding:11px 14px;font-family:'Nunito';font-weight:800;cursor:pointer;text-align:left;display:flex;justify-content:space-between;align-items:center;}
+.journey-action:hover{background:rgba(255,255,255,.13);}
+.home-hero-grid .next-class{height:100%;margin-bottom:0;min-height:220px;align-items:center;}
+
+@media(max-width:980px){.home-hero-grid{grid-template-columns:1fr;}.home-hero-grid .next-class{min-height:0;}}
+@media(max-width:700px){
+  .journey-card{padding:18px;border-radius:20px;}
+  .journey-head{align-items:flex-start;flex-direction:column;gap:8px;}
+  .journey-head h2{font-size:22px;}
+  .journey-score{font-size:32px;}
+  .journey-stats{grid-template-columns:repeat(2,1fr);}
+  .home-hero-grid{gap:12px;margin-bottom:14px;}
+  .home-hero-grid .next-class{min-height:150px;}
+}
+
 /* ============ SIDEBAR ============ */
 .rail{
   width:78px;
