@@ -1,5 +1,5 @@
-const PRISMA_SW_VERSION = '29G';
-const PRISMA_SW_VERSION = '29G';
+const PRISMA_SW_VERSION = '29E2';
+const PRISMA_SW_VERSION = '29D';
 self.addEventListener('install', event => {
   self.skipWaiting();
 });
