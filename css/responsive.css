@@ -652,22 +652,27 @@
 .prisma-alert-row.high .prisma-alert-days{color:#c96a1b}
 @media (max-width:700px){.prisma-alerts-card{min-height:330px}.prisma-alert-row{padding:14px 0}}
 
-
-
-/* Prisma — Configurações */
-.prisma-settings-card{max-width:760px}
-.prisma-settings-icon{
-  width:52px;height:52px;border-radius:16px;display:flex;align-items:center;
-  justify-content:center;margin-bottom:14px;font-size:24px;color:#fff;
-  background:linear-gradient(135deg,#ec4899,#8b5cf6);
-  box-shadow:0 10px 28px rgba(236,72,153,.22)
+/* ============================================================
+   PRISMA — CONTROLES DE NOTIFICAÇÃO
+============================================================ */
+.prisma-notification-actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-top:14px;
 }
-.prisma-settings-row{
-  margin-top:20px;padding-top:16px;border-top:1px solid rgba(255,255,255,.08);
-  display:flex;align-items:center;justify-content:space-between;gap:14px
+.prisma-notification-actions .btn{min-height:36px}
+.prisma-notification-status{
+  margin-top:8px;
+  color:var(--muted);
+  font-size:10.5px;
+  line-height:1.4;
 }
-.prisma-settings-row span{color:var(--muted);font-size:12px}
-@media(max-width:700px){
-  .prisma-settings-row{align-items:stretch;flex-direction:column}
-  .prisma-settings-row .journey-action{width:100%}
+.prisma-notification-actions .btn:disabled{
+  opacity:.55;
+  cursor:not-allowed;
+}
+@media (max-width:700px){
+  .prisma-notification-actions{display:grid;grid-template-columns:1fr 1fr}
+  .prisma-notification-actions .btn{width:100%}
 }
