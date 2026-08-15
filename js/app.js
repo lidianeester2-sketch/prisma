@@ -2183,7 +2183,7 @@ async function getPrismaNotificationRegistration(){
   try{
     if(!prismaNotificationRegistration){
       prismaNotificationRegistration =
-        await navigator.serviceWorker.register('./sw.js?v=29g', {scope:'./'});
+        await navigator.serviceWorker.register('./sw.js?v=29g-fix', {scope:'./'});
     }
     return await navigator.serviceWorker.ready;
   }catch(err){
@@ -2269,8 +2269,6 @@ async function showPrismaTestNotification(){
 }
 
 function initPrismaNotifications(){
-  // As notificações não aparecem mais no Início.
-  // O teste fica disponível somente em Configurações.
   const testBtn = document.getElementById('settingsTestNotificationBtn');
   testBtn?.addEventListener('click', async ()=>{
     if('Notification' in window && Notification.permission !== 'granted'){
@@ -2292,16 +2290,14 @@ function updatePrismaSettingsNotificationStatus(){
     return;
   }
 
-  const permission = Notification.permission;
-  if(permission === 'granted'){
+  if(Notification.permission === 'granted'){
     status.textContent = '✓ Notificações permitidas neste navegador.';
-  }else if(permission === 'denied'){
-    status.textContent = 'Notificações bloqueadas. Reative nas configurações do navegador.';
+  }else if(Notification.permission === 'denied'){
+    status.textContent = 'Notificações bloqueadas no navegador.';
   }else{
     status.textContent = 'Notificações ainda não autorizadas.';
   }
 }
-
 
 /* ============================================================
    PRISMA — ALERTAS E PRIORIDADE
