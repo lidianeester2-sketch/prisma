@@ -2183,7 +2183,7 @@ async function getPrismaNotificationRegistration(){
   try{
     if(!prismaNotificationRegistration){
       prismaNotificationRegistration =
-        await navigator.serviceWorker.register('./sw.js?v=29g-fix', {scope:'./'});
+        await navigator.serviceWorker.register('./sw.js?v=29e2', {scope:'./'});
     }
     return await navigator.serviceWorker.ready;
   }catch(err){
@@ -2269,34 +2269,14 @@ async function showPrismaTestNotification(){
 }
 
 function initPrismaNotifications(){
-  const testBtn = document.getElementById('settingsTestNotificationBtn');
-  testBtn?.addEventListener('click', async ()=>{
-    if('Notification' in window && Notification.permission !== 'granted'){
-      await requestPrismaNotifications();
-    }else{
-      await showPrismaTestNotification();
-    }
-    updatePrismaSettingsNotificationStatus();
-  });
-  updatePrismaSettingsNotificationStatus();
-}
+  const enable=document.getElementById('enableNotificationsBtn');
+  const test=document.getElementById('testNotificationBtn');
 
-function updatePrismaSettingsNotificationStatus(){
-  const status = document.getElementById('notificationSettingsStatus');
-  if(!status) return;
+  enable?.addEventListener('click',requestPrismaNotifications);
+  test?.addEventListener('click',showPrismaTestNotification);
 
-  if(!('Notification' in window)){
-    status.textContent = 'Seu navegador não oferece notificações.';
-    return;
-  }
-
-  if(Notification.permission === 'granted'){
-    status.textContent = '✓ Notificações permitidas neste navegador.';
-  }else if(Notification.permission === 'denied'){
-    status.textContent = 'Notificações bloqueadas no navegador.';
-  }else{
-    status.textContent = 'Notificações ainda não autorizadas.';
-  }
+  getPrismaNotificationRegistration();
+  updateNotificationStatus();
 }
 
 /* ============================================================
