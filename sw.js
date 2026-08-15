@@ -1,3 +1,4 @@
+const PRISMA_SW_VERSION = '29D';
 self.addEventListener('install', event => {
   self.skipWaiting();
 });
