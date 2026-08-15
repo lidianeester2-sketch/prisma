@@ -516,7 +516,7 @@
 
 
 /* ============================================================
-   PRISMA — HOME: LEITURAS + PROJETOS EM ANDAMENTO
+   PRISMA — HOME: LEITURAS + PROJETOS
 ============================================================ */
 .home-extra-grid{
   align-items:stretch;
@@ -639,29 +639,40 @@
   }
 }
 
-/* Desktop: the 7th and 8th content cards remain normal two-column cards. */
-@media (min-width:701px){
-  .home-mobile-carousel > .home-mobile-panel:nth-child(6),
-  .home-mobile-carousel > .home-mobile-panel:nth-child(7){
-    display:block;
-  }
-  .home-mobile-carousel > .home-mobile-panel:nth-child(6) > .card,
-  .home-mobile-carousel > .home-mobile-panel:nth-child(7) > .card{
-    width:100%;
-  }
-  .home-mobile-carousel > .home-mobile-panel:nth-child(6) > .card{
-    grid-column:1;
-    grid-row:4;
-  }
-  .home-mobile-carousel > .home-mobile-panel:nth-child(7) > .card{
-    grid-column:2;
-    grid-row:4;
-  }
-}
+/* ============================================================
+   PRISMA — ALERTAS E PRIORIDADE
+============================================================ */
+.prisma-alert-row{display:flex;align-items:center;gap:11px;padding:12px 0;border-top:1px solid rgba(15,23,42,.07)}
+.prisma-alert-icon{flex:none;width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:10px;background:rgba(15,23,42,.05)}
+.prisma-alert-main{min-width:0;flex:1}
+.prisma-alert-main strong{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prisma-alert-main small{display:block;margin-top:3px;color:var(--muted);font-size:11px}
+.prisma-alert-days{flex:none;font-family:var(--font-mono);font-size:10px;color:var(--muted)}
+.prisma-alert-row.urgent .prisma-alert-days,.prisma-alert-row.urgent .prisma-alert-main strong{color:#c52255}
+.prisma-alert-row.high .prisma-alert-days{color:#c96a1b}
+@media (max-width:700px){.prisma-alerts-card{min-height:330px}.prisma-alert-row{padding:14px 0}}
 
+/* ============================================================
+   PRISMA — CONTROLES DE NOTIFICAÇÃO
+============================================================ */
+.prisma-notification-actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-top:14px;
+}
+.prisma-notification-actions .btn{min-height:36px}
+.prisma-notification-status{
+  margin-top:8px;
+  color:var(--muted);
+  font-size:10.5px;
+  line-height:1.4;
+}
+.prisma-notification-actions .btn:disabled{
+  opacity:.55;
+  cursor:not-allowed;
+}
 @media (max-width:700px){
-  .home-mobile-carousel > .home-mobile-panel:nth-child(6) > .card,
-  .home-mobile-carousel > .home-mobile-panel:nth-child(7) > .card{
-    min-height:330px;
-  }
+  .prisma-notification-actions{display:grid;grid-template-columns:1fr 1fr}
+  .prisma-notification-actions .btn{width:100%}
 }
