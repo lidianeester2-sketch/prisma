@@ -1,5 +1,5 @@
-const PRISMA_SW_VERSION = '29E2';
-const PRISMA_SW_VERSION = '29D';
+const PRISMA_SW_VERSION = 'NOTIF-FIX-1';
+const PRISMA_SW_VERSION = 'NOTIF-FIX-1';
 self.addEventListener('install', event => {
   self.skipWaiting();
 });
