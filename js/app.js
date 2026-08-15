@@ -2183,7 +2183,7 @@ async function getPrismaNotificationRegistration(){
   try{
     if(!prismaNotificationRegistration){
       prismaNotificationRegistration =
-        await navigator.serviceWorker.register('./sw.js?v=29e2', {scope:'./'});
+        await navigator.serviceWorker.register('./sw.js?v=29g', {scope:'./'});
     }
     return await navigator.serviceWorker.ready;
   }catch(err){
@@ -2269,15 +2269,39 @@ async function showPrismaTestNotification(){
 }
 
 function initPrismaNotifications(){
-  const enable=document.getElementById('enableNotificationsBtn');
-  const test=document.getElementById('testNotificationBtn');
-
-  enable?.addEventListener('click',requestPrismaNotifications);
-  test?.addEventListener('click',showPrismaTestNotification);
-
-  getPrismaNotificationRegistration();
-  updateNotificationStatus();
+  // As notificações não aparecem mais no Início.
+  // O teste fica disponível somente em Configurações.
+  const testBtn = document.getElementById('settingsTestNotificationBtn');
+  testBtn?.addEventListener('click', async ()=>{
+    if('Notification' in window && Notification.permission !== 'granted'){
+      await requestPrismaNotifications();
+    }else{
+      await showPrismaTestNotification();
+    }
+    updatePrismaSettingsNotificationStatus();
+  });
+  updatePrismaSettingsNotificationStatus();
 }
+
+function updatePrismaSettingsNotificationStatus(){
+  const status = document.getElementById('notificationSettingsStatus');
+  if(!status) return;
+
+  if(!('Notification' in window)){
+    status.textContent = 'Seu navegador não oferece notificações.';
+    return;
+  }
+
+  const permission = Notification.permission;
+  if(permission === 'granted'){
+    status.textContent = '✓ Notificações permitidas neste navegador.';
+  }else if(permission === 'denied'){
+    status.textContent = 'Notificações bloqueadas. Reative nas configurações do navegador.';
+  }else{
+    status.textContent = 'Notificações ainda não autorizadas.';
+  }
+}
+
 
 /* ============================================================
    PRISMA — ALERTAS E PRIORIDADE
