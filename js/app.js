@@ -2175,6 +2175,23 @@ async function initPrisma(){
 /* ============================================================
    PRISMA — NOTIFICAÇÕES DO NAVEGADOR
 ============================================================ */
+let prismaNotificationRegistration = null;
+
+async function getPrismaNotificationRegistration(){
+  if(!('serviceWorker' in navigator)) return null;
+
+  try{
+    if(!prismaNotificationRegistration){
+      prismaNotificationRegistration =
+        await navigator.serviceWorker.register('./sw.js', {scope:'./'});
+    }
+    return await navigator.serviceWorker.ready;
+  }catch(err){
+    console.error('Prisma: não foi possível registrar o service worker.', err);
+    return null;
+  }
+}
+
 function updateNotificationStatus(){
   const status=document.getElementById('notificationStatus');
   const btn=document.getElementById('enableNotificationsBtn');
@@ -2210,29 +2227,45 @@ async function requestPrismaNotifications(){
     updateNotificationStatus();
     return;
   }
+
   try{
+    // O registro acontece junto da ação do usuário.
+    await getPrismaNotificationRegistration();
+
     const permission=await Notification.requestPermission();
     updateNotificationStatus();
-    if(permission==='granted') showPrismaTestNotification();
+
+    if(permission==='granted'){
+      await showPrismaTestNotification();
+    }
   }catch(err){
-    console.error('Erro ao solicitar notificações:',err);
-    updateNotificationStatus();
+    console.error('Prisma: erro ao ativar notificações.',err);
+    const status=document.getElementById('notificationStatus');
+    if(status) status.textContent='Não consegui ativar a notificação. Tente novamente pelo aplicativo instalado.';
   }
 }
 
-function showPrismaTestNotification(){
+async function showPrismaTestNotification(){
   if(!('Notification' in window) || Notification.permission!=='granted') return;
 
-  const n=new Notification('Prisma',{
-    body:'Você pediu uma notificação. Eu trouxe. O caos pode esperar um minuto.',
-    tag:'prisma-test-notification',
-    icon:'assets/icons/icon-192.png'
-  });
+  try{
+    const registration=await getPrismaNotificationRegistration();
 
-  n.onclick=()=>{
-    window.focus();
-    n.close();
-  };
+    if(!registration){
+      throw new Error('Service Worker indisponível.');
+    }
+
+    await registration.showNotification('Prisma', {
+      body:'Você pediu uma notificação. Eu trouxe. O caos pode esperar um minuto.',
+      tag:'prisma-test-notification',
+      renotify:true,
+      data:{url:'./'}
+    });
+  }catch(err){
+    console.error('Prisma: erro ao mostrar notificação.',err);
+    const status=document.getElementById('notificationStatus');
+    if(status) status.textContent='A permissão foi concedida, mas o navegador não conseguiu exibir a notificação. Confirme que o Prisma está instalado na tela inicial.';
+  }
 }
 
 function initPrismaNotifications(){
@@ -2242,6 +2275,7 @@ function initPrismaNotifications(){
   enable?.addEventListener('click',requestPrismaNotifications);
   test?.addEventListener('click',showPrismaTestNotification);
 
+  getPrismaNotificationRegistration();
   updateNotificationStatus();
 }
 
