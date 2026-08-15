@@ -2183,7 +2183,7 @@ async function getPrismaNotificationRegistration(){
   try{
     if(!prismaNotificationRegistration){
       prismaNotificationRegistration =
-        await navigator.serviceWorker.register('./sw.js', {scope:'./'});
+        await navigator.serviceWorker.register('./sw.js?v=29e2', {scope:'./'});
     }
     return await navigator.serviceWorker.ready;
   }catch(err){
