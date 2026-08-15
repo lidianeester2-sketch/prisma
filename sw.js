@@ -1,3 +1,4 @@
+const PRISMA_SW_VERSION = '29E2';
 const PRISMA_SW_VERSION = '29D';
 self.addEventListener('install', event => {
   self.skipWaiting();
@@ -14,8 +15,9 @@ self.addEventListener('push', event => {
   event.waitUntil(
     self.registration.showNotification(data.title || 'Prisma', {
       body: data.body || 'O Prisma tem uma coisa para te avisar.',
-      icon: './assets/icons/icon-192.png',
-      badge: './assets/icons/icon-192.png',
+      icon: './assets/icons/notification-icon.png',
+      badge: './assets/icons/notification-icon.png',
+      image: './assets/icons/icon-512.png',
       tag: data.tag || 'prisma-notification',
       renotify: true,
       data: { url: data.url || './' }
