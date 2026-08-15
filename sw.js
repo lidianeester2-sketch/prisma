@@ -6,6 +6,22 @@ self.addEventListener('activate', event => {
   event.waitUntil(self.clients.claim());
 });
 
+self.addEventListener('push', event => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; } catch(e) {}
+
+  event.waitUntil(
+    self.registration.showNotification(data.title || 'Prisma', {
+      body: data.body || 'O Prisma tem uma coisa para te avisar.',
+      icon: './assets/icons/icon-192.png',
+      badge: './assets/icons/icon-192.png',
+      tag: data.tag || 'prisma-notification',
+      renotify: true,
+      data: { url: data.url || './' }
+    })
+  );
+});
+
 self.addEventListener('notificationclick', event => {
   event.notification.close();
 
