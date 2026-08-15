@@ -1456,6 +1456,8 @@ async function loadProjects(){
   catch(e){ projects = []; }
   populateProjectSelects();
   renderProjGrid();
+  renderHomeProjects();
+  renderHomeAlerts();
 }
 async function saveProjects(){ try{ await remoteStorage.set('proj-list', JSON.stringify(projects)); }catch(e){} }
 async function loadProjProgress(){
@@ -1467,6 +1469,7 @@ async function initProjWorkspace(){
   await Promise.all([loadProjects(), loadProjProgress()]);
   renderProjProgressGrid();
   renderProjContinueCard();
+  renderHomeProjects();
   renderJourneyProgress();
 }
 
@@ -1767,6 +1770,95 @@ document.getElementById('projNotesGrid').addEventListener('click', async e=>{
 /* ============================================================
    PAINEL DE LEITURAS
 ============================================================ */
+
+/* ============================================================
+   HOME — LEITURAS E PROJETOS EM ANDAMENTO
+============================================================ */
+function renderHomeReadings(){
+  const list = document.getElementById('homeReadingsList');
+  const count = document.getElementById('homeReadingsCount');
+  if(!list || !count) return;
+
+  const active = (readings || [])
+    .filter(r => r.status === 'lendo')
+    .sort((a,b) => (b.updated||0) - (a.updated||0));
+
+  count.textContent = active.length;
+
+  if(!active.length){
+    list.innerHTML = `
+      <div class="home-empty">
+        <span>📖</span>
+        <div>
+          <strong>Nenhuma leitura em andamento.</strong>
+          <small>Quando você começar uma, ela aparece aqui.</small>
+        </div>
+      </div>`;
+    return;
+  }
+
+  list.innerHTML = active.slice(0,4).map(r=>{
+    const pct = leitPct(r);
+    return `
+      <div class="home-progress-item">
+        <div class="home-progress-top">
+          <div class="home-progress-title">
+            <strong>${escapeHtml(r.title)}</strong>
+            <small>${escapeHtml(r.author || '—')} · Lendo</small>
+          </div>
+          <strong class="home-progress-pct">${pct}%</strong>
+        </div>
+        <div class="home-progress-bar"><div style="width:${pct}%"></div></div>
+      </div>`;
+  }).join('');
+}
+
+function renderHomeProjects(){
+  const list = document.getElementById('homeProjectsList');
+  const count = document.getElementById('homeProjectsCount');
+  if(!list || !count) return;
+
+  const active = (projects || [])
+    .filter(p => p.status !== 'concluido')
+    .map(p=>{
+      const prog = projProgress[p.id] || {done:0,total:10,updated:0};
+      return {p, prog, pct: projProgressPct(prog)};
+    })
+    .sort((a,b) => {
+      if((a.prog.updated||0) !== (b.prog.updated||0)){
+        return (b.prog.updated||0) - (a.prog.updated||0);
+      }
+      return a.pct - b.pct;
+    });
+
+  count.textContent = active.length;
+
+  if(!active.length){
+    list.innerHTML = `
+      <div class="home-empty">
+        <span>💼</span>
+        <div>
+          <strong>Nenhum projeto em andamento.</strong>
+          <small>Quando você criar um, ele aparece aqui.</small>
+        </div>
+      </div>`;
+    return;
+  }
+
+  list.innerHTML = active.slice(0,4).map(({p,prog,pct})=>`
+    <div class="home-progress-item">
+      <div class="home-progress-top">
+        <div class="home-progress-title">
+          <strong>${escapeHtml(p.name)}</strong>
+          <small>${escapeHtml(p.client||'Projeto')} · ${prog.done}/${prog.total} etapas</small>
+        </div>
+        <strong class="home-progress-pct">${pct}%</strong>
+      </div>
+      <div class="home-progress-bar"><div style="width:${pct}%"></div></div>
+    </div>
+  `).join('');
+}
+
 let readings = [];
 let leitTasks = [];
 let leitNotes = [];
@@ -1783,6 +1875,7 @@ async function loadReadings(){
   renderLeitContinueCard();
   renderLeitQueue();
   updateLeitStatsChip();
+  renderHomeReadings();
 }
 async function saveReadings(){ try{ await remoteStorage.set('leit-list', JSON.stringify(readings)); }catch(e){} }
 
@@ -2065,7 +2158,11 @@ async function initPrisma(){
   loadLeitNotes();
 
   initWorkspace();
-  setTimeout(renderJourneyProgress, 1200);
+  setTimeout(()=>{
+    renderJourneyProgress();
+    renderHomeReadings();
+    renderHomeProjects();
+  }, 1200);
 }
 
 
@@ -2074,6 +2171,144 @@ async function initPrisma(){
    Reorganiza apenas a apresentação da Home. Os IDs dos elementos
    permanecem os mesmos para não interferir na sincronização.
 ============================================================ */
+
+/* ============================================================
+   PRISMA — NOTIFICAÇÕES DO NAVEGADOR
+============================================================ */
+function updateNotificationStatus(){
+  const status=document.getElementById('notificationStatus');
+  const btn=document.getElementById('enableNotificationsBtn');
+  const test=document.getElementById('testNotificationBtn');
+  if(!status) return;
+
+  if(!('Notification' in window)){
+    status.textContent='Este navegador não oferece notificações.';
+    if(btn) btn.disabled=true;
+    if(test) test.disabled=true;
+    return;
+  }
+
+  const permission=Notification.permission;
+
+  if(permission==='granted'){
+    status.textContent='Notificações ativadas. ✦';
+    if(btn) btn.textContent='✓ Notificações ativas';
+    if(test) test.disabled=false;
+  }else if(permission==='denied'){
+    status.textContent='Notificações bloqueadas no navegador. Reative-as nas configurações do site.';
+    if(btn) btn.textContent='🔔 Ativar nas configurações';
+    if(test) test.disabled=true;
+  }else{
+    status.textContent='O Prisma ainda não tem permissão para enviar notificações.';
+    if(btn) btn.textContent='🔔 Ativar notificações';
+    if(test) test.disabled=true;
+  }
+}
+
+async function requestPrismaNotifications(){
+  if(!('Notification' in window)){
+    updateNotificationStatus();
+    return;
+  }
+  try{
+    const permission=await Notification.requestPermission();
+    updateNotificationStatus();
+    if(permission==='granted') showPrismaTestNotification();
+  }catch(err){
+    console.error('Erro ao solicitar notificações:',err);
+    updateNotificationStatus();
+  }
+}
+
+function showPrismaTestNotification(){
+  if(!('Notification' in window) || Notification.permission!=='granted') return;
+
+  const n=new Notification('Prisma',{
+    body:'Você pediu uma notificação. Eu trouxe. O caos pode esperar um minuto.',
+    tag:'prisma-test-notification',
+    icon:'assets/icons/icon-192.png'
+  });
+
+  n.onclick=()=>{
+    window.focus();
+    n.close();
+  };
+}
+
+function initPrismaNotifications(){
+  const enable=document.getElementById('enableNotificationsBtn');
+  const test=document.getElementById('testNotificationBtn');
+
+  enable?.addEventListener('click',requestPrismaNotifications);
+  test?.addEventListener('click',showPrismaTestNotification);
+
+  updateNotificationStatus();
+}
+
+/* ============================================================
+   PRISMA — ALERTAS E PRIORIDADE
+============================================================ */
+function prismaDaysUntil(v){
+  if(!v) return null;
+  const d=new Date(String(v).length<=10 ? v+'T00:00:00' : v);
+  if(Number.isNaN(d.getTime())) return null;
+  const t=new Date(); t.setHours(0,0,0,0); d.setHours(0,0,0,0);
+  return Math.ceil((d-t)/86400000);
+}
+function prismaAlertLevel(days){
+  if(days===null) return 'normal';
+  if(days<=1) return 'urgent';
+  if(days<=3) return 'high';
+  if(days<=7) return 'medium';
+  return 'normal';
+}
+function prismaAlertLabel(days){
+  if(days===null) return 'sem prazo';
+  if(days<0) return `atrasado ${Math.abs(days)}d`;
+  if(days===0) return 'vence hoje';
+  if(days===1) return 'vence amanhã';
+  return `em ${days} dias`;
+}
+function buildPrismaAlerts(){
+  const alerts=[];
+  (assignments||[]).forEach(a=>{
+    const ms=a.milestones||[];
+    if(ms.length && !ms.some(m=>!m.done)) return;
+    const days=prismaDaysUntil(a.due);
+    alerts.push({title:a.title||'Trabalho',meta:`${a.subject||'Trabalho'} · ${prismaAlertLabel(days)}`,days,level:prismaAlertLevel(days),icon:'📋'});
+  });
+  (projects||[]).filter(p=>p.status!=='concluido').forEach(p=>{
+    const ds=(projDeliverables||[]).filter(d=>d.projectId===p.id&&!d.done)
+      .map(d=>({d,days:prismaDaysUntil(d.due)})).filter(x=>x.days!==null).sort((a,b)=>a.days-b.days);
+    const days=ds.length?ds[0].days:prismaDaysUntil(p.due);
+    alerts.push({title:ds.length?`${p.name} · ${ds[0].d.title||'entrega'}`:p.name,meta:`Projeto · ${prismaAlertLabel(days)}`,days,level:prismaAlertLevel(days),icon:'💼'});
+  });
+  (classes||[]).forEach(c=>{
+    const days=prismaDaysUntil(c.date||c.day);
+    if(!c.done && days===0) alerts.push({title:c.title||c.subject||'Aula hoje',meta:`Aula · hoje${c.time?' às '+c.time:''}`,days:0,level:'urgent',icon:'📚'});
+  });
+  (quickTasks||[]).forEach(t=>{
+    if(t.done) return;
+    const days=prismaDaysUntil(t.due||t.date);
+    if(days!==null) alerts.push({title:t.text||t.title||'Tarefa rápida',meta:`Tarefa · ${prismaAlertLabel(days)}`,days,level:prismaAlertLevel(days),icon:'✓'});
+  });
+  return alerts.sort((a,b)=>(a.days??9999)-(b.days??9999));
+}
+function renderHomeAlerts(){
+  const list=document.getElementById('homeAlertsList'), count=document.getElementById('homeAlertsCount');
+  if(!list||!count) return;
+  const alerts=buildPrismaAlerts();
+  count.textContent=alerts.length;
+  if(!alerts.length){
+    list.innerHTML='<div class="home-empty"><span>😌</span><div><strong>Nenhum incêndio importante detectado.</strong><small>O Prisma continuará observando.</small></div></div>';
+    return;
+  }
+  list.innerHTML=alerts.slice(0,6).map(a=>{
+    const tone=a.level==='urgent'?'🔴':a.level==='high'?'🟠':a.level==='medium'?'🟡':'🟢';
+    return `<div class="prisma-alert-row ${a.level}"><span class="prisma-alert-icon">${a.icon}</span><div class="prisma-alert-main"><strong>${escapeHtml(a.title)}</strong><small>${tone} ${escapeHtml(a.meta)}</small></div><span class="prisma-alert-days">${escapeHtml(prismaAlertLabel(a.days))}</span></div>`;
+  }).join('');
+}
+
 function setupMobileHomeCarousel(){
   const page = document.getElementById('page-inicio');
   if(!page || page.dataset.mobileCarouselReady === '1') return;
@@ -2086,12 +2321,17 @@ function setupMobileHomeCarousel(){
   const miniDeadlines = document.getElementById('miniDeadlines');
   const habitToday = document.getElementById('habitToday');
   const playlistMini = document.getElementById('playlistMini');
-  if(!journey || !nextClass || !qtList || !miniDeadlines || !habitToday || !playlistMini) return;
+  const readingsCard = document.getElementById('homeReadingsCard');
+  const projectsCard = document.getElementById('homeProjectsCard');
+
+  if(!journey || !nextClass || !qtList || !miniDeadlines || !habitToday ||
+     !playlistMini || !readingsCard || !projectsCard) return;
 
   const taskCard = qtList.closest('.card');
   const deadlineCard = miniDeadlines.closest('.card');
   const habitCard = habitToday.closest('.card');
   const playlistCard = playlistMini.closest('.card');
+
   if(!taskCard || !deadlineCard || !habitCard || !playlistCard) return;
 
   const oldGrids = [...page.querySelectorAll(':scope > .grid2')];
@@ -2112,15 +2352,19 @@ function setupMobileHomeCarousel(){
   carousel.appendChild(makePanel('prazos', deadlineCard));
   carousel.appendChild(makePanel('habitos', habitCard));
   carousel.appendChild(makePanel('playlist', playlistCard));
+  carousel.appendChild(makePanel('leituras', readingsCard));
+  carousel.appendChild(makePanel('projetos', projectsCard));
+  const alertsCard=document.getElementById('homeAlertsCard');
+  if(alertsCard) carousel.appendChild(makePanel('alertas', alertsCard));
 
-  // Remove os grids vazios que continham os cards antes da reorganização.
   oldGrids.forEach(grid => grid.remove());
   topbar?.insertAdjacentElement('afterend', carousel);
 
   const dots = document.createElement('div');
   dots.className = 'home-mobile-dots';
   dots.setAttribute('aria-label','Navegação da página inicial');
-  for(let i=0;i<5;i++){
+
+  for(let i=0;i<8;i++){
     const dot = document.createElement('button');
     dot.type = 'button';
     dot.className = 'home-mobile-dot' + (i===0?' on':'');
@@ -2138,13 +2382,18 @@ function setupMobileHomeCarousel(){
     if(ticking) return;
     ticking = true;
     requestAnimationFrame(()=>{
-      const index = Math.max(0, Math.min(4, Math.round(carousel.scrollLeft / Math.max(1, carousel.clientWidth))));
-      dots.querySelectorAll('.home-mobile-dot').forEach((dot,i)=>dot.classList.toggle('on', i===index));
+      const index = Math.max(0, Math.min(7,
+        Math.round(carousel.scrollLeft / Math.max(1, carousel.clientWidth))
+      ));
+      dots.querySelectorAll('.home-mobile-dot')
+        .forEach((dot,i)=>dot.classList.toggle('on', i===index));
       ticking = false;
     });
   }, {passive:true});
 }
-
 setupMobileHomeCarousel();
 
 initPrisma();
+
+
+document.addEventListener('DOMContentLoaded', initPrismaNotifications);
