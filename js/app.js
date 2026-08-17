@@ -82,31 +82,106 @@ function setSyncStatus(state){
   else { el.textContent = '☁️ sincronizado'; el.style.color = 'var(--mint-dk)'; }
 }
 
+const REMOTE_TIMEOUT_MS = 5000;
+const LOCAL_CACHE_PREFIX = 'prisma-sync-cache:';
+
+function cacheKey(key){
+  return LOCAL_CACHE_PREFIX + key;
+}
+
+function readSyncCache(key){
+  try{
+    const raw = localStorage.getItem(cacheKey(key));
+    if(!raw) return null;
+    const value = JSON.parse(raw);
+    return {key, value};
+  }catch(err){
+    return null;
+  }
+}
+
+function writeSyncCache(key, value){
+  try{
+    localStorage.setItem(cacheKey(key), JSON.stringify(value));
+  }catch(err){}
+}
+
+async function fetchWithTimeout(url, options={}, timeout=REMOTE_TIMEOUT_MS){
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeout);
+  try{
+    return await fetch(url, {...options, signal:controller.signal});
+  }finally{
+    clearTimeout(timer);
+  }
+}
+
 const remoteStorage = {
   async get(key){
+    const cached = readSyncCache(key);
+
     try{
-      const res = await fetch(`${SHEET_URL}?action=get&key=${encodeURIComponent(key)}`);
+      const res = await fetchWithTimeout(
+        `${SHEET_URL}?action=get&key=${encodeURIComponent(key)}&t=${Date.now()}`,
+        {method:'GET', cache:'no-store'}
+      );
+
+      if(!res.ok) throw new Error(`HTTP ${res.status}`);
+
       const data = await res.json();
+
+      if(!data || data.value===undefined || data.value===null){
+        if(cached){
+          setSyncStatus('ok');
+          return cached;
+        }
+        setSyncStatus('ok');
+        return null;
+      }
+
+      writeSyncCache(key, data.value);
       setSyncStatus('ok');
-      if(!data || data.value===undefined || data.value===null) return null;
-      return { key, value: data.value };
+      return {key, value:data.value};
     }catch(err){
-      console.error('Erro ao ler da planilha:', err);
+      console.error(`Prisma: erro ao ler "${key}" da nuvem:`, err);
+
+      // Se já existe uma cópia local, o aplicativo continua funcionando
+      // com os últimos dados conhecidos em vez de voltar tudo para zero.
+      if(cached){
+        setSyncStatus('error');
+        return cached;
+      }
+
       setSyncStatus('error');
       return null;
     }
   },
+
   async set(key, value){
+    // Salva localmente primeiro. Assim uma falha temporária da internet
+    // não apaga o que a pessoa acabou de registrar.
+    writeSyncCache(key, value);
     setSyncStatus('saving');
+
     try{
-      // Sem cabeçalho Content-Type explícito para evitar bloqueio de CORS (preflight) no Apps Script.
-      const res = await fetch(SHEET_URL, { method:'POST', body: JSON.stringify({ action:'set', key, value }) });
+      const res = await fetchWithTimeout(
+        SHEET_URL,
+        {
+          method:'POST',
+          body:JSON.stringify({action:'set', key, value})
+        }
+      );
+
+      if(!res.ok) throw new Error(`HTTP ${res.status}`);
+
       const data = await res.json();
       setSyncStatus('ok');
       return data;
     }catch(err){
-      console.error('Erro ao salvar na planilha:', err);
+      console.error(`Prisma: erro ao salvar "${key}" na nuvem:`, err);
       setSyncStatus('error');
+
+      // O dado continua salvo no dispositivo e será usado na próxima abertura.
       return null;
     }
   }
@@ -2183,7 +2258,7 @@ async function getPrismaNotificationRegistration(){
   try{
     if(!prismaNotificationRegistration){
       prismaNotificationRegistration =
-        await navigator.serviceWorker.register('./sw.js?v=29e2', {scope:'./'});
+        await navigator.serviceWorker.register('./sw.js?v=notif-fix-2', {scope:'./'});
     }
     return await navigator.serviceWorker.ready;
   }catch(err){
