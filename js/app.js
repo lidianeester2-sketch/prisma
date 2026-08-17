@@ -77,72 +77,18 @@ function setSyncStatus(state){
   // state: 'ok' | 'saving' | 'error'
   const el = document.getElementById('syncStatus');
   if(!el) return;
-  if(state==='saving'){
-    el.textContent = '☁️ sincronizando...';
-    el.style.color = 'var(--gold-dk)';
-  }else if(state==='error'){
-    el.textContent = '⚠️ falha ao sincronizar';
-    el.style.color = 'var(--coral)';
-  }else{
-    el.textContent = '☁️ sincronizado';
-    el.style.color = 'var(--mint-dk)';
-  }
-}
-
-/*
- * O Google Apps Script responde por outro domínio e o ContentService
- * pode passar por um redirect que o fetch() normal não consegue ler
- * por CORS. Para leitura usamos JSONP; para escrita usamos POST
- * "no-cors" (requisição simples), que o Apps Script consegue receber.
- */
-function getRemoteJsonp(key, timeoutMs = 12000){
-  return new Promise((resolve, reject)=>{
-    const callbackName = '__prismaSync_' + Date.now() + '_' +
-      Math.random().toString(36).slice(2);
-
-    const script = document.createElement('script');
-    const timer = setTimeout(()=>{
-      cleanup();
-      reject(new Error('Tempo esgotado ao consultar o Google Sheets.'));
-    }, timeoutMs);
-
-    function cleanup(){
-      clearTimeout(timer);
-      try{ delete window[callbackName]; }catch(_){}
-      script.remove();
-    }
-
-    window[callbackName] = (data)=>{
-      cleanup();
-      resolve(data);
-    };
-
-    script.onerror = ()=>{
-      cleanup();
-      reject(new Error('Não foi possível acessar o Apps Script.'));
-    };
-
-    const params = new URLSearchParams({
-      action: 'get',
-      key: String(key),
-      callback: callbackName
-    });
-
-    script.src = `${SHEET_URL}?${params.toString()}`;
-    document.head.appendChild(script);
-  });
+  if(state==='saving'){ el.textContent = '☁️ sincronizando...'; el.style.color = 'var(--gold-dk)'; }
+  else if(state==='error'){ el.textContent = '⚠️ falha ao sincronizar'; el.style.color = 'var(--coral)'; }
+  else { el.textContent = '☁️ sincronizado'; el.style.color = 'var(--mint-dk)'; }
 }
 
 const remoteStorage = {
   async get(key){
     try{
-      const data = await getRemoteJsonp(key);
+      const res = await fetch(`${SHEET_URL}?action=get&key=${encodeURIComponent(key)}`);
+      const data = await res.json();
       setSyncStatus('ok');
-
-      if(!data || data.value===undefined || data.value===null){
-        return null;
-      }
-
+      if(!data || data.value===undefined || data.value===null) return null;
       return { key, value: data.value };
     }catch(err){
       console.error('Erro ao ler da planilha:', err);
@@ -150,27 +96,14 @@ const remoteStorage = {
       return null;
     }
   },
-
   async set(key, value){
     setSyncStatus('saving');
-
     try{
-      /*
-       * mode:no-cors evita o preflight CORS. Não conseguimos ler a
-       * resposta, mas a requisição é entregue ao Apps Script.
-       */
-      await fetch(SHEET_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        body: JSON.stringify({
-          action: 'set',
-          key,
-          value
-        })
-      });
-
+      // Sem cabeçalho Content-Type explícito para evitar bloqueio de CORS (preflight) no Apps Script.
+      const res = await fetch(SHEET_URL, { method:'POST', body: JSON.stringify({ action:'set', key, value }) });
+      const data = await res.json();
       setSyncStatus('ok');
-      return { ok: true };
+      return data;
     }catch(err){
       console.error('Erro ao salvar na planilha:', err);
       setSyncStatus('error');
@@ -178,7 +111,6 @@ const remoteStorage = {
     }
   }
 };
-
 
 /* ============================================================
    NAV
