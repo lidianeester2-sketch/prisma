@@ -2240,6 +2240,25 @@ async function initPrisma(){
 /* ============================================================
    PRISMA — NOTIFICAÇÕES DO NAVEGADOR
 ============================================================ */
+
+/*
+ * Chave pública VAPID — identifica o Prisma perante o serviço
+ * de push do navegador (Google/Apple). É pública mesmo, pode
+ * ficar no código do cliente sem problema. A chave PRIVADA
+ * correspondente NUNCA deve aparecer aqui — ela fica guardada
+ * apenas no lado do Apps Script (Script Properties).
+ */
+const PRISMA_VAPID_PUBLIC_KEY = 'BDoe_EQ9o0vuNVRojuU8v3SpCqPXbR0nuLOWJDaXYg3hORWnk-fbCi7aFkyK4zABgr3qWSX6fofNyZEpv--YdDk';
+
+function urlBase64ToUint8Array(base64String){
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for(let i = 0; i < rawData.length; i++) outputArray[i] = rawData.charCodeAt(i);
+  return outputArray;
+}
+
 let prismaNotificationRegistration = null;
 
 async function getPrismaNotificationRegistration(){
@@ -2253,6 +2272,35 @@ async function getPrismaNotificationRegistration(){
     return await navigator.serviceWorker.ready;
   }catch(err){
     console.error('Prisma: não foi possível registrar o service worker.', err);
+    return null;
+  }
+}
+
+/*
+ * Cadastra este dispositivo no serviço de push do navegador e
+ * guarda o "endereço" (subscription) na planilha, pra que o
+ * robô do Apps Script saiba pra onde mandar os avisos, mesmo
+ * com o app fechado.
+ */
+async function subscribeToPushNotifications(){
+  if(!('PushManager' in window)) return null;
+
+  try{
+    const registration = await getPrismaNotificationRegistration();
+    if(!registration) return null;
+
+    let subscription = await registration.pushManager.getSubscription();
+    if(!subscription){
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(PRISMA_VAPID_PUBLIC_KEY)
+      });
+    }
+
+    await remoteStorage.set('push-subscription', JSON.stringify(subscription));
+    return subscription;
+  }catch(err){
+    console.error('Prisma: falha ao cadastrar notificações push.', err);
     return null;
   }
 }
@@ -2301,6 +2349,7 @@ async function requestPrismaNotifications(){
     updateNotificationStatus();
 
     if(permission==='granted'){
+      await subscribeToPushNotifications();
       await showPrismaTestNotification();
     }
   }catch(err){
@@ -2344,6 +2393,10 @@ function initPrismaNotifications(){
 
   getPrismaNotificationRegistration();
   updateNotificationStatus();
+
+  if('Notification' in window && Notification.permission==='granted'){
+    subscribeToPushNotifications();
+  }
 }
 
 /* ============================================================
