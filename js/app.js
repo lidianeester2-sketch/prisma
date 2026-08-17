@@ -74,13 +74,67 @@ function todayISO(){ return new Date().toISOString().slice(0,10); }
 const SHEET_URL = 'https://script.google.com/macros/s/AKfycbzjqZ29NlsU7x_x5FVt9325FAFJPcsHGoh0Jr1jwibo1oYKq7QG8DHLObPXXbD6-EBq/exec';
 
 function setSyncStatus(state){
-  // state: 'ok' | 'saving' | 'error'
+  // state: 'ok' | 'saving' | 'error' | 'offline'
   const el = document.getElementById('syncStatus');
   if(!el) return;
   if(state==='saving'){ el.textContent = '☁️ sincronizando...'; el.style.color = 'var(--gold-dk)'; }
   else if(state==='error'){ el.textContent = '⚠️ falha ao sincronizar'; el.style.color = 'var(--coral)'; }
+  else if(state==='offline'){ el.textContent = '📴 offline — salvo localmente'; el.style.color = 'var(--gold-dk)'; }
   else { el.textContent = '☁️ sincronizado'; el.style.color = 'var(--mint-dk)'; }
 }
+
+/* ------------------------------------------------------------
+   Espelho local (localStorage) + fila de escritas pendentes.
+   Permite abrir o Prisma e continuar editando sem internet;
+   assim que a conexão volta, tudo que ficou pendente é
+   enviado pra planilha automaticamente.
+------------------------------------------------------------ */
+const MIRROR_PREFIX = 'prisma-mirror:';
+const PENDING_KEY = 'prisma-pending-writes';
+
+function mirrorGet(key){
+  try{ return localStorage.getItem(MIRROR_PREFIX + key); }catch(e){ return null; }
+}
+function mirrorSet(key, value){
+  try{ localStorage.setItem(MIRROR_PREFIX + key, value); }catch(e){}
+}
+function getPendingWrites(){
+  try{ return JSON.parse(localStorage.getItem(PENDING_KEY) || '{}'); }catch(e){ return {}; }
+}
+function setPendingWrites(obj){
+  try{ localStorage.setItem(PENDING_KEY, JSON.stringify(obj)); }catch(e){}
+}
+function queuePendingWrite(key, value){
+  const pending = getPendingWrites();
+  pending[key] = value;
+  setPendingWrites(pending);
+}
+
+let flushingPending = false;
+async function flushPendingWrites(){
+  if(flushingPending) return;
+  const pending = getPendingWrites();
+  const keys = Object.keys(pending);
+  if(keys.length === 0) return;
+
+  flushingPending = true;
+  for(const key of keys){
+    try{
+      const res = await fetch(SHEET_URL, { method:'POST', body: JSON.stringify({ action:'set', key, value: pending[key] }) });
+      await res.json();
+      const current = getPendingWrites();
+      delete current[key];
+      setPendingWrites(current);
+    }catch(err){
+      // ainda sem internet ou planilha indisponível: tenta de novo na próxima vez
+      break;
+    }
+  }
+  flushingPending = false;
+  const remaining = Object.keys(getPendingWrites());
+  setSyncStatus(remaining.length > 0 ? 'offline' : 'ok');
+}
+window.addEventListener('online', flushPendingWrites);
 
 const remoteStorage = {
   async get(key){
@@ -89,15 +143,22 @@ const remoteStorage = {
       const data = await res.json();
       setSyncStatus('ok');
       if(!data || data.value===undefined || data.value===null) return null;
+      mirrorSet(key, data.value);
       return { key, value: data.value };
     }catch(err){
       console.error('Erro ao ler da planilha:', err);
+      const cached = mirrorGet(key);
+      if(cached !== null){
+        setSyncStatus('offline');
+        return { key, value: cached };
+      }
       setSyncStatus('error');
       return null;
     }
   },
   async set(key, value){
     setSyncStatus('saving');
+    mirrorSet(key, value); // guarda local imediatamente, então a UI nunca perde o que foi digitado
     try{
       // Sem cabeçalho Content-Type explícito para evitar bloqueio de CORS (preflight) no Apps Script.
       const res = await fetch(SHEET_URL, { method:'POST', body: JSON.stringify({ action:'set', key, value }) });
@@ -105,8 +166,9 @@ const remoteStorage = {
       setSyncStatus('ok');
       return data;
     }catch(err){
-      console.error('Erro ao salvar na planilha:', err);
-      setSyncStatus('error');
+      console.error('Erro ao salvar na planilha (sem internet?). Guardado localmente para reenviar depois.', err);
+      queuePendingWrite(key, value);
+      setSyncStatus('offline');
       return null;
     }
   }
@@ -2162,7 +2224,10 @@ async function initPrisma(){
     renderJourneyProgress();
     renderHomeReadings();
     renderHomeProjects();
+    checkPrismaSmartAlerts();
   }, 1200);
+
+  if(navigator.onLine) flushPendingWrites();
 }
 
 
@@ -2183,7 +2248,7 @@ async function getPrismaNotificationRegistration(){
   try{
     if(!prismaNotificationRegistration){
       prismaNotificationRegistration =
-        await navigator.serviceWorker.register('./sw.js?v=29e2', {scope:'./'});
+        await navigator.serviceWorker.register('./sw.js?v=offline1', {scope:'./'});
     }
     return await navigator.serviceWorker.ready;
   }catch(err){
@@ -2257,6 +2322,8 @@ async function showPrismaTestNotification(){
 
     await registration.showNotification('Prisma', {
       body:'Você pediu uma notificação. Eu trouxe. O caos pode esperar um minuto.',
+      icon:'./assets/icons/notification-icon.png',
+      badge:'./assets/icons/notification-icon.png',
       tag:'prisma-test-notification',
       renotify:true,
       data:{url:'./'}
@@ -2317,9 +2384,10 @@ function buildPrismaAlerts(){
     const days=ds.length?ds[0].days:prismaDaysUntil(p.due);
     alerts.push({title:ds.length?`${p.name} · ${ds[0].d.title||'entrega'}`:p.name,meta:`Projeto · ${prismaAlertLabel(days)}`,days,level:prismaAlertLevel(days),icon:'💼'});
   });
-  (classes||[]).forEach(c=>{
-    const days=prismaDaysUntil(c.date||c.day);
-    if(!c.done && days===0) alerts.push({title:c.title||c.subject||'Aula hoje',meta:`Aula · hoje${c.time?' às '+c.time:''}`,days:0,level:'urgent',icon:'📚'});
+  const todayJsDay = new Date().getDay(); // 0=Domingo
+  subjects.filter(s=>s.type==='presencial' && s.dayIdx!=null && (s.dayIdx+1)===todayJsDay).forEach(s=>{
+    const time = s.time ? s.time.split('–')[0] : '';
+    alerts.push({title:s.name||'Aula hoje',meta:`Aula · hoje${time?' às '+time:''}`,days:0,level:'urgent',icon:'📚'});
   });
   (quickTasks||[]).forEach(t=>{
     if(t.done) return;
@@ -2341,6 +2409,59 @@ function renderHomeAlerts(){
     const tone=a.level==='urgent'?'🔴':a.level==='high'?'🟠':a.level==='medium'?'🟡':'🟢';
     return `<div class="prisma-alert-row ${a.level}"><span class="prisma-alert-icon">${a.icon}</span><div class="prisma-alert-main"><strong>${escapeHtml(a.title)}</strong><small>${tone} ${escapeHtml(a.meta)}</small></div><span class="prisma-alert-days">${escapeHtml(prismaAlertLabel(a.days))}</span></div>`;
   }).join('');
+}
+
+/* ============================================================
+   PRISMA — NOTIFICAÇÕES INTELIGENTES (locais)
+   Usa os mesmos alertas do card "Alertas" da Home para disparar
+   notificações de verdade (aula hoje, prazo perto, prova perto),
+   com o mesmo layout/tom do botão de teste.
+
+   Importante: isso só dispara enquanto o app está aberto (ou
+   acabou de ser aberto). Sem um servidor de push de verdade
+   (Web Push com VAPID), o navegador não consegue notificar
+   sozinho com o app fechado — isso exigiria outra peça de
+   infraestrutura, não só código local.
+============================================================ */
+function prismaAlertNotificationBody(a){
+  if(a.icon==='📚') return `${a.meta.replace('Aula · hoje', 'Você tem aula hoje')}. Sim, ela realmente existe.`;
+  if(a.days===0) return `${a.title} vence hoje. Talvez seja uma boa hora de parar de fingir que você não viu.`;
+  if(a.days===1) return `${a.title} vence amanhã. Ainda dá tempo — mas não muito.`;
+  return `${a.title} vence em ${a.days} dias. Tempo suficiente pra fazer ou procrastinar profissionalmente.`;
+}
+
+async function checkPrismaSmartAlerts(){
+  if(!('Notification' in window) || Notification.permission!=='granted') return;
+
+  const registration = await getPrismaNotificationRegistration();
+  if(!registration) return;
+
+  const notifiedStorageKey = 'prisma-notified-alerts:' + todayISO();
+  let notified = [];
+  try{ notified = JSON.parse(localStorage.getItem(notifiedStorageKey) || '[]'); }catch(e){}
+
+  const relevant = buildPrismaAlerts().filter(a=>a.level==='urgent' || a.level==='high');
+
+  for(const a of relevant){
+    const alertKey = `${a.level}:${a.title}:${a.meta}`;
+    if(notified.includes(alertKey)) continue;
+
+    try{
+      await registration.showNotification('Prisma', {
+        body: prismaAlertNotificationBody(a),
+        icon:'./assets/icons/notification-icon.png',
+        badge:'./assets/icons/notification-icon.png',
+        tag: 'prisma-alert-' + alertKey.slice(0,80),
+        renotify:false,
+        data:{url:'./'}
+      });
+      notified.push(alertKey);
+    }catch(err){
+      console.error('Prisma: falha ao mostrar notificação de alerta.', err);
+    }
+  }
+
+  try{ localStorage.setItem(notifiedStorageKey, JSON.stringify(notified)); }catch(e){}
 }
 
 function setupMobileHomeCarousel(){
