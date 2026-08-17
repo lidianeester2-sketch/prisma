@@ -676,3 +676,11 @@
   .prisma-notification-actions{display:grid;grid-template-columns:1fr 1fr}
   .prisma-notification-actions .btn{width:100%}
 }
+
+
+/* Prisma — ajuste de layout ao recolher a navegação */
+@media (min-width:981px){
+  .app.rail-collapsed main{
+    max-width:none;
+  }
+}
