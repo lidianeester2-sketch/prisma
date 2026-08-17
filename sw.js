@@ -1,4 +1,4 @@
-const PRISMA_SW_VERSION = 'SYNC-FIX-1';
+const PRISMA_SW_VERSION = 'NOTIF-FIX-1';
 self.addEventListener('install', event => {
   self.skipWaiting();
 });
