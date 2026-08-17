@@ -2477,7 +2477,11 @@ function renderHomeAlerts(){
    infraestrutura, não só código local.
 ============================================================ */
 function prismaAlertNotificationBody(a){
-  if(a.icon==='📚') return `${a.meta.replace('Aula · hoje', 'Você tem aula hoje')}. Sim, ela realmente existe.`;
+  if(a.icon==='📚'){
+    const horaMatch = a.meta.match(/às (.+)$/);
+    const hora = horaMatch ? ` às ${horaMatch[1]}` : '';
+    return `Você tem aula de ${a.title} hoje${hora}. Sim, ela realmente existe.`;
+  }
   if(a.days===0) return `${a.title} vence hoje. Talvez seja uma boa hora de parar de fingir que você não viu.`;
   if(a.days===1) return `${a.title} vence amanhã. Ainda dá tempo — mas não muito.`;
   return `${a.title} vence em ${a.days} dias. Tempo suficiente pra fazer ou procrastinar profissionalmente.`;
