@@ -109,12 +109,125 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-4.5-9.5-9A5.5 5.5 0 0112 6a5.5 5.5 0 019.5 6c-2.5 4.5-9.5 9-9.5 9z"/></svg>
       Hábitos
     </button>
+    <button class="rail-collapse-btn" type="button" title="Recolher navegação" aria-label="Recolher navegação" aria-expanded="true">
+      <span>←</span><b>Recolher</b>
+    </button>
   </div>
 
   <main>
 
     <!-- ============ INÍCIO ============ -->
-    
+    <section class="page active" id="page-inicio">
+      <div class="topbar">
+        <div class="prisma-greeting-block"><h1 id="userGreeting">Bom dia</h1><div class="prisma-message" id="dailyPhrase">Aqui está o resumo do seu semestre hoje.</div></div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <div class="chip-today" id="syncStatus" style="color:var(--gold-dk);">☁️ conectando...</div>
+          <div class="chip-today" id="todayChip">—</div>
+        </div>
+      </div>
+
+      <div class="home-hero-grid">
+        <div class="journey-card" id="journeyCard">
+          <div class="journey-kicker">✦ SUA JORNADA <span>(sob supervisão do Prisma)</span></div>
+          <div class="journey-head">
+            <div>
+              <h2>Quanto do caos você já transformou em plano?</h2>
+              <p>Atualiza conforme você faz acontecer por aqui. ✦</p>
+            </div>
+            <div class="journey-score" id="journeyPct">0%</div>
+          </div>
+          <div class="journey-progress"><div id="journeyProgressFill" style="width:0%"></div></div>
+          <div class="journey-status" id="journeyStatus">Prisma está calculando o tamanho do caos...</div>
+          <div class="journey-stats">
+            <div><span>⚠️</span><strong id="journeyPending">0</strong><small>pendências</small></div>
+            <div><span>📚</span><strong id="journeyStudies">0%</strong><small>estudos</small></div>
+            <div><span>✓</span><strong id="journeyHabits">0/0</strong><small>hábitos hoje</small></div>
+            <div><span>📖</span><strong id="journeyReadings">0</strong><small>leituras</small></div>
+          </div>
+          <button class="journey-action" id="journeyAction" type="button">Registrar evolução <span>›</span></button>
+        </div>
+
+        <div id="nextClassCard" class="next-class">
+          <div class="icon">📚</div>
+          <div class="info">
+            <div class="label">Próxima aula</div>
+            <h3 id="nextClassName">—</h3>
+            <p id="nextClassWhen">—</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="card">
+          <h2>Tarefas rápidas de hoje</h2>
+          <p class="card-sub">Coisas pequenas — leituras, e-mails, recados.</p>
+          <div class="qt-add">
+            <input type="text" id="qtInput" placeholder="Adicionar tarefa rápida...">
+            <button id="qtAddBtn">+</button>
+          </div>
+          <div class="qt-list" id="qtList"></div>
+        </div>
+
+        <div class="card">
+          <h2>Prazos mais próximos</h2>
+          <p class="card-sub">Seus 3 trabalhos/provas mais urgentes.</p>
+          <div id="miniDeadlines"></div>
+        </div>
+      </div>
+
+      <div class="grid2" style="margin-top:18px;">
+        <div class="card">
+          <h2>Hábitos de hoje</h2>
+          <p class="card-sub">Marcar rapidinho — o detalhe completo fica na aba Hábitos.</p>
+          <div class="qt-list" id="habitToday"></div>
+        </div>
+        <div class="card">
+          <h2>Playlist para estudar</h2>
+          <p class="card-sub">Sua trilha sonora favorita, sempre à mão.</p>
+          <div id="playlistMini"></div>
+        </div>
+      </div>
+
+      <div class="grid2 home-extra-grid" style="margin-top:18px;">
+        <div class="card home-extra-card" id="homeReadingsCard">
+          <div class="home-card-heading">
+            <div>
+              <h2>📖 Leituras em andamento</h2>
+              <p class="card-sub">O que está ocupando sua cabeça ultimamente.</p>
+            </div>
+            <span class="home-card-count" id="homeReadingsCount">0</span>
+          </div>
+          <div id="homeReadingsList"></div>
+        </div>
+
+        <div class="card home-extra-card" id="homeProjectsCard">
+          <div class="home-card-heading">
+            <div>
+              <h2>💼 Projetos em andamento</h2>
+              <p class="card-sub">O caos profissional, agora organizado.</p>
+            </div>
+            <span class="home-card-count" id="homeProjectsCount">0</span>
+          </div>
+          <div id="homeProjectsList"></div>
+        </div>
+      </div>
+      <div class="card prisma-alerts-card" id="homeAlertsCard" style="margin-top:18px;">
+        <div class="home-card-heading">
+          <div>
+            <h2>🔔 O Prisma quer te avisar</h2>
+            <p class="card-sub">Prazos, aulas e compromissos em ordem de urgência.</p>
+          </div>
+          <span class="home-card-count" id="homeAlertsCount">0</span>
+        </div>
+        <div id="homeAlertsList"></div>
+        <div class="prisma-notification-actions">
+          <button class="btn small" id="enableNotificationsBtn" type="button">🔔 Ativar notificações</button>
+          <button class="btn small ghost" id="testNotificationBtn" type="button">Testar</button>
+        </div>
+        <div class="prisma-notification-status" id="notificationStatus"></div>
+      </div>
+
+    </section>
 
     <!-- ============ MATÉRIAS ============ -->
     <section class="page" id="page-materias">
