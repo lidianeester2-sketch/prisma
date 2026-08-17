@@ -2245,27 +2245,26 @@ async function requestPrismaNotifications(){
   }
 }
 
-async async function showPrismaTestNotification(){
+async function showPrismaTestNotification(){
+  if(!('Notification' in window) || Notification.permission!=='granted') return;
+
   try{
-    if(!('Notification' in window)) return false;
-    if(Notification.permission !== 'granted'){
-      const permission = await Notification.requestPermission();
-      if(permission !== 'granted') return false;
+    const registration=await getPrismaNotificationRegistration();
+
+    if(!registration){
+      throw new Error('Service Worker indisponível.');
     }
-    const registration = await navigator.serviceWorker.ready;
+
     await registration.showNotification('Prisma', {
-      body: 'Você pediu uma notificação. Eu trouxe. O caos pode esperar um minuto.',
-      icon: './assets/icons/notification-icon.png',
-      badge: './assets/icons/notification-icon.png',
-      image: './assets/icons/icon-512.png',
-      tag: 'prisma-test',
-      renotify: true,
-      data: { url: './' }
+      body:'Você pediu uma notificação. Eu trouxe. O caos pode esperar um minuto.',
+      tag:'prisma-test-notification',
+      renotify:true,
+      data:{url:'./'}
     });
-    return true;
-  }catch(error){
-    console.warn('Prisma notification test:', error);
-    return false;
+  }catch(err){
+    console.error('Prisma: erro ao mostrar notificação.',err);
+    const status=document.getElementById('notificationStatus');
+    if(status) status.textContent='A permissão foi concedida, mas o navegador não conseguiu exibir a notificação. Confirme que o Prisma está instalado na tela inicial.';
   }
 }
 
@@ -2399,7 +2398,9 @@ function setupMobileHomeCarousel(){
   dots.className = 'home-mobile-dots';
   dots.setAttribute('aria-label','Navegação da página inicial');
 
-  for(let i=0;i<8;i++){
+  const panelCount = carousel.children.length;
+
+  for(let i=0;i<panelCount;i++){
     const dot = document.createElement('button');
     dot.type = 'button';
     dot.className = 'home-mobile-dot' + (i===0?' on':'');
@@ -2417,7 +2418,7 @@ function setupMobileHomeCarousel(){
     if(ticking) return;
     ticking = true;
     requestAnimationFrame(()=>{
-      const index = Math.max(0, Math.min(7,
+      const index = Math.max(0, Math.min(panelCount - 1,
         Math.round(carousel.scrollLeft / Math.max(1, carousel.clientWidth))
       ));
       dots.querySelectorAll('.home-mobile-dot')
@@ -2427,6 +2428,54 @@ function setupMobileHomeCarousel(){
   }, {passive:true});
 }
 setupMobileHomeCarousel();
+
+/* ============================================================
+   PRISMA — SIDEBAR DESKTOP RECOLHÍVEL
+============================================================ */
+(function initRailCollapse(){
+  const appShell = document.querySelector('.app');
+  const btn = document.querySelector('.rail-collapse-btn');
+  if(!appShell || !btn) return;
+
+  const storageKey = 'prisma-rail-collapsed';
+  const isDesktop = () => window.matchMedia('(min-width:981px)').matches;
+
+  function applyCollapsed(collapsed){
+    appShell.classList.toggle('rail-collapsed', collapsed);
+
+    const icon = btn.querySelector('span');
+    const label = btn.querySelector('b');
+
+    if(icon) icon.textContent = collapsed ? '→' : '←';
+    if(label) label.textContent = collapsed ? 'Expandir' : 'Recolher';
+
+    btn.setAttribute('aria-expanded', String(!collapsed));
+    btn.setAttribute(
+      'aria-label',
+      collapsed ? 'Expandir navegação' : 'Recolher navegação'
+    );
+    btn.title = collapsed ? 'Expandir navegação' : 'Recolher navegação';
+  }
+
+  applyCollapsed(isDesktop() && localStorage.getItem(storageKey) === '1');
+
+  btn.addEventListener('click', () => {
+    if(!isDesktop()) return;
+
+    const collapsed = !appShell.classList.contains('rail-collapsed');
+    localStorage.setItem(storageKey, collapsed ? '1' : '0');
+    applyCollapsed(collapsed);
+  });
+
+  window.addEventListener('resize', () => {
+    if(!isDesktop()){
+      appShell.classList.remove('rail-collapsed');
+      btn.setAttribute('aria-expanded', 'true');
+    }else{
+      applyCollapsed(localStorage.getItem(storageKey) === '1');
+    }
+  });
+})();
 
 initPrisma();
 
