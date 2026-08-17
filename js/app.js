@@ -77,115 +77,108 @@ function setSyncStatus(state){
   // state: 'ok' | 'saving' | 'error'
   const el = document.getElementById('syncStatus');
   if(!el) return;
-  if(state==='saving'){ el.textContent = '☁️ sincronizando...'; el.style.color = 'var(--gold-dk)'; }
-  else if(state==='error'){ el.textContent = '⚠️ falha ao sincronizar'; el.style.color = 'var(--coral)'; }
-  else { el.textContent = '☁️ sincronizado'; el.style.color = 'var(--mint-dk)'; }
-}
-
-const REMOTE_TIMEOUT_MS = 5000;
-const LOCAL_CACHE_PREFIX = 'prisma-sync-cache:';
-
-function cacheKey(key){
-  return LOCAL_CACHE_PREFIX + key;
-}
-
-function readSyncCache(key){
-  try{
-    const raw = localStorage.getItem(cacheKey(key));
-    if(!raw) return null;
-    const value = JSON.parse(raw);
-    return {key, value};
-  }catch(err){
-    return null;
+  if(state==='saving'){
+    el.textContent = '☁️ sincronizando...';
+    el.style.color = 'var(--gold-dk)';
+  }else if(state==='error'){
+    el.textContent = '⚠️ falha ao sincronizar';
+    el.style.color = 'var(--coral)';
+  }else{
+    el.textContent = '☁️ sincronizado';
+    el.style.color = 'var(--mint-dk)';
   }
 }
 
-function writeSyncCache(key, value){
-  try{
-    localStorage.setItem(cacheKey(key), JSON.stringify(value));
-  }catch(err){}
-}
+/*
+ * O Google Apps Script responde por outro domínio e o ContentService
+ * pode passar por um redirect que o fetch() normal não consegue ler
+ * por CORS. Para leitura usamos JSONP; para escrita usamos POST
+ * "no-cors" (requisição simples), que o Apps Script consegue receber.
+ */
+function getRemoteJsonp(key, timeoutMs = 12000){
+  return new Promise((resolve, reject)=>{
+    const callbackName = '__prismaSync_' + Date.now() + '_' +
+      Math.random().toString(36).slice(2);
 
-async function fetchWithTimeout(url, options={}, timeout=REMOTE_TIMEOUT_MS){
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeout);
-  try{
-    return await fetch(url, {...options, signal:controller.signal});
-  }finally{
-    clearTimeout(timer);
-  }
+    const script = document.createElement('script');
+    const timer = setTimeout(()=>{
+      cleanup();
+      reject(new Error('Tempo esgotado ao consultar o Google Sheets.'));
+    }, timeoutMs);
+
+    function cleanup(){
+      clearTimeout(timer);
+      try{ delete window[callbackName]; }catch(_){}
+      script.remove();
+    }
+
+    window[callbackName] = (data)=>{
+      cleanup();
+      resolve(data);
+    };
+
+    script.onerror = ()=>{
+      cleanup();
+      reject(new Error('Não foi possível acessar o Apps Script.'));
+    };
+
+    const params = new URLSearchParams({
+      action: 'get',
+      key: String(key),
+      callback: callbackName
+    });
+
+    script.src = `${SHEET_URL}?${params.toString()}`;
+    document.head.appendChild(script);
+  });
 }
 
 const remoteStorage = {
   async get(key){
-    const cached = readSyncCache(key);
-
     try{
-      const res = await fetchWithTimeout(
-        `${SHEET_URL}?action=get&key=${encodeURIComponent(key)}&t=${Date.now()}`,
-        {method:'GET', cache:'no-store'}
-      );
-
-      if(!res.ok) throw new Error(`HTTP ${res.status}`);
-
-      const data = await res.json();
+      const data = await getRemoteJsonp(key);
+      setSyncStatus('ok');
 
       if(!data || data.value===undefined || data.value===null){
-        if(cached){
-          setSyncStatus('ok');
-          return cached;
-        }
-        setSyncStatus('ok');
         return null;
       }
 
-      writeSyncCache(key, data.value);
-      setSyncStatus('ok');
-      return {key, value:data.value};
+      return { key, value: data.value };
     }catch(err){
-      console.error(`Prisma: erro ao ler "${key}" da nuvem:`, err);
-
-      // Se já existe uma cópia local, o aplicativo continua funcionando
-      // com os últimos dados conhecidos em vez de voltar tudo para zero.
-      if(cached){
-        setSyncStatus('error');
-        return cached;
-      }
-
+      console.error('Erro ao ler da planilha:', err);
       setSyncStatus('error');
       return null;
     }
   },
 
   async set(key, value){
-    // Salva localmente primeiro. Assim uma falha temporária da internet
-    // não apaga o que a pessoa acabou de registrar.
-    writeSyncCache(key, value);
     setSyncStatus('saving');
 
     try{
-      const res = await fetchWithTimeout(
-        SHEET_URL,
-        {
-          method:'POST',
-          body:JSON.stringify({action:'set', key, value})
-        }
-      );
+      /*
+       * mode:no-cors evita o preflight CORS. Não conseguimos ler a
+       * resposta, mas a requisição é entregue ao Apps Script.
+       */
+      await fetch(SHEET_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        body: JSON.stringify({
+          action: 'set',
+          key,
+          value
+        })
+      });
 
-      if(!res.ok) throw new Error(`HTTP ${res.status}`);
-
-      const data = await res.json();
       setSyncStatus('ok');
-      return data;
+      return { ok: true };
     }catch(err){
-      console.error(`Prisma: erro ao salvar "${key}" na nuvem:`, err);
+      console.error('Erro ao salvar na planilha:', err);
       setSyncStatus('error');
-
-      // O dado continua salvo no dispositivo e será usado na próxima abertura.
       return null;
     }
   }
 };
+
 
 /* ============================================================
    NAV
@@ -2258,7 +2251,7 @@ async function getPrismaNotificationRegistration(){
   try{
     if(!prismaNotificationRegistration){
       prismaNotificationRegistration =
-        await navigator.serviceWorker.register('./sw.js?v=notif-fix-2', {scope:'./'});
+        await navigator.serviceWorker.register('./sw.js?v=29e2', {scope:'./'});
     }
     return await navigator.serviceWorker.ready;
   }catch(err){
