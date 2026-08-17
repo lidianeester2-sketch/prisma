@@ -71,7 +71,7 @@ function todayISO(){ return new Date().toISOString().slice(0,10); }
    ARMAZENAMENTO NA NUVEM — Google Sheets via Apps Script
    Os mesmos dados aparecem em qualquer dispositivo que abrir este arquivo.
 ============================================================ */
-const SHEET_URL = 'https://script.google.com/macros/s/AKfycbw5rt-wrRMq7Rs3tUMcNJ6B5_wB2hVNPKv8d7wRHTs--H4aIMjrkqhs4WXCinwFl81S/exec';
+const SHEET_URL = 'https://script.google.com/macros/s/AKfycbzjqZ29NlsU7x_x5FVt9325FAFJPcsHGoh0Jr1jwibo1oYKq7QG8DHLObPXXbD6-EBq/exec';
 
 function setSyncStatus(state){
   // state: 'ok' | 'saving' | 'error'
