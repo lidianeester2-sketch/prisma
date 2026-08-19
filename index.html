@@ -1,6 +1,15 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
+    <script>
+      // Aplica o tema salvo antes da página desenhar, pra não "piscar" o tema errado.
+      try {
+        var savedTheme = localStorage.getItem('prisma-theme');
+        if (savedTheme && savedTheme !== 'prisma') {
+          document.documentElement.setAttribute('data-theme', savedTheme);
+        }
+      } catch (e) {}
+    </script>
     <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/png" sizes="64x64" href="assets/icons/favicon-64.png">
 <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
@@ -26,6 +35,26 @@
     <div class="sub">Cada painel guarda os próprios dados — trocar não apaga nada.</div>
     <div class="switcher-grid" id="switcherGrid"></div>
     <button class="switcher-close" id="switcherClose">Fechar</button>
+  </div>
+</div>
+
+<div class="draw-overlay" id="drawOverlay">
+  <div class="draw-modal">
+    <h2>Desenhar</h2>
+    <div class="draw-toolbar">
+      <button class="draw-color active" data-color="#111111" style="background:#111111;" title="Preto"></button>
+      <button class="draw-color" data-color="#EF4444" style="background:#EF4444;" title="Vermelho"></button>
+      <button class="draw-color" data-color="#3B82F6" style="background:#3B82F6;" title="Azul"></button>
+      <button class="draw-color" data-color="#10B981" style="background:#10B981;" title="Verde"></button>
+      <button class="draw-color" data-color="#F59E0B" style="background:#F59E0B;" title="Amarelo"></button>
+      <button id="drawEraserBtn" type="button" title="Borracha">🧼</button>
+      <button id="drawClearBtn" type="button" title="Limpar tudo">🗑️</button>
+    </div>
+    <canvas id="drawCanvas" width="600" height="400"></canvas>
+    <div class="draw-actions">
+      <button class="btn small ghost" id="drawCancelBtn" type="button">Cancelar</button>
+      <button class="btn small" id="drawSaveBtn" type="button">Usar desenho</button>
+    </div>
   </div>
 </div>
 
@@ -108,6 +137,10 @@
     <button data-workspace="all" data-page="habitos" title="Hábitos">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-4.5-9.5-9A5.5 5.5 0 0112 6a5.5 5.5 0 019.5 6c-2.5 4.5-9.5 9-9.5 9z"/></svg>
       Hábitos
+    </button>
+    <button data-workspace="all" data-page="config" title="Configurações">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      Configurações
     </button>
     <button class="rail-collapse-btn" type="button" title="Recolher navegação" aria-label="Recolher navegação" aria-expanded="true">
       <span>←</span><b>Recolher</b>
@@ -311,23 +344,40 @@
         <div><h1>Anotações</h1><div class="sub">Registre o que achar interessante em cada matéria.</div></div>
       </div>
 
-      <div class="note-form">
-        <textarea id="noteText" placeholder="Escreva sua anotação..."></textarea>
-        <div class="note-form-row">
-          <select id="noteSubject"></select>
-          <button id="noteAddBtn">Salvar anotação</button>
+      <div id="notesFoldersView">
+        <div class="notes-folders-grid" id="notesFoldersGrid"></div>
+      </div>
+
+      <div id="notesFolderContent" style="display:none;">
+        <button class="btn small ghost" id="noteBackToFolders" type="button">← Todas as pastas</button>
+        <h2 id="noteFolderLabel" style="margin:10px 0 16px;font-family:'Baloo 2';"></h2>
+
+        <div class="note-form">
+          <textarea id="noteText" placeholder="Escreva sua anotação..."></textarea>
+          <div class="note-drawing-preview-wrap" id="noteDrawingPreviewWrap" style="display:none;">
+            <img id="noteDrawingPreview" alt="Desenho anexado">
+            <button id="noteDrawingRemove" type="button" title="Remover desenho">✕</button>
+          </div>
+          <div class="note-form-row">
+            <select id="noteSubject"></select>
+            <select id="noteCategory"></select>
+            <button class="btn small ghost" id="noteNewCategoryBtn" type="button">+ Categoria</button>
+            <button class="btn small ghost" id="noteDrawBtn" type="button">✏️ Desenhar</button>
+            <button id="noteAddBtn">Salvar anotação</button>
+          </div>
         </div>
-      </div>
 
-      <div class="notes-toolbar">
-        <span style="font-size:12.5px;color:var(--muted);">Filtrar:</span>
-        <select id="noteFilterSubject"><option value="all">Todas as matérias</option></select>
-        <button id="noteFavFilter">⭐ Só favoritas</button>
-        <button id="noteDeleteSelected" type="button">Apagar selecionadas</button>
-        <button id="noteDeleteAll" type="button">Apagar todas</button>
-      </div>
+        <div class="notes-toolbar">
+          <span style="font-size:12.5px;color:var(--muted);">Filtrar:</span>
+          <select id="noteFilterCategory"><option value="all">Todas as categorias</option></select>
+          <button id="noteFavFilter">⭐ Só favoritas</button>
+          <button id="noteSortToggle" type="button">Mais recentes primeiro ↓</button>
+          <button id="noteDeleteSelected" type="button">Apagar selecionadas</button>
+          <button id="noteDeleteAll" type="button">Apagar todas</button>
+        </div>
 
-      <div class="notes-grid" id="notesGrid"></div>
+        <div class="notes-grid" id="notesGrid"></div>
+      </div>
     </section>
 
     <!-- ============ PLAYLIST ============ -->
@@ -503,6 +553,44 @@
           <button id="habitAddBtn">Adicionar</button>
         </div>
         <table class="habit-table" id="habitTable"></table>
+      </div>
+    </section>
+
+    <!-- ============ CONFIGURAÇÕES ============ -->
+    <section class="page" id="page-config">
+      <div class="topbar">
+        <div><h1>Configurações</h1><div class="sub">Deixe o Prisma com a sua cara.</div></div>
+      </div>
+      <div class="card">
+        <h2 style="margin-top:0;">🎨 Tema</h2>
+        <p class="card-sub">Escolha a paleta de cores do aplicativo. Fica salvo neste aparelho.</p>
+        <div class="theme-grid" id="themeGrid">
+          <button class="theme-option" data-theme-key="prisma" type="button">
+            <span class="theme-swatch theme-swatch-prisma"></span>
+            <strong>Prisma</strong>
+            <small>Rosa e roxo — o visual original</small>
+          </button>
+          <button class="theme-option" data-theme-key="mono" type="button">
+            <span class="theme-swatch theme-swatch-mono"></span>
+            <strong>Preto e branco</strong>
+            <small>Alto contraste, sem cor</small>
+          </button>
+          <button class="theme-option" data-theme-key="minimal" type="button">
+            <span class="theme-swatch theme-swatch-minimal"></span>
+            <strong>Minimalista</strong>
+            <small>Elegante, tons neutros e um único acento</small>
+          </button>
+          <button class="theme-option" data-theme-key="masculino" type="button">
+            <span class="theme-swatch theme-swatch-masculino"></span>
+            <strong>Masculino</strong>
+            <small>Grafite, aço e âmbar queimado</small>
+          </button>
+          <button class="theme-option" data-theme-key="branco" type="button">
+            <span class="theme-swatch theme-swatch-branco"></span>
+            <strong>Fundo branco</strong>
+            <small>Claro, limpo, alto contraste</small>
+          </button>
+        </div>
       </div>
     </section>
 
