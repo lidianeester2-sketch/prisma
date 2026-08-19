@@ -720,9 +720,9 @@ let assignments = [];
 function populateSubjectSelects(){
   const opts = subjects.map(s=>`<option value="${s.code}">${s.code} — ${s.name}</option>`).join('');
   document.getElementById('asSubject').innerHTML = opts;
-  document.getElementById('noteSubject').innerHTML = opts;
-  const filterOpts = '<option value="all">Todas as matérias</option>' + opts;
-  document.getElementById('noteFilterSubject').innerHTML = filterOpts;
+  const noteSubjectSel = document.getElementById('noteSubject');
+  if(noteSubjectSel) noteSubjectSel.innerHTML = `<option value="">Geral (sem matéria)</option>` + opts;
+  renderNoteFolders();
 }
 
 function generateMilestones(dueISO){
@@ -914,36 +914,112 @@ document.getElementById('filterRow').addEventListener('click', e=>{
    ANOTAÇÕES
 ============================================================ */
 let notes = [];
-let noteFilterSubject = 'all';
+let noteCategories = [];
+let noteFilterSubject = null; // null = pastas ainda não abertas; 'all' = todas; '' = geral; ou o code de uma matéria
+let noteFilterCategory = 'all';
 let noteFavOnly = false;
+let noteSortAsc = false; // false = mais recentes primeiro
 let selectedNoteIds = new Set();
+let currentDrawingDataUrl = null;
+
+const defaultNoteCategories = ['Resumo','Dúvida','Ideia','Revisão','Importante'];
 
 async function loadNotes(){
   try{ const r = await remoteStorage.get('notes-list'); notes = r? JSON.parse(r.value):[]; }
   catch(e){ notes = []; }
-  renderNotes();
+  renderNoteFolders();
 }
 async function saveNotes(){
   try{ await remoteStorage.set('notes-list', JSON.stringify(notes)); }catch(e){}
 }
+
+async function loadNoteCategories(){
+  try{
+    const r = await remoteStorage.get('note-categories');
+    noteCategories = r ? JSON.parse(r.value) : [...defaultNoteCategories];
+  }catch(e){ noteCategories = [...defaultNoteCategories]; }
+  if(!noteCategories.length) noteCategories = [...defaultNoteCategories];
+  populateNoteCategorySelects();
+}
+async function saveNoteCategories(){
+  try{ await remoteStorage.set('note-categories', JSON.stringify(noteCategories)); }catch(e){}
+}
+function populateNoteCategorySelects(){
+  const opts = noteCategories.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  const composeSel = document.getElementById('noteCategory');
+  if(composeSel) composeSel.innerHTML = `<option value="">Sem categoria</option>` + opts;
+  const filterSel = document.getElementById('noteFilterCategory');
+  if(filterSel) filterSel.innerHTML = `<option value="all">Todas as categorias</option>` + opts;
+}
+
+function renderNoteFolders(){
+  const grid = document.getElementById('notesFoldersGrid');
+  if(!grid) return;
+  const countFor = code => notes.filter(n => code==='' ? !n.subject : n.subject===code).length;
+
+  const cards = [`<div class="note-folder-card" data-folder="all"><span class="note-folder-icon">📋</span><strong>Todas as anotações</strong><small>${notes.length} anotações</small></div>`];
+  subjects.forEach(s=>{
+    cards.push(`<div class="note-folder-card" data-folder="${escapeHtml(s.code)}" style="background:${s.bg};color:${s.fg};"><span class="note-folder-icon">${s.icon||'📁'}</span><strong>${escapeHtml(s.name)}</strong><small>${countFor(s.code)} anotações</small></div>`);
+  });
+  cards.push(`<div class="note-folder-card" data-folder=""><span class="note-folder-icon">🗂️</span><strong>Geral</strong><small>${countFor('')} sem matéria</small></div>`);
+  grid.innerHTML = cards.join('');
+}
+
+function openNoteFolder(code){
+  noteFilterSubject = code;
+  document.getElementById('notesFoldersView').style.display = 'none';
+  document.getElementById('notesFolderContent').style.display = '';
+
+  const subjSelect = document.getElementById('noteSubject');
+  if(subjSelect && code && code!=='all') subjSelect.value = code;
+
+  const label = document.getElementById('noteFolderLabel');
+  if(code==='all') label.textContent = 'Todas as anotações';
+  else if(code==='') label.textContent = 'Geral';
+  else { const s = subjects.find(s=>s.code===code); label.textContent = s ? s.name : code; }
+
+  renderNotes();
+}
+function closeNoteFolder(){
+  noteFilterSubject = null;
+  document.getElementById('notesFoldersView').style.display = '';
+  document.getElementById('notesFolderContent').style.display = 'none';
+  renderNoteFolders();
+}
+document.getElementById('notesFoldersGrid').addEventListener('click', e=>{
+  const card = e.target.closest('.note-folder-card');
+  if(card) openNoteFolder(card.dataset.folder);
+});
+document.getElementById('noteBackToFolders').addEventListener('click', closeNoteFolder);
+
+function noteSortKey(n){ return n.createdAt || (n.date ? n.date+'T00:00:00.000Z' : ''); }
+
 function renderNotes(){
   selectedNoteIds = new Set([...selectedNoteIds].filter(id=>notes.some(n=>n.id===id)));
   let list = [...notes];
-  if(noteFilterSubject!=='all') list = list.filter(n=>n.subject===noteFilterSubject);
+  if(noteFilterSubject==='') list = list.filter(n=>!n.subject);
+  else if(noteFilterSubject && noteFilterSubject!=='all') list = list.filter(n=>n.subject===noteFilterSubject);
+  if(noteFilterCategory!=='all') list = list.filter(n=>(n.category||'')===noteFilterCategory);
   if(noteFavOnly) list = list.filter(n=>n.favorite);
-  list.sort((a,b)=> b.date.localeCompare(a.date));
+
+  list.sort((a,b)=>{
+    const ka=noteSortKey(a), kb=noteSortKey(b);
+    return noteSortAsc ? ka.localeCompare(kb) : kb.localeCompare(ka);
+  });
+
   const grid = document.getElementById('notesGrid');
   if(!list.length){ grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1;">Nenhuma anotação por aqui ainda ✦</div>'; return; }
   grid.innerHTML = list.map(n=>{
     const subj = subjects.find(s=>s.code===n.subject);
     return `<div class="note-card" style="background:${subj?subj.bg:'var(--bg-soft)'};color:${subj?subj.fg:'var(--text)'}" data-id="${n.id}">
       <div class="note-subject" style="display:flex;justify-content:space-between;align-items:center;">
-        <span>${subj?subj.code:'geral'}</span>
+        <span>${subj?subj.code:'geral'}${n.category?` · ${escapeHtml(n.category)}`:''}</span>
         <label style="font-size:11px;display:flex;align-items:center;gap:5px;">
           <input type="checkbox" class="note-select" ${selectedNoteIds.has(n.id)?'checked':''}> selecionar
         </label>
       </div>
-      <div class="note-text">${escapeHtml(n.text)}</div>
+      ${n.drawing?`<img class="note-drawing-thumb" src="${n.drawing}" alt="Desenho da anotação">`:''}
+      ${n.text?`<div class="note-text">${escapeHtml(n.text)}</div>`:''}
       <div class="note-foot">
         <span class="note-date">${fmtDDMM(n.date)}</span>
         <span>
@@ -957,16 +1033,40 @@ function renderNotes(){
 document.getElementById('noteAddBtn').addEventListener('click', async ()=>{
   const ta = document.getElementById('noteText');
   const text = ta.value.trim();
-  if(!text) return;
-  notes.push({ id:uid(), subject:document.getElementById('noteSubject').value, text, favorite:false, date:todayISO() });
+  if(!text && !currentDrawingDataUrl) return;
+  notes.push({
+    id:uid(),
+    subject:document.getElementById('noteSubject').value,
+    category:document.getElementById('noteCategory').value || '',
+    text,
+    drawing: currentDrawingDataUrl,
+    favorite:false,
+    date:todayISO(),
+    createdAt:new Date().toISOString()
+  });
   ta.value='';
-  renderNotes(); await saveNotes();
+  clearDrawingDraft();
+  renderNotes(); renderNoteFolders(); await saveNotes();
 });
-document.getElementById('noteFilterSubject').addEventListener('change', e=>{ noteFilterSubject = e.target.value; renderNotes(); });
+document.getElementById('noteFilterCategory').addEventListener('change', e=>{ noteFilterCategory = e.target.value; renderNotes(); });
 document.getElementById('noteFavFilter').addEventListener('click', e=>{
   noteFavOnly = !noteFavOnly;
   e.target.classList.toggle('on', noteFavOnly);
   renderNotes();
+});
+document.getElementById('noteSortToggle').addEventListener('click', e=>{
+  noteSortAsc = !noteSortAsc;
+  e.target.textContent = noteSortAsc ? 'Mais antigas primeiro ↑' : 'Mais recentes primeiro ↓';
+  renderNotes();
+});
+document.getElementById('noteNewCategoryBtn').addEventListener('click', async ()=>{
+  const name = (prompt('Nome da nova categoria:') || '').trim();
+  if(!name) return;
+  if(noteCategories.some(c=>c.toLowerCase()===name.toLowerCase())){ showToast('Essa categoria já existe.'); return; }
+  noteCategories.push(name);
+  populateNoteCategorySelects();
+  document.getElementById('noteCategory').value = name;
+  await saveNoteCategories();
 });
 document.getElementById('notesGrid').addEventListener('click', async e=>{
   const card = e.target.closest('.note-card'); if(!card) return;
@@ -979,7 +1079,7 @@ document.getElementById('notesGrid').addEventListener('click', async e=>{
   if(e.target.closest('[data-action="fav"]')) n.favorite = !n.favorite;
   else if(e.target.closest('[data-action="del"]')) { notes = notes.filter(n=>n.id!==id); selectedNoteIds.delete(id); }
   else return;
-  renderNotes(); await saveNotes();
+  renderNotes(); renderNoteFolders(); await saveNotes();
 });
 
 
@@ -988,7 +1088,7 @@ document.getElementById('noteDeleteSelected').addEventListener('click', async ()
   if(!confirm(`Apagar ${selectedNoteIds.size} anotação(ões) selecionada(s)?`)) return;
   notes = notes.filter(n=>!selectedNoteIds.has(n.id));
   selectedNoteIds.clear();
-  renderNotes();
+  renderNotes(); renderNoteFolders();
   await saveNotes();
   showToast('Anotações selecionadas apagadas. ✦');
 });
@@ -997,10 +1097,83 @@ document.getElementById('noteDeleteAll').addEventListener('click', async ()=>{
   if(!confirm('Apagar todas as anotações? Essa ação não pode ser desfeita.')) return;
   notes = [];
   selectedNoteIds.clear();
-  renderNotes();
+  renderNotes(); renderNoteFolders();
   await saveNotes();
   showToast('Todas as anotações foram apagadas. ✦');
 });
+
+/* ---------- desenho (tipo bloco de notas do iPhone) ---------- */
+let drawCtx = null, drawingActive = false, drawColor = '#111111', drawErasing = false, lastX = 0, lastY = 0;
+
+function initDrawCanvas(){
+  const canvas = document.getElementById('drawCanvas');
+  if(!canvas || drawCtx) return;
+  drawCtx = canvas.getContext('2d');
+  drawCtx.fillStyle = '#FFFFFF';
+  drawCtx.fillRect(0,0,canvas.width,canvas.height);
+  drawCtx.lineJoin='round'; drawCtx.lineCap='round';
+
+  function getPos(e){
+    const rect = canvas.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return { x:(clientX-rect.left)*(canvas.width/rect.width), y:(clientY-rect.top)*(canvas.height/rect.height) };
+  }
+  function start(e){ e.preventDefault(); drawingActive=true; const p=getPos(e); lastX=p.x; lastY=p.y; }
+  function move(e){
+    if(!drawingActive) return;
+    e.preventDefault();
+    const p = getPos(e);
+    drawCtx.strokeStyle = drawErasing ? '#FFFFFF' : drawColor;
+    drawCtx.lineWidth = drawErasing ? 18 : 4;
+    drawCtx.beginPath(); drawCtx.moveTo(lastX,lastY); drawCtx.lineTo(p.x,p.y); drawCtx.stroke();
+    lastX=p.x; lastY=p.y;
+  }
+  function end(){ drawingActive=false; }
+
+  canvas.addEventListener('mousedown', start);
+  canvas.addEventListener('mousemove', move);
+  window.addEventListener('mouseup', end);
+  canvas.addEventListener('touchstart', start, {passive:false});
+  canvas.addEventListener('touchmove', move, {passive:false});
+  canvas.addEventListener('touchend', end);
+}
+function openDrawModal(){ initDrawCanvas(); document.getElementById('drawOverlay').classList.add('show'); }
+function closeDrawModal(){ document.getElementById('drawOverlay').classList.remove('show'); }
+function clearDrawingDraft(){
+  currentDrawingDataUrl = null;
+  document.getElementById('noteDrawingPreviewWrap').style.display = 'none';
+}
+
+document.getElementById('noteDrawBtn').addEventListener('click', openDrawModal);
+document.getElementById('drawCancelBtn').addEventListener('click', closeDrawModal);
+document.getElementById('drawOverlay').addEventListener('click', e=>{ if(e.target.id==='drawOverlay') closeDrawModal(); });
+document.querySelectorAll('.draw-color').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    drawColor = btn.dataset.color; drawErasing = false;
+    document.querySelectorAll('.draw-color').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('drawEraserBtn').classList.remove('active');
+  });
+});
+document.getElementById('drawEraserBtn').addEventListener('click', e=>{
+  drawErasing = true;
+  document.querySelectorAll('.draw-color').forEach(b=>b.classList.remove('active'));
+  e.currentTarget.classList.add('active');
+});
+document.getElementById('drawClearBtn').addEventListener('click', ()=>{
+  const canvas = document.getElementById('drawCanvas');
+  drawCtx.fillStyle = '#FFFFFF';
+  drawCtx.fillRect(0,0,canvas.width,canvas.height);
+});
+document.getElementById('drawSaveBtn').addEventListener('click', ()=>{
+  const canvas = document.getElementById('drawCanvas');
+  currentDrawingDataUrl = canvas.toDataURL('image/png');
+  document.getElementById('noteDrawingPreview').src = currentDrawingDataUrl;
+  document.getElementById('noteDrawingPreviewWrap').style.display = '';
+  closeDrawModal();
+});
+document.getElementById('noteDrawingRemove').addEventListener('click', clearDrawingDraft);
 
 /* ============================================================
    PLAYLIST — YouTube (vídeos, não YouTube Music)
@@ -2206,6 +2379,7 @@ async function initPrisma(){
   loadQuickTasks();
   loadAssignments();
   loadNotes();
+  loadNoteCategories();
   loadPlaylist();
   loadHabits();
   loadCourseProgress();
@@ -2652,6 +2826,36 @@ setupMobileHomeCarousel();
     }else{
       applyCollapsed(localStorage.getItem(storageKey) === '1');
     }
+  });
+})();
+
+/* ============================================================
+   PRISMA — TEMAS (seletor de cores na página Configurações)
+============================================================ */
+(function(){
+  const THEME_KEY = 'prisma-theme';
+
+  function applyPrismaTheme(themeKey){
+    if(themeKey && themeKey !== 'prisma'){
+      document.documentElement.setAttribute('data-theme', themeKey);
+    }else{
+      document.documentElement.removeAttribute('data-theme');
+    }
+    try{ localStorage.setItem(THEME_KEY, themeKey); }catch(e){}
+
+    document.querySelectorAll('.theme-option').forEach(btn=>{
+      btn.classList.toggle('active', btn.dataset.themeKey === themeKey);
+    });
+  }
+
+  document.querySelectorAll('.theme-option').forEach(btn=>{
+    btn.addEventListener('click', ()=> applyPrismaTheme(btn.dataset.themeKey));
+  });
+
+  let currentTheme = 'prisma';
+  try{ currentTheme = localStorage.getItem(THEME_KEY) || 'prisma'; }catch(e){}
+  document.querySelectorAll('.theme-option').forEach(btn=>{
+    btn.classList.toggle('active', btn.dataset.themeKey === currentTheme);
   });
 })();
 
