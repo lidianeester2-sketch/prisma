@@ -155,6 +155,7 @@
         <div class="prisma-greeting-block"><h1 id="userGreeting">Bom dia</h1><div class="prisma-message" id="dailyPhrase">Aqui está o resumo do seu semestre hoje.</div></div>
         <div style="display:flex;gap:8px;align-items:center;">
           <div class="chip-today" id="syncStatus" style="color:var(--gold-dk);">☁️ conectando...</div>
+          <div class="chip-today" id="liveClock">—</div>
           <div class="chip-today" id="todayChip">—</div>
         </div>
       </div>
@@ -455,19 +456,39 @@
       <div class="topbar">
         <div><h1>Anotações de Projetos</h1><div class="sub">Registre decisões, ideias e recados de cada projeto.</div></div>
       </div>
-      <div class="note-form">
-        <textarea id="projNoteText" placeholder="Escreva sua anotação..."></textarea>
-        <div class="note-form-row">
-          <select id="projNoteProject"></select>
-          <button id="projNoteAddBtn">Salvar anotação</button>
+
+      <div id="projNotesFoldersView">
+        <div class="notes-folders-grid" id="projNotesFoldersGrid"></div>
+      </div>
+
+      <div id="projNotesFolderContent" style="display:none;">
+        <button class="btn small ghost" id="projNoteBackToFolders" type="button">← Todas as pastas</button>
+        <h2 id="projNoteFolderLabel" style="margin:10px 0 16px;font-family:'Baloo 2';"></h2>
+
+        <div class="note-form">
+          <textarea id="projNoteText" placeholder="Escreva sua anotação..."></textarea>
+          <div class="note-drawing-preview-wrap" id="projNoteDrawingPreviewWrap" style="display:none;">
+            <img id="projNoteDrawingPreview" alt="Desenho anexado">
+            <button id="projNoteDrawingRemove" type="button" title="Remover desenho">✕</button>
+          </div>
+          <div class="note-form-row">
+            <select id="projNoteProject"></select>
+            <select id="projNoteCategory"></select>
+            <button class="btn small ghost" id="projNoteNewCategoryBtn" type="button">+ Categoria</button>
+            <button class="btn small ghost" id="projNoteDrawBtn" type="button">✏️ Desenhar</button>
+            <button id="projNoteAddBtn">Salvar anotação</button>
+          </div>
         </div>
+
+        <div class="notes-toolbar">
+          <span style="font-size:12.5px;color:var(--muted);">Filtrar:</span>
+          <select id="projNoteFilterCategory"><option value="all">Todas as categorias</option></select>
+          <button id="projNoteFavFilter">⭐ Só favoritas</button>
+          <button id="projNoteSortToggle" type="button">Mais recentes primeiro ↓</button>
+        </div>
+
+        <div class="notes-grid" id="projNotesGrid"></div>
       </div>
-      <div class="notes-toolbar">
-        <span style="font-size:12.5px;color:var(--muted);">Filtrar:</span>
-        <select id="projNoteFilterProject"><option value="all">Todos os projetos</option></select>
-        <button id="projNoteFavFilter">⭐ Só favoritas</button>
-      </div>
-      <div class="notes-grid" id="projNotesGrid"></div>
     </section>
 
     <!-- ============ PROJETOS: PROGRESSO ============ -->
@@ -518,19 +539,39 @@
       <div class="topbar">
         <div><h1>Anotações de Leitura</h1><div class="sub">Trechos, citações e assuntos interessantes.</div></div>
       </div>
-      <div class="note-form">
-        <textarea id="leitNoteText" placeholder="Escreva sua anotação..."></textarea>
-        <div class="note-form-row">
-          <select id="leitNoteReading"></select>
-          <button id="leitNoteAddBtn">Salvar anotação</button>
+
+      <div id="leitNotesFoldersView">
+        <div class="notes-folders-grid" id="leitNotesFoldersGrid"></div>
+      </div>
+
+      <div id="leitNotesFolderContent" style="display:none;">
+        <button class="btn small ghost" id="leitNoteBackToFolders" type="button">← Todas as pastas</button>
+        <h2 id="leitNoteFolderLabel" style="margin:10px 0 16px;font-family:'Baloo 2';"></h2>
+
+        <div class="note-form">
+          <textarea id="leitNoteText" placeholder="Escreva sua anotação..."></textarea>
+          <div class="note-drawing-preview-wrap" id="leitNoteDrawingPreviewWrap" style="display:none;">
+            <img id="leitNoteDrawingPreview" alt="Desenho anexado">
+            <button id="leitNoteDrawingRemove" type="button" title="Remover desenho">✕</button>
+          </div>
+          <div class="note-form-row">
+            <select id="leitNoteReading"></select>
+            <select id="leitNoteCategory"></select>
+            <button class="btn small ghost" id="leitNoteNewCategoryBtn" type="button">+ Categoria</button>
+            <button class="btn small ghost" id="leitNoteDrawBtn" type="button">✏️ Desenhar</button>
+            <button id="leitNoteAddBtn">Salvar anotação</button>
+          </div>
         </div>
+
+        <div class="notes-toolbar">
+          <span style="font-size:12.5px;color:var(--muted);">Filtrar:</span>
+          <select id="leitNoteFilterCategory"><option value="all">Todas as categorias</option></select>
+          <button id="leitNoteFavFilter">⭐ Só favoritas</button>
+          <button id="leitNoteSortToggle" type="button">Mais recentes primeiro ↓</button>
+        </div>
+
+        <div class="notes-grid" id="leitNotesGrid"></div>
       </div>
-      <div class="notes-toolbar">
-        <span style="font-size:12.5px;color:var(--muted);">Filtrar:</span>
-        <select id="leitNoteFilterReading"><option value="all">Todas as leituras</option></select>
-        <button id="leitNoteFavFilter">⭐ Só favoritas</button>
-      </div>
-      <div class="notes-grid" id="leitNotesGrid"></div>
     </section>
 
     <!-- ============ LEITURAS: PROGRESSO ============ -->
