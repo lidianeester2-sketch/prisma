@@ -267,6 +267,14 @@ function updatePrismaGreeting(name=''){
   }
 }
 
+function updatePrismaClock(){
+  const el = document.getElementById('liveClock');
+  if(!el) return;
+  el.textContent = '🕐 ' + new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+}
+updatePrismaClock();
+setInterval(updatePrismaClock, 1000*15);
+
 async function loadPrismaGreeting(){
   let name = '';
   try{
@@ -660,13 +668,18 @@ function renderNextClass(){
     document.getElementById('nextClassWhen').textContent = '';
     return;
   }
-  const diffMs = best.dt - new Date();
-  const diffH = diffMs/3600000;
-  let when;
+  const now = new Date();
+  const isSameDay = (a,b) => a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate();
+  const tomorrow = new Date(now); tomorrow.setDate(now.getDate()+1);
+
   const dayStr = best.dt.toLocaleDateString('pt-BR',{weekday:'long'});
   const timeStr = best.dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
-  if(diffH < 24) when = `Hoje/logo mais · ${timeStr}`;
+
+  let when;
+  if(isSameDay(best.dt, now)) when = `Hoje · ${timeStr}`;
+  else if(isSameDay(best.dt, tomorrow)) when = `Amanhã · ${timeStr}`;
   else when = `${dayStr}, ${timeStr}`;
+
   document.getElementById('nextClassName').textContent = best.subj.name;
   document.getElementById('nextClassWhen').textContent = `${when} · ${best.subj.code}`;
 }
@@ -920,7 +933,6 @@ let noteFilterCategory = 'all';
 let noteFavOnly = false;
 let noteSortAsc = false; // false = mais recentes primeiro
 let selectedNoteIds = new Set();
-let currentDrawingDataUrl = null;
 
 const defaultNoteCategories = ['Resumo','Dúvida','Ideia','Revisão','Importante'];
 
@@ -1033,19 +1045,19 @@ function renderNotes(){
 document.getElementById('noteAddBtn').addEventListener('click', async ()=>{
   const ta = document.getElementById('noteText');
   const text = ta.value.trim();
-  if(!text && !currentDrawingDataUrl) return;
+  if(!text && !currentDrawingDrafts.faculdade) return;
   notes.push({
     id:uid(),
     subject:document.getElementById('noteSubject').value,
     category:document.getElementById('noteCategory').value || '',
     text,
-    drawing: currentDrawingDataUrl,
+    drawing: currentDrawingDrafts.faculdade,
     favorite:false,
     date:todayISO(),
     createdAt:new Date().toISOString()
   });
   ta.value='';
-  clearDrawingDraft();
+  clearDrawingDraft('faculdade');
   renderNotes(); renderNoteFolders(); await saveNotes();
 });
 document.getElementById('noteFilterCategory').addEventListener('change', e=>{ noteFilterCategory = e.target.value; renderNotes(); });
@@ -1102,8 +1114,16 @@ document.getElementById('noteDeleteAll').addEventListener('click', async ()=>{
   showToast('Todas as anotações foram apagadas. ✦');
 });
 
-/* ---------- desenho (tipo bloco de notas do iPhone) ---------- */
+/* ---------- desenho (tipo bloco de notas do iPhone) — compartilhado pelos 3 painéis ---------- */
 let drawCtx = null, drawingActive = false, drawColor = '#111111', drawErasing = false, lastX = 0, lastY = 0;
+let currentDrawingDrafts = { faculdade:null, projetos:null, leituras:null };
+let activeDrawTarget = 'faculdade';
+
+const drawPreviewIds = {
+  faculdade: {wrap:'noteDrawingPreviewWrap', img:'noteDrawingPreview'},
+  projetos: {wrap:'projNoteDrawingPreviewWrap', img:'projNoteDrawingPreview'},
+  leituras: {wrap:'leitNoteDrawingPreviewWrap', img:'leitNoteDrawingPreview'}
+};
 
 function initDrawCanvas(){
   const canvas = document.getElementById('drawCanvas');
@@ -1138,14 +1158,27 @@ function initDrawCanvas(){
   canvas.addEventListener('touchmove', move, {passive:false});
   canvas.addEventListener('touchend', end);
 }
-function openDrawModal(){ initDrawCanvas(); document.getElementById('drawOverlay').classList.add('show'); }
+function clearDrawCanvasBlank(){
+  const canvas = document.getElementById('drawCanvas');
+  if(!drawCtx || !canvas) return;
+  drawCtx.fillStyle = '#FFFFFF';
+  drawCtx.fillRect(0,0,canvas.width,canvas.height);
+}
+function openDrawModal(target){
+  activeDrawTarget = target || 'faculdade';
+  initDrawCanvas();
+  clearDrawCanvasBlank();
+  document.getElementById('drawOverlay').classList.add('show');
+}
 function closeDrawModal(){ document.getElementById('drawOverlay').classList.remove('show'); }
-function clearDrawingDraft(){
-  currentDrawingDataUrl = null;
-  document.getElementById('noteDrawingPreviewWrap').style.display = 'none';
+function clearDrawingDraft(target){
+  currentDrawingDrafts[target] = null;
+  document.getElementById(drawPreviewIds[target].wrap).style.display = 'none';
 }
 
-document.getElementById('noteDrawBtn').addEventListener('click', openDrawModal);
+document.getElementById('noteDrawBtn').addEventListener('click', ()=>openDrawModal('faculdade'));
+document.getElementById('projNoteDrawBtn').addEventListener('click', ()=>openDrawModal('projetos'));
+document.getElementById('leitNoteDrawBtn').addEventListener('click', ()=>openDrawModal('leituras'));
 document.getElementById('drawCancelBtn').addEventListener('click', closeDrawModal);
 document.getElementById('drawOverlay').addEventListener('click', e=>{ if(e.target.id==='drawOverlay') closeDrawModal(); });
 document.querySelectorAll('.draw-color').forEach(btn=>{
@@ -1161,19 +1194,19 @@ document.getElementById('drawEraserBtn').addEventListener('click', e=>{
   document.querySelectorAll('.draw-color').forEach(b=>b.classList.remove('active'));
   e.currentTarget.classList.add('active');
 });
-document.getElementById('drawClearBtn').addEventListener('click', ()=>{
-  const canvas = document.getElementById('drawCanvas');
-  drawCtx.fillStyle = '#FFFFFF';
-  drawCtx.fillRect(0,0,canvas.width,canvas.height);
-});
+document.getElementById('drawClearBtn').addEventListener('click', clearDrawCanvasBlank);
 document.getElementById('drawSaveBtn').addEventListener('click', ()=>{
   const canvas = document.getElementById('drawCanvas');
-  currentDrawingDataUrl = canvas.toDataURL('image/png');
-  document.getElementById('noteDrawingPreview').src = currentDrawingDataUrl;
-  document.getElementById('noteDrawingPreviewWrap').style.display = '';
+  const dataUrl = canvas.toDataURL('image/png');
+  currentDrawingDrafts[activeDrawTarget] = dataUrl;
+  const ids = drawPreviewIds[activeDrawTarget];
+  document.getElementById(ids.img).src = dataUrl;
+  document.getElementById(ids.wrap).style.display = '';
   closeDrawModal();
 });
-document.getElementById('noteDrawingRemove').addEventListener('click', clearDrawingDraft);
+document.getElementById('noteDrawingRemove').addEventListener('click', ()=>clearDrawingDraft('faculdade'));
+document.getElementById('projNoteDrawingRemove').addEventListener('click', ()=>clearDrawingDraft('projetos'));
+document.getElementById('leitNoteDrawingRemove').addEventListener('click', ()=>clearDrawingDraft('leituras'));
 
 /* ============================================================
    PLAYLIST — YouTube (vídeos, não YouTube Music)
@@ -1711,8 +1744,9 @@ async function initProjWorkspace(){
 function populateProjectSelects(){
   const opts = projects.map(p=>`<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
   document.getElementById('projAsProject').innerHTML = opts;
-  document.getElementById('projNoteProject').innerHTML = opts;
-  document.getElementById('projNoteFilterProject').innerHTML = '<option value="all">Todos os projetos</option>' + opts;
+  const projNoteSel = document.getElementById('projNoteProject');
+  if(projNoteSel) projNoteSel.innerHTML = `<option value="">Geral (sem projeto)</option>` + opts;
+  renderProjNoteFolders();
 }
 function renderProjGrid(){
   const grid = document.getElementById('projGrid');
@@ -1950,19 +1984,82 @@ document.getElementById('projAssignList').addEventListener('click', async e=>{
   renderProjDeliverables(); renderProjMiniDeadlines(); await saveProjDeliverables();
 });
 
-let projNoteFilterProject = 'all';
+let projNoteFilterProject = null;
+let projNoteFilterCategory = 'all';
 let projNoteFavOnly = false;
+let projNoteSortAsc = false;
+let projNoteCategories = [];
+const defaultProjNoteCategories = ['Decisão','Ideia','Recado','Risco','Importante'];
+
 async function loadProjNotes(){
   try{ const r = await remoteStorage.get('proj-notes-list'); projNotes = r? JSON.parse(r.value):[]; }
   catch(e){ projNotes = []; }
-  renderProjNotes();
+  renderProjNoteFolders();
 }
 async function saveProjNotesFn(){ try{ await remoteStorage.set('proj-notes-list', JSON.stringify(projNotes)); }catch(e){} }
+
+async function loadProjNoteCategories(){
+  try{
+    const r = await remoteStorage.get('proj-note-categories');
+    projNoteCategories = r ? JSON.parse(r.value) : [...defaultProjNoteCategories];
+  }catch(e){ projNoteCategories = [...defaultProjNoteCategories]; }
+  if(!projNoteCategories.length) projNoteCategories = [...defaultProjNoteCategories];
+  populateProjNoteCategorySelects();
+}
+async function saveProjNoteCategories(){ try{ await remoteStorage.set('proj-note-categories', JSON.stringify(projNoteCategories)); }catch(e){} }
+function populateProjNoteCategorySelects(){
+  const opts = projNoteCategories.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  const composeSel = document.getElementById('projNoteCategory');
+  if(composeSel) composeSel.innerHTML = `<option value="">Sem categoria</option>` + opts;
+  const filterSel = document.getElementById('projNoteFilterCategory');
+  if(filterSel) filterSel.innerHTML = `<option value="all">Todas as categorias</option>` + opts;
+}
+
+function renderProjNoteFolders(){
+  const grid = document.getElementById('projNotesFoldersGrid');
+  if(!grid) return;
+  const countFor = id => projNotes.filter(n => id==='' ? !n.project : n.project===id).length;
+  const cards = [`<div class="note-folder-card" data-folder="all"><span class="note-folder-icon">📋</span><strong>Todas as anotações</strong><small>${projNotes.length} anotações</small></div>`];
+  projects.forEach((p,idx)=>{
+    const c = dynColor(idx);
+    cards.push(`<div class="note-folder-card" data-folder="${escapeHtml(p.id)}" style="background:${c.bg};color:${c.fg};"><span class="note-folder-icon">📁</span><strong>${escapeHtml(p.name)}</strong><small>${countFor(p.id)} anotações</small></div>`);
+  });
+  cards.push(`<div class="note-folder-card" data-folder=""><span class="note-folder-icon">🗂️</span><strong>Geral</strong><small>${countFor('')} sem projeto</small></div>`);
+  grid.innerHTML = cards.join('');
+}
+function openProjNoteFolder(id){
+  projNoteFilterProject = id;
+  document.getElementById('projNotesFoldersView').style.display = 'none';
+  document.getElementById('projNotesFolderContent').style.display = '';
+  const sel = document.getElementById('projNoteProject');
+  if(sel && id && id!=='all') sel.value = id;
+  const label = document.getElementById('projNoteFolderLabel');
+  if(id==='all') label.textContent = 'Todas as anotações';
+  else if(id==='') label.textContent = 'Geral';
+  else { const p = projects.find(p=>p.id===id); label.textContent = p ? p.name : id; }
+  renderProjNotes();
+}
+function closeProjNoteFolder(){
+  projNoteFilterProject = null;
+  document.getElementById('projNotesFoldersView').style.display = '';
+  document.getElementById('projNotesFolderContent').style.display = 'none';
+  renderProjNoteFolders();
+}
+document.getElementById('projNotesFoldersGrid').addEventListener('click', e=>{
+  const card = e.target.closest('.note-folder-card'); if(card) openProjNoteFolder(card.dataset.folder);
+});
+document.getElementById('projNoteBackToFolders').addEventListener('click', closeProjNoteFolder);
+
 function renderProjNotes(){
   let list = [...projNotes];
-  if(projNoteFilterProject!=='all') list = list.filter(n=>n.project===projNoteFilterProject);
+  if(projNoteFilterProject==='') list = list.filter(n=>!n.project);
+  else if(projNoteFilterProject && projNoteFilterProject!=='all') list = list.filter(n=>n.project===projNoteFilterProject);
+  if(projNoteFilterCategory!=='all') list = list.filter(n=>(n.category||'')===projNoteFilterCategory);
   if(projNoteFavOnly) list = list.filter(n=>n.favorite);
-  list.sort((a,b)=>b.date.localeCompare(a.date));
+  list.sort((a,b)=>{
+    const ka=a.createdAt||a.date, kb=b.createdAt||b.date;
+    return projNoteSortAsc ? ka.localeCompare(kb) : kb.localeCompare(ka);
+  });
   const grid = document.getElementById('projNotesGrid');
   if(!list.length){ grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1;">Nenhuma anotação por aqui ainda ✦</div>'; return; }
   grid.innerHTML = list.map(n=>{
@@ -1970,8 +2067,9 @@ function renderProjNotes(){
     const idx = projects.findIndex(p=>p.id===n.project);
     const c = idx>=0 ? dynColor(idx) : {bg:'var(--bg-soft)', fg:'var(--text)'};
     return `<div class="note-card" style="background:${c.bg};color:${c.fg}" data-id="${n.id}">
-      <div class="note-subject">${proj?escapeHtml(proj.name):'geral'}</div>
-      <div class="note-text">${escapeHtml(n.text)}</div>
+      <div class="note-subject">${proj?escapeHtml(proj.name):'geral'}${n.category?` · ${escapeHtml(n.category)}`:''}</div>
+      ${n.drawing?`<img class="note-drawing-thumb" src="${n.drawing}" alt="Desenho da anotação">`:''}
+      ${n.text?`<div class="note-text">${escapeHtml(n.text)}</div>`:''}
       <div class="note-foot">
         <span class="note-date">${fmtDDMM(n.date)}</span>
         <span>
@@ -1984,13 +2082,39 @@ function renderProjNotes(){
 }
 document.getElementById('projNoteAddBtn').addEventListener('click', async ()=>{
   const ta = document.getElementById('projNoteText');
-  const text = ta.value.trim(); if(!text) return;
-  projNotes.push({id:uid(), project:document.getElementById('projNoteProject').value, text, favorite:false, date:todayISO()});
-  ta.value=''; renderProjNotes(); await saveProjNotesFn();
+  const text = ta.value.trim();
+  if(!text && !currentDrawingDrafts.projetos) return;
+  projNotes.push({
+    id:uid(),
+    project:document.getElementById('projNoteProject').value,
+    category:document.getElementById('projNoteCategory').value || '',
+    text,
+    drawing: currentDrawingDrafts.projetos,
+    favorite:false,
+    date:todayISO(),
+    createdAt:new Date().toISOString()
+  });
+  ta.value='';
+  clearDrawingDraft('projetos');
+  renderProjNotes(); renderProjNoteFolders(); await saveProjNotesFn();
 });
-document.getElementById('projNoteFilterProject').addEventListener('change', e=>{ projNoteFilterProject=e.target.value; renderProjNotes(); });
+document.getElementById('projNoteFilterCategory').addEventListener('change', e=>{ projNoteFilterCategory=e.target.value; renderProjNotes(); });
 document.getElementById('projNoteFavFilter').addEventListener('click', e=>{
   projNoteFavOnly = !projNoteFavOnly; e.target.classList.toggle('on', projNoteFavOnly); renderProjNotes();
+});
+document.getElementById('projNoteSortToggle').addEventListener('click', e=>{
+  projNoteSortAsc = !projNoteSortAsc;
+  e.target.textContent = projNoteSortAsc ? 'Mais antigas primeiro ↑' : 'Mais recentes primeiro ↓';
+  renderProjNotes();
+});
+document.getElementById('projNoteNewCategoryBtn').addEventListener('click', async ()=>{
+  const name = (prompt('Nome da nova categoria:') || '').trim();
+  if(!name) return;
+  if(projNoteCategories.some(c=>c.toLowerCase()===name.toLowerCase())){ showToast('Essa categoria já existe.'); return; }
+  projNoteCategories.push(name);
+  populateProjNoteCategorySelects();
+  document.getElementById('projNoteCategory').value = name;
+  await saveProjNoteCategories();
 });
 document.getElementById('projNotesGrid').addEventListener('click', async e=>{
   const card = e.target.closest('.note-card'); if(!card) return;
@@ -1999,7 +2123,7 @@ document.getElementById('projNotesGrid').addEventListener('click', async e=>{
   if(e.target.closest('[data-action="fav"]')) n.favorite=!n.favorite;
   else if(e.target.closest('[data-action="del"]')) projNotes = projNotes.filter(n=>n.id!==id);
   else return;
-  renderProjNotes(); await saveProjNotesFn();
+  renderProjNotes(); renderProjNoteFolders(); await saveProjNotesFn();
 });
 
 /* ============================================================
@@ -2116,8 +2240,9 @@ async function saveReadings(){ try{ await remoteStorage.set('leit-list', JSON.st
 
 function populateReadingSelects(){
   const opts = readings.map(r=>`<option value="${r.id}">${escapeHtml(r.title)}</option>`).join('');
-  document.getElementById('leitNoteReading').innerHTML = opts;
-  document.getElementById('leitNoteFilterReading').innerHTML = '<option value="all">Todas as leituras</option>' + opts;
+  const leitNoteSel = document.getElementById('leitNoteReading');
+  if(leitNoteSel) leitNoteSel.innerHTML = `<option value="">Geral (sem leitura)</option>` + opts;
+  renderLeitNoteFolders();
 }
 function leitPct(r){ if(!r.pagesTotal) return 0; return Math.min(100, Math.round((r.pagesCurrent/r.pagesTotal)*100)); }
 function updateLeitStatsChip(){
@@ -2305,19 +2430,82 @@ document.getElementById('leitQtList').addEventListener('click', async e=>{
   renderLeitTasks(); await saveLeitTasks();
 });
 
-let leitNoteFilterReading = 'all';
+let leitNoteFilterReading = null;
+let leitNoteFilterCategory = 'all';
 let leitNoteFavOnly = false;
+let leitNoteSortAsc = false;
+let leitNoteCategories = [];
+const defaultLeitNoteCategories = ['Citação','Resumo','Reflexão','Dúvida','Importante'];
+
 async function loadLeitNotes(){
   try{ const r = await remoteStorage.get('leit-notes-list'); leitNotes = r? JSON.parse(r.value):[]; }
   catch(e){ leitNotes = []; }
-  renderLeitNotes();
+  renderLeitNoteFolders();
 }
 async function saveLeitNotesFn(){ try{ await remoteStorage.set('leit-notes-list', JSON.stringify(leitNotes)); }catch(e){} }
+
+async function loadLeitNoteCategories(){
+  try{
+    const r = await remoteStorage.get('leit-note-categories');
+    leitNoteCategories = r ? JSON.parse(r.value) : [...defaultLeitNoteCategories];
+  }catch(e){ leitNoteCategories = [...defaultLeitNoteCategories]; }
+  if(!leitNoteCategories.length) leitNoteCategories = [...defaultLeitNoteCategories];
+  populateLeitNoteCategorySelects();
+}
+async function saveLeitNoteCategories(){ try{ await remoteStorage.set('leit-note-categories', JSON.stringify(leitNoteCategories)); }catch(e){} }
+function populateLeitNoteCategorySelects(){
+  const opts = leitNoteCategories.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  const composeSel = document.getElementById('leitNoteCategory');
+  if(composeSel) composeSel.innerHTML = `<option value="">Sem categoria</option>` + opts;
+  const filterSel = document.getElementById('leitNoteFilterCategory');
+  if(filterSel) filterSel.innerHTML = `<option value="all">Todas as categorias</option>` + opts;
+}
+
+function renderLeitNoteFolders(){
+  const grid = document.getElementById('leitNotesFoldersGrid');
+  if(!grid) return;
+  const countFor = id => leitNotes.filter(n => id==='' ? !n.reading : n.reading===id).length;
+  const cards = [`<div class="note-folder-card" data-folder="all"><span class="note-folder-icon">📋</span><strong>Todas as anotações</strong><small>${leitNotes.length} anotações</small></div>`];
+  readings.forEach((r,idx)=>{
+    const c = dynColor(idx);
+    cards.push(`<div class="note-folder-card" data-folder="${escapeHtml(r.id)}" style="background:${c.bg};color:${c.fg};"><span class="note-folder-icon">📁</span><strong>${escapeHtml(r.title)}</strong><small>${countFor(r.id)} anotações</small></div>`);
+  });
+  cards.push(`<div class="note-folder-card" data-folder=""><span class="note-folder-icon">🗂️</span><strong>Geral</strong><small>${countFor('')} sem leitura</small></div>`);
+  grid.innerHTML = cards.join('');
+}
+function openLeitNoteFolder(id){
+  leitNoteFilterReading = id;
+  document.getElementById('leitNotesFoldersView').style.display = 'none';
+  document.getElementById('leitNotesFolderContent').style.display = '';
+  const sel = document.getElementById('leitNoteReading');
+  if(sel && id && id!=='all') sel.value = id;
+  const label = document.getElementById('leitNoteFolderLabel');
+  if(id==='all') label.textContent = 'Todas as anotações';
+  else if(id==='') label.textContent = 'Geral';
+  else { const r = readings.find(r=>r.id===id); label.textContent = r ? r.title : id; }
+  renderLeitNotes();
+}
+function closeLeitNoteFolder(){
+  leitNoteFilterReading = null;
+  document.getElementById('leitNotesFoldersView').style.display = '';
+  document.getElementById('leitNotesFolderContent').style.display = 'none';
+  renderLeitNoteFolders();
+}
+document.getElementById('leitNotesFoldersGrid').addEventListener('click', e=>{
+  const card = e.target.closest('.note-folder-card'); if(card) openLeitNoteFolder(card.dataset.folder);
+});
+document.getElementById('leitNoteBackToFolders').addEventListener('click', closeLeitNoteFolder);
+
 function renderLeitNotes(){
   let list = [...leitNotes];
-  if(leitNoteFilterReading!=='all') list = list.filter(n=>n.reading===leitNoteFilterReading);
+  if(leitNoteFilterReading==='') list = list.filter(n=>!n.reading);
+  else if(leitNoteFilterReading && leitNoteFilterReading!=='all') list = list.filter(n=>n.reading===leitNoteFilterReading);
+  if(leitNoteFilterCategory!=='all') list = list.filter(n=>(n.category||'')===leitNoteFilterCategory);
   if(leitNoteFavOnly) list = list.filter(n=>n.favorite);
-  list.sort((a,b)=>b.date.localeCompare(a.date));
+  list.sort((a,b)=>{
+    const ka=a.createdAt||a.date, kb=b.createdAt||b.date;
+    return leitNoteSortAsc ? ka.localeCompare(kb) : kb.localeCompare(ka);
+  });
   const grid = document.getElementById('leitNotesGrid');
   if(!list.length){ grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1;">Nenhuma anotação por aqui ainda ✦</div>'; return; }
   grid.innerHTML = list.map(n=>{
@@ -2325,8 +2513,9 @@ function renderLeitNotes(){
     const idx = readings.findIndex(r=>r.id===n.reading);
     const c = idx>=0 ? dynColor(idx) : {bg:'var(--bg-soft)', fg:'var(--text)'};
     return `<div class="note-card" style="background:${c.bg};color:${c.fg}" data-id="${n.id}">
-      <div class="note-subject">${reading?escapeHtml(reading.title):'geral'}</div>
-      <div class="note-text">${escapeHtml(n.text)}</div>
+      <div class="note-subject">${reading?escapeHtml(reading.title):'geral'}${n.category?` · ${escapeHtml(n.category)}`:''}</div>
+      ${n.drawing?`<img class="note-drawing-thumb" src="${n.drawing}" alt="Desenho da anotação">`:''}
+      ${n.text?`<div class="note-text">${escapeHtml(n.text)}</div>`:''}
       <div class="note-foot">
         <span class="note-date">${fmtDDMM(n.date)}</span>
         <span>
@@ -2339,13 +2528,39 @@ function renderLeitNotes(){
 }
 document.getElementById('leitNoteAddBtn').addEventListener('click', async ()=>{
   const ta = document.getElementById('leitNoteText');
-  const text = ta.value.trim(); if(!text) return;
-  leitNotes.push({id:uid(), reading:document.getElementById('leitNoteReading').value, text, favorite:false, date:todayISO()});
-  ta.value=''; renderLeitNotes(); await saveLeitNotesFn();
+  const text = ta.value.trim();
+  if(!text && !currentDrawingDrafts.leituras) return;
+  leitNotes.push({
+    id:uid(),
+    reading:document.getElementById('leitNoteReading').value,
+    category:document.getElementById('leitNoteCategory').value || '',
+    text,
+    drawing: currentDrawingDrafts.leituras,
+    favorite:false,
+    date:todayISO(),
+    createdAt:new Date().toISOString()
+  });
+  ta.value='';
+  clearDrawingDraft('leituras');
+  renderLeitNotes(); renderLeitNoteFolders(); await saveLeitNotesFn();
 });
-document.getElementById('leitNoteFilterReading').addEventListener('change', e=>{ leitNoteFilterReading=e.target.value; renderLeitNotes(); });
+document.getElementById('leitNoteFilterCategory').addEventListener('change', e=>{ leitNoteFilterCategory=e.target.value; renderLeitNotes(); });
 document.getElementById('leitNoteFavFilter').addEventListener('click', e=>{
   leitNoteFavOnly = !leitNoteFavOnly; e.target.classList.toggle('on', leitNoteFavOnly); renderLeitNotes();
+});
+document.getElementById('leitNoteSortToggle').addEventListener('click', e=>{
+  leitNoteSortAsc = !leitNoteSortAsc;
+  e.target.textContent = leitNoteSortAsc ? 'Mais antigas primeiro ↑' : 'Mais recentes primeiro ↓';
+  renderLeitNotes();
+});
+document.getElementById('leitNoteNewCategoryBtn').addEventListener('click', async ()=>{
+  const name = (prompt('Nome da nova categoria:') || '').trim();
+  if(!name) return;
+  if(leitNoteCategories.some(c=>c.toLowerCase()===name.toLowerCase())){ showToast('Essa categoria já existe.'); return; }
+  leitNoteCategories.push(name);
+  populateLeitNoteCategorySelects();
+  document.getElementById('leitNoteCategory').value = name;
+  await saveLeitNoteCategories();
 });
 document.getElementById('leitNotesGrid').addEventListener('click', async e=>{
   const card = e.target.closest('.note-card'); if(!card) return;
@@ -2354,7 +2569,7 @@ document.getElementById('leitNotesGrid').addEventListener('click', async e=>{
   if(e.target.closest('[data-action="fav"]')) n.favorite=!n.favorite;
   else if(e.target.closest('[data-action="del"]')) leitNotes = leitNotes.filter(n=>n.id!==id);
   else return;
-  renderLeitNotes(); await saveLeitNotesFn();
+  renderLeitNotes(); renderLeitNoteFolders(); await saveLeitNotesFn();
 });
 
 /* chips de data dos novos painéis */
@@ -2388,10 +2603,12 @@ async function initPrisma(){
   loadProjTasks();
   loadProjDeliverables();
   loadProjNotes();
+  loadProjNoteCategories();
 
   loadReadings();
   loadLeitTasks();
   loadLeitNotes();
+  loadLeitNoteCategories();
 
   initWorkspace();
   setTimeout(()=>{
@@ -2441,7 +2658,7 @@ async function getPrismaNotificationRegistration(){
   try{
     if(!prismaNotificationRegistration){
       prismaNotificationRegistration =
-        await navigator.serviceWorker.register('./sw.js?v=offline1', {scope:'./'});
+        await navigator.serviceWorker.register('./sw.js?v=timeaware1', {scope:'./'});
     }
     return await navigator.serviceWorker.ready;
   }catch(err){
@@ -2611,9 +2828,15 @@ function buildPrismaAlerts(){
     const days=ds.length?ds[0].days:prismaDaysUntil(p.due);
     alerts.push({title:ds.length?`${p.name} · ${ds[0].d.title||'entrega'}`:p.name,meta:`Projeto · ${prismaAlertLabel(days)}`,days,level:prismaAlertLevel(days),icon:'💼'});
   });
-  const todayJsDay = new Date().getDay(); // 0=Domingo
+  const now = new Date();
+  const todayJsDay = now.getDay(); // 0=Domingo
   subjects.filter(s=>s.type==='presencial' && s.dayIdx!=null && (s.dayIdx+1)===todayJsDay).forEach(s=>{
     const time = s.time ? s.time.split('–')[0] : '';
+    if(time){
+      const [h,m] = time.split(':').map(Number);
+      const classTime = new Date(now); classTime.setHours(h,m,0,0);
+      if(classTime <= now) return; // já passou, não é mais um alerta
+    }
     alerts.push({title:s.name||'Aula hoje',meta:`Aula · hoje${time?' às '+time:''}`,days:0,level:'urgent',icon:'📚'});
   });
   (quickTasks||[]).forEach(t=>{
