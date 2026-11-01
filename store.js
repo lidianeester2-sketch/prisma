@@ -7,7 +7,7 @@
 (function () {
   const KEY = 'prisma2:db';
   const DIRTY_KEY = 'prisma2:dirty';
-  const COLS = ['items', 'tasks', 'notes', 'events', 'habits', 'meta'];
+  const COLS = ['items', 'tasks', 'notes', 'events', 'habits', 'meta', 'fin_conta', 'fin_cat', 'fin_lanc', 'fin_rec', 'fin_ciclo', 'fin_conc', 'fin_hist'];
   let db = {};
   let dirty = new Set();
   const listeners = new Set();
@@ -125,6 +125,20 @@
       emit({ col: '*' });
     },
     removeSeeded() { ['items', 'tasks', 'notes', 'habits'].forEach(c => Object.values(db[c]).forEach(r => { if (r.seed && !r.deleted) touch(c, { id: r.id, deleted: true }); })); },
+    /* Registro "de partida" (categorias padrão, contas fixas do ciclo): fica só no aparelho,
+       com data antiga, até você mexer nele. Assim nunca sobrescreve o que veio de outro aparelho. */
+    seed(col, rec) {
+      if (db[col][rec.id]) return db[col][rec.id];
+      db[col][rec.id] = { ...rec, createdAt: Date.now(), updatedAt: 0 };
+      persist();
+      return db[col][rec.id];
+    },
+    /* Remove registros SÓ deste aparelho (não apaga na nuvem). Usado no "Esqueci o PIN". */
+    purgeLocal(cols) {
+      cols.forEach(c => { db[c] = {}; [...dirty].forEach(k => { if (k.startsWith(c + ':')) dirty.delete(k); }); });
+      if (db.meta.finprofile) { delete db.meta.finprofile; dirty.delete('meta:finprofile'); }
+      emit({ col: '*', remote: true });
+    },
     raw() { return db; }
   };
 

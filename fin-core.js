@@ -1,0 +1,352 @@
+/* ============================================================
+   FINANCEIRO+ — motor de cálculo (fin-core)
+   Regras e fórmulas num lugar só. Funções puras: recebem dados,
+   devolvem números. Nenhuma tela faz conta por conta própria.
+
+   Dinheiro: SEMPRE centavos inteiros (R$ 50,48 = 5048).
+   Datas: texto 'AAAA-MM-DD', sem fuso.
+   Roda no navegador (P.finCore) e no Node (testes / robô).
+============================================================ */
+(function (root) {
+  'use strict';
+
+  /* ---------------- dinheiro ---------------- */
+  const isCents = v => Number.isInteger(v);
+
+  // "50,48" "1.234,56" "R$ 200" "125 reais" "12.5" → centavos
+  function parseMoney(input) {
+    if (input === null || input === undefined) return null;
+    if (typeof input === 'number') return Number.isFinite(input) ? Math.round(input * 100) : null;
+    let s = String(input).trim().toLowerCase().replace(/r\$\s*/g, '').replace(/reais?|real/g, '').replace(/\s/g, '');
+    if (!s) return null;
+    const neg = s.startsWith('-'); if (neg) s = s.slice(1);
+    if (!/^[\d.,]+$/.test(s)) return null;
+    let intPart, decPart = '';
+    const lastComma = s.lastIndexOf(','), lastDot = s.lastIndexOf('.');
+    if (lastComma > -1 && lastComma > lastDot) {            // padrão BR: 1.234,56
+      intPart = s.slice(0, lastComma).replace(/[.,]/g, ''); decPart = s.slice(lastComma + 1);
+    } else if (lastDot > -1 && lastComma === -1 && s.length - lastDot - 1 <= 2 && (s.match(/\./g) || []).length === 1) {
+      intPart = s.slice(0, lastDot); decPart = s.slice(lastDot + 1); // 12.5 → decimal
+    } else {
+      intPart = s.replace(/[.,]/g, '');                      // 1.000 → mil
+    }
+    if (decPart.length > 2 || !/^\d*$/.test(decPart) || !/^\d+$/.test(intPart || '0')) return null;
+    const cents = Number(intPart || '0') * 100 + Number((decPart + '00').slice(0, 2));
+    return neg ? -cents : cents;
+  }
+
+  function formatMoney(cents, opts = {}) {
+    if (!isCents(cents)) return '—';
+    const neg = cents < 0, abs = Math.abs(cents);
+    const int = Math.floor(abs / 100).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    const dec = String(abs % 100).padStart(2, '0');
+    const sign = neg ? '−' : (opts.plus && cents > 0 ? '+' : '');
+    return `${sign}R$ ${int},${dec}`;
+  }
+
+  // Divide um total em partes proporcionais aos pesos, sem perder centavo
+  // (método do maior resto; empate → a parte que vem primeiro).
+  function allocate(total, weights) {
+    const sumW = weights.reduce((a, b) => a + b, 0);
+    if (!weights.length) return [];
+    if (sumW <= 0) return weights.map((_, i) => (i === 0 ? total : 0));
+    const sign = total < 0 ? -1 : 1, abs = Math.abs(total);
+    const raw = weights.map(w => (abs * w) / sumW);
+    const out = raw.map(Math.floor);
+    let rest = abs - out.reduce((a, b) => a + b, 0);
+    const order = raw.map((r, i) => [r - Math.floor(r), i]).sort((a, b) => b[0] - a[0] || a[1] - b[1]);
+    for (let k = 0; k < rest; k++) out[order[k % order.length][1]] += 1;
+    return out.map(v => v * sign);
+  }
+
+  /* ---------------- datas ---------------- */
+  const pad = n => String(n).padStart(2, '0');
+  const toISO = (y, m, d) => `${y}-${pad(m)}-${pad(d)}`;
+  const parts = iso => iso.split('-').map(Number);
+  const dayNum = iso => { const [y, m, d] = parts(iso); return Date.UTC(y, m - 1, d) / 864e5; };
+  const fromNum = n => new Date(n * 864e5).toISOString().slice(0, 10);
+  const addDays = (iso, n) => fromNum(dayNum(iso) + n);
+  const diffDays = (a, b) => dayNum(b) - dayNum(a);
+  const daysInMonth = (y, m) => new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const weekday = iso => new Date(dayNum(iso) * 864e5).getUTCDay();
+
+  function easter(y) { // algoritmo de Meeus/Jones/Butcher
+    const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25);
+    const g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4;
+    const l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+    const month = Math.floor((h + l - 7 * m + 114) / 31), day = ((h + l - 7 * m + 114) % 31) + 1;
+    return toISO(y, month, day);
+  }
+  // Dias sem expediente bancário nacional (feriados nacionais + carnaval + Corpus Christi).
+  const holidayCache = {};
+  function bankHolidays(y) {
+    if (holidayCache[y]) return holidayCache[y];
+    const e = easter(y);
+    const list = ['01-01', '04-21', '05-01', '09-07', '10-12', '11-02', '11-15', '11-20', '12-25'].map(md => `${y}-${md}`)
+      .concat([addDays(e, -48), addDays(e, -47), addDays(e, -2), addDays(e, 60)]);
+    return (holidayCache[y] = new Set(list));
+  }
+  const isBusinessDay = iso => { const w = weekday(iso); return w !== 0 && w !== 6 && !bankHolidays(parts(iso)[0]).has(iso); };
+  function shiftBusiness(iso, rule) {
+    if (rule === 'mantem') return iso;
+    let d = iso, guard = 0;
+    while (!isBusinessDay(d) && guard++ < 10) d = addDays(d, rule === 'antecipa' ? -1 : 1);
+    return d;
+  }
+
+  /* ---------------- ciclo salarial ---------------- */
+  function paydayIn(y, m, profile) {
+    const day = Math.min(profile.payday || 6, daysInMonth(y, m));
+    return shiftBusiness(toISO(y, m, day), profile.paydayRule || 'adia');
+  }
+  function nextPayday(afterIso, profile) {   // primeiro pagamento DEPOIS da data
+    let [y, m] = parts(afterIso);
+    for (let i = 0; i < 3; i++) {
+      const p = paydayIn(y, m, profile);
+      if (p > afterIso) return p;
+      m++; if (m > 12) { m = 1; y++; }
+    }
+    return null;
+  }
+  function prevPayday(onOrBeforeIso, profile) { // último pagamento ATÉ a data
+    let [y, m] = parts(onOrBeforeIso);
+    for (let i = 0; i < 3; i++) {
+      const p = paydayIn(y, m, profile);
+      if (p <= onOrBeforeIso) return p;
+      m--; if (m < 1) { m = 12; y--; }
+    }
+    return null;
+  }
+
+  // Ciclo vigente: o salvo que contém a data; se não houver, o projetado pelas regras do perfil.
+  function cycleFor(today, cycles, profile) {
+    const saved = (cycles || []).filter(c => !c.deleted && c.start <= today && today <= c.end).sort((a, b) => b.start.localeCompare(a.start))[0];
+    if (saved) return { ...saved, projected: false, nextPay: addDays(saved.end, 1) };
+    const start = prevPayday(today, profile), next = nextPayday(today, profile);
+    return { id: null, start, end: addDays(next, -1), nextPay: next, projected: true, weeks: [] };
+  }
+
+  // Semanas do ciclo: blocos de 7 dias a partir do início; o resto vira "dias finais".
+  function weekRanges(start, end) {
+    const out = []; let s = start;
+    while (s <= end) {
+      const e = addDays(s, 6) <= end ? addDays(s, 6) : end;
+      out.push({ start: s, end: e, days: diffDays(s, e) + 1 });
+      s = addDays(e, 1);
+    }
+    out.forEach((w, i) => { w.label = w.days < 7 ? 'Dias finais' : `Semana ${i + 1}`; });
+    return out;
+  }
+  function splitWeeks(start, end, base) {
+    const ranges = weekRanges(start, end);
+    const limits = allocate(Math.max(0, base), ranges.map(r => r.days));
+    return ranges.map((r, i) => ({ start: r.start, end: r.end, days: r.days, label: r.label, limit: limits[i], locked: false }));
+  }
+
+  /* ---------------- recorrências ---------------- */
+  // Uma ocorrência por mês, no dia escolhido (limitado ao fim do mês), dentro do intervalo.
+  // O id é fixo (rec-<id>-<AAAA-MM>): gerar de novo nunca duplica, nem entre aparelhos.
+  function occurrences(rec, from, to) {
+    if (!rec || rec.active === false || rec.deleted) return [];
+    const out = [];
+    let [y, m] = parts(from); const [ty, tm] = parts(to);
+    while (y < ty || (y === ty && m <= tm)) {
+      const ym = `${y}-${pad(m)}`;
+      const date = toISO(y, m, Math.min(rec.day || 1, daysInMonth(y, m)));
+      const inRange = date >= from && date <= to && (!rec.start || ym >= rec.start) && (!rec.end || ym <= rec.end);
+      if (inRange) out.push({
+        id: `rec-${rec.id}-${ym}`, kind: rec.kind || 'despesa', desc: rec.desc, amount: rec.amount, date,
+        status: 'previsto', certainty: rec.certainty || 'confirmado', method: rec.method || 'boleto',
+        accountId: rec.accountId || null, categoryId: rec.categoryId || null, recId: rec.id, origin: 'recorrencia'
+      });
+      m++; if (m > 12) { m = 1; y++; }
+    }
+    return out;
+  }
+
+  /* ---------------- saldos ---------------- */
+  const live = t => t && !t.deleted && t.status !== 'cancelado';
+  const done = t => live(t) && t.status === 'realizado';
+  const planned = t => live(t) && t.status === 'previsto';
+
+  // Efeito de um lançamento REALIZADO no saldo de uma conta (centavos, com sinal).
+  function effectOn(accountId, t) {
+    if (!done(t)) return 0;
+    switch (t.kind) {
+      case 'receita': return t.accountId === accountId ? t.amount : 0;
+      case 'despesa': return t.accountId === accountId && t.method !== 'credito' ? -t.amount : 0;
+      case 'transferencia': return (t.toAccountId === accountId ? t.amount : 0) - (t.accountId === accountId ? t.amount : 0);
+      case 'ajuste': return t.accountId === accountId ? (t.sign === 'saida' ? -t.amount : t.amount) : 0;
+      default: return 0;
+    }
+  }
+  function balance(account, txs) {
+    return (account.opening || 0) + txs.reduce((s, t) => s + effectOn(account.id, t), 0);
+  }
+
+  /* ---------------- o painel inteiro ---------------- */
+  // state: { accounts, txs, categories, cycles, profile }
+  function snapshot(state, today) {
+    const { accounts = [], txs = [], categories = [], cycles = [], profile = {} } = state;
+    const accs = accounts.filter(a => !a.deleted && !a.archived);
+    const availIds = new Set(accs.filter(a => a.inAvailable !== false).map(a => a.id));
+    const balances = accs.map(a => ({ account: a, balance: balance(a, txs) }));
+    const real = balances.filter(b => availIds.has(b.account.id)).reduce((s, b) => s + b.balance, 0);
+
+    const cycle = cycleFor(today, cycles, profile);
+    const reserved = cycle.projected ? (profile.reserve || 0) : (cycle.reserve || 0);
+
+    // Comprometido: despesas previstas (inclusive atrasadas) até a véspera do próximo salário,
+    // pagas por conta do disponível ou ainda sem conta definida. Cartão de crédito entra na v7.
+    const committedItems = txs.filter(t => planned(t) && t.kind === 'despesa' && t.method !== 'credito' && t.date < cycle.nextPay && (!t.accountId || availIds.has(t.accountId)))
+      .sort((a, b) => a.date.localeCompare(b.date));
+    const committed = committedItems.reduce((s, t) => s + t.amount, 0);
+
+    const toReceiveItems = txs.filter(t => planned(t) && t.kind === 'receita' && t.date < cycle.nextPay);
+    const toReceive = toReceiveItems.reduce((s, t) => s + t.amount, 0);
+
+    const canSpend = real - reserved - committed;
+    const daysLeft = diffDays(today, cycle.nextPay); // inclui hoje
+    const perDay = daysLeft > 0 && canSpend > 0 ? Math.floor(canSpend / daysLeft) : 0;
+
+    const inCycle = t => done(t) && t.date >= cycle.start && t.date <= cycle.end;
+    const incomeCycle = txs.filter(t => inCycle(t) && t.kind === 'receita').reduce((s, t) => s + t.amount, 0);
+    const expenseCycle = txs.filter(t => inCycle(t) && t.kind === 'despesa').reduce((s, t) => s + t.amount, 0);
+
+    const weeklyCats = new Set(categories.filter(c => c.weekly !== false && c.kind === 'despesa').map(c => c.id));
+    const spentIn = (s, e) => txs.filter(t => done(t) && t.kind === 'despesa' && t.date >= s && t.date <= e && weeklyCats.has(t.categoryId)).reduce((a, t) => a + t.amount, 0);
+    const weeks = (cycle.weeks || []).map(w => ({ ...w, spent: spentIn(w.start, w.end) }));
+    const week = weeks.find(w => w.start <= today && today <= w.end) || null;
+
+    return {
+      today, cycle, balances, real, reserved, committed, committedItems, toReceive, toReceiveItems,
+      canSpend, daysLeft, perDay, incomeCycle, expenseCycle, weeks, week,
+      premissas: [
+        'Saldo real = contas marcadas como “no disponível”, só com lançamentos realizados.',
+        `Comprometido = despesas previstas ou atrasadas até ${cycle.end.split('-').reverse().slice(0, 2).join('/')}, véspera do próximo salário.`,
+        'Limite de cartão de crédito nunca conta como dinheiro.',
+        'Valores a receber aparecem à parte e não entram no “posso gastar”.'
+      ]
+    };
+  }
+
+  // Plano do ciclo ao registrar o salário (mostrado para confirmar antes de salvar).
+  function cyclePlan(state, start, reserveCents) {
+    const { accounts = [], txs = [], profile = {} } = state;
+    const next = nextPayday(start, profile), end = addDays(next, -1);
+    const availIds = new Set(accounts.filter(a => !a.deleted && !a.archived && a.inAvailable !== false).map(a => a.id));
+    const available = accounts.filter(a => availIds.has(a.id)).reduce((s, a) => s + balance(a, txs), 0);
+    const commitments = txs.filter(t => planned(t) && t.kind === 'despesa' && t.method !== 'credito' && t.date <= end && (!t.accountId || availIds.has(t.accountId)))
+      .sort((a, b) => a.date.localeCompare(b.date));
+    const committed = commitments.reduce((s, t) => s + t.amount, 0);
+    const reserve = Math.max(0, reserveCents ?? profile.reserve ?? 0);
+    const base = available - committed - reserve;
+    return { start, end, nextPay: next, available, commitments, committed, reserve, base, weeks: splitWeeks(start, end, base) };
+  }
+
+  /* ---------------- frase em linguagem natural ---------------- */
+  const CATEGORY_WORDS = {
+    alimentacao: ['hamburguer', 'hambúrguer', 'lanche', 'ifood', 'mercado', 'supermercado', 'padaria', 'restaurante', 'pizza', 'almoço', 'almoco', 'jantar', 'café', 'cafe', 'açaí', 'acai', 'sorvete', 'comida', 'feira', 'bombom'],
+    transporte: ['uber', '99', 'gasolina', 'combustível', 'combustivel', 'ônibus', 'onibus', 'metrô', 'metro', 'estacionamento', 'passagem', 'pedágio', 'pedagio'],
+    saude: ['farmácia', 'farmacia', 'remédio', 'remedio', 'consulta', 'médico', 'medico', 'dentista', 'exame'],
+    educacao: ['faculdade', 'curso', 'mensalidade', 'apostila', 'livro'],
+    academia: ['academia', 'personal'],
+    moradia: ['aluguel', 'condomínio', 'condominio', 'luz', 'energia', 'água', 'agua', 'internet', 'gás', 'gas'],
+    assinaturas: ['netflix', 'spotify', 'prime', 'disney', 'youtube', 'assinatura', 'hbo', 'max', 'icloud'],
+    lazer: ['cinema', 'show', 'bar', 'viagem', 'passeio', 'ingresso', 'festa'],
+    compras: ['roupa', 'maquiagem', 'perfume', 'sapato', 'tênis', 'tenis', 'blusa', 'presente', 'protetor'],
+    familia: ['mãe', 'mae', 'pai', 'irmã', 'irma', 'irmão', 'irmao', 'avó', 'avo', 'família', 'familia'],
+    freelas: ['freela', 'freelance', 'job'],
+    vendas: ['venda', 'vendi', 'vendas'],
+    salario: ['salário', 'salario', 'pagamento do mês'],
+    reembolsos: ['reembolso', 'devolução', 'devolucao', 'estorno']
+  };
+  const strip = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
+  function parsePhrase(text, today) {
+    const raw = String(text || '').trim();
+    const t = strip(raw);
+    const out = { kind: 'despesa', amount: null, desc: '', categoryKey: null, method: null, date: today, installments: 1, person: null, missing: [], notes: [] };
+    if (!raw) { out.missing.push('frase'); return out; }
+
+    if (/\b(recebi|ganhei|entrou|caiu|recebimento|salario caiu|me pagou|me pagaram)\b/.test(t)) out.kind = 'receita';
+    if (/\b(transferi|guardei|passei)\b.*\b(para|pra)\b.*\b(conta|poupanca|reserva)\b/.test(t)) out.kind = 'transferencia';
+
+    // valor: primeiro número com cara de dinheiro (ignora "4 vezes"/"4x" e datas)
+    const noInstall = raw.replace(/\b\d+\s*(x|vezes)\b/gi, ' ').replace(/\b\d{1,2}\/\d{1,2}(\/\d{2,4})?\b/g, ' ');
+    const m = noInstall.match(/(?:r\$\s*)?(\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?|\d+(?:[.,]\d{1,2})?)/i);
+    if (m) out.amount = parseMoney(m[1]);
+    if (!out.amount || out.amount <= 0) { out.amount = null; out.missing.push('valor'); }
+
+    if (/\b(debito)\b/.test(t)) out.method = 'debito';
+    else if (/\bpix\b/.test(t)) out.method = 'pix';
+    else if (/\b(dinheiro|especie)\b/.test(t)) out.method = 'dinheiro';
+    else if (/\bboleto\b/.test(t)) out.method = 'boleto';
+    else if (/\b(credito|cartao)\b/.test(t)) out.method = 'credito';
+    const inst = t.match(/\b(\d{1,2})\s*(x|vezes)\b/);
+    if (inst) { out.installments = Math.max(1, Number(inst[1])); out.method = 'credito'; }
+
+    if (/\bontem\b/.test(t)) out.date = addDays(today, -1);
+    else if (/\banteontem\b/.test(t)) out.date = addDays(today, -2);
+    const dm = t.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/);
+    if (dm) {
+      let y = dm[3] ? Number(dm[3].length === 2 ? '20' + dm[3] : dm[3]) : Number(today.slice(0, 4));
+      const cand = toISO(y, Number(dm[2]), Number(dm[1]));
+      if (!dm[3] && cand > today && diffDays(today, cand) > 60) y--;
+      out.date = toISO(y, Number(dm[2]), Number(dm[1]));
+    }
+
+    const pm = raw.match(/\b(?:para|pra|pro|pro\s+a?)\s+(?:a\s+|o\s+)?([A-ZÁÉÍÓÚÂÊÔÃÕÇ][\wÀ-ú]+(?:\s+[A-ZÁÉÍÓÚÂÊÔÃÕÇ][\wÀ-ú]+)?)/);
+    if (pm && out.kind !== 'transferencia') out.person = pm[1];
+
+    for (const [key, words] of Object.entries(CATEGORY_WORDS)) {
+      if (words.some(w => new RegExp(`\\b${strip(w)}\\b`).test(t))) {
+        const incomeKeys = ['freelas', 'vendas', 'salario', 'reembolsos'];
+        if ((out.kind === 'receita') === incomeKeys.includes(key)) { out.categoryKey = key; break; }
+        if (out.kind === 'despesa' && !incomeKeys.includes(key)) { out.categoryKey = key; break; }
+      }
+    }
+    if (out.kind === 'receita' && !out.categoryKey) out.categoryKey = 'outras-receitas';
+
+    // descrição: a frase sem verbos de abertura, valor e forma de pagamento
+    let d = raw
+      .replace(/^(gastei|paguei|comprei|recebi|ganhei|transferi|guardei)\s+/i, '')
+      .replace(/(?:r\$\s*)?\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?|(?:r\$\s*)?\d+(?:[.,]\d{1,2})?/i, '')
+      .replace(/\b(reais|real)\b/gi, '')
+      .replace(/\b(no|na|em|com o|com a)?\s*(d[eé]bito|pix|dinheiro|boleto|cr[eé]dito|cart[aã]o)\b/gi, '')
+      .replace(/\bem\s+\d{1,2}\s*(x|vezes)\b|\b\d{1,2}\s*(x|vezes)\b/gi, '')
+      .replace(/\b(hoje|ontem|anteontem)\b/gi, '')
+      .replace(/\b\d{1,2}\/\d{1,2}(\/\d{2,4})?\b/g, '')
+      .replace(/^\s*(com|de|em|no|na|um|uma)\s+/i, '')
+      .replace(/\s{2,}/g, ' ').trim().replace(/[.,;]$/, '').trim();
+    if (out.person && out.kind === 'despesa' && /^(para|pra|pro)\b/i.test(d)) d = `Pagamento ${d}`;
+    out.desc = d ? d.charAt(0).toUpperCase() + d.slice(1) : '';
+    if (!out.desc) out.missing.push('descricao');
+    if (out.kind !== 'transferencia' && !out.categoryKey) out.missing.push('categoria');
+    if (!out.method && out.kind === 'despesa') out.missing.push('forma');
+    if (out.method === 'credito') out.notes.push('Compras no cartão de crédito chegam na v7.');
+    return out;
+  }
+
+  /* ---------------- histórico ---------------- */
+  const TRACKED_SKIP = new Set(['updatedAt', 'createdAt', 'touchedAt']);
+  function diff(before, after) {
+    const changes = {};
+    const keys = new Set([...Object.keys(before || {}), ...Object.keys(after || {})]);
+    keys.forEach(k => {
+      if (TRACKED_SKIP.has(k)) return;
+      const a = before ? before[k] : undefined, b = after ? after[k] : undefined;
+      if (JSON.stringify(a) !== JSON.stringify(b)) changes[k] = [a === undefined ? null : a, b === undefined ? null : b];
+    });
+    return changes;
+  }
+
+  const api = {
+    parseMoney, formatMoney, allocate,
+    addDays, diffDays, weekday, easter, bankHolidays, isBusinessDay, shiftBusiness,
+    paydayIn, nextPayday, prevPayday, cycleFor, weekRanges, splitWeeks,
+    occurrences, effectOn, balance, snapshot, cyclePlan, parsePhrase, diff
+  };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  if (root) { root.P = root.P || {}; root.P.finCore = api; }
+})(typeof window !== 'undefined' ? window : null);

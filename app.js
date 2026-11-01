@@ -3,7 +3,8 @@
 ============================================================ */
 (function () {
   const S = P.store;
-  const ROUTES = { hoje: 'Hoje', agenda: 'Agenda', areas: 'Áreas', notas: 'Notas', ajustes: 'Ajustes' };
+  const ROUTES = { hoje: 'Hoje', agenda: 'Agenda', areas: 'Áreas', notas: 'Notas', ajustes: 'Ajustes', fin: 'Financeiro+', 'fin-orcamento': 'Orçamento', 'fin-lanc': 'Lançamentos', 'fin-mais': 'Mais' };
+  P.space = () => (route.startsWith('fin') ? 'fin' : 'prisma');
   let route = 'hoje';
   let pendingRender = false;
 
@@ -27,7 +28,7 @@
     const caret = keepId && 'selectionStart' in act ? act.selectionStart : null;
     const y = window.scrollY;
     try {
-      if (typeof P.views[route] !== 'function') throw new Error(`A tela "${route}" não carregou. Provavelmente falta o arquivo ${route === 'ajustes' ? 'settings.js' : route === 'hoje' || route === 'agenda' || route === 'areas' || route === 'notas' ? 'views.js' : 'da tela'} no GitHub.`);
+      if (typeof P.views[route] !== 'function') throw new Error(`A tela "${route}" não carregou. Provavelmente falta o arquivo ${route === 'ajustes' ? 'settings.js' : route.startsWith('fin') ? 'fin-views.js' : 'views.js'} no GitHub.`);
       view.innerHTML = P.views[route]();
       P.mounts?.[route]?.(view);
     } catch (err) {
@@ -45,10 +46,13 @@
     if (!ROUTES[to]) to = 'hoje';
     if (location.hash !== '#' + to) { location.hash = to; return; }
     route = to;
+    document.body.dataset.space = P.space();
+    P.ui[P.space() === 'fin' ? 'lastFin' : 'lastPrisma'] = to; P.saveUI();
     [...P.openSheets].forEach(sh => sh.close());
     P.$$('[data-nav]').forEach(b => { const on = b.dataset.nav === to; b.classList.toggle('on', on); on ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current'); });
     P.$('#mobile-title').textContent = ROUTES[to];
-    document.title = to === 'hoje' ? 'Prisma' : `${ROUTES[to]} · Prisma`;
+    document.title = to === 'hoje' ? 'Prisma' : to === 'fin' ? 'Financeiro+' : `${ROUTES[to]} · ${P.space() === 'fin' ? 'Financeiro+' : 'Prisma'}`;
+    const tc = document.querySelector('meta[name="theme-color"]'); if (tc) tc.content = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#08080d';
     P.render();
     window.scrollTo(0, 0);
   };
@@ -81,7 +85,11 @@
       try { const keys = await caches.keys(); await Promise.all(keys.map(k => caches.delete(k))); } catch (e) {}
       location.reload();
     },
-    capture: el => P.capture(el.dataset.type || 'tarefa', { due: el.dataset.due, area: el.dataset.area }),
+    capture: el => {
+      if (P.space() === 'fin') { if (!P.fin.locked()) P.fin.lancar(); else P.render(); return; }
+      P.capture(el.dataset.type || 'tarefa', { due: el.dataset.due, area: el.dataset.area });
+    },
+    switchSpace: () => P.go(P.space() === 'fin' ? (P.ui.lastPrisma || 'hoje') : (P.ui.lastFin || 'fin')),
     openTask: el => P.openTask(el.dataset.id),
     openItem: el => P.openItem(el.dataset.id),
     openNote: el => P.openNote(el.dataset.id),
@@ -155,8 +163,8 @@
   document.addEventListener('keydown', e => {
     if (P.openSheets.length || e.metaKey || e.ctrlKey || e.altKey) return;
     if (/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName)) return;
-    if (e.key === 'n' || e.key === 'N') { e.preventDefault(); P.capture('tarefa'); }
-    const map = { '1': 'hoje', '2': 'agenda', '3': 'areas', '4': 'notas' };
+    if (e.key === 'n' || e.key === 'N') { e.preventDefault(); P.actions.capture({ dataset: {} }); }
+    const map = P.space() === 'fin' ? { '1': 'fin', '2': 'fin-orcamento', '3': 'fin-lanc', '4': 'fin-mais' } : { '1': 'hoje', '2': 'agenda', '3': 'areas', '4': 'notas' };
     if (map[e.key]) P.go(map[e.key]);
   });
 
@@ -166,7 +174,7 @@
     if (P.openSheets.length) return;
     const act = document.activeElement;
     if (act && /^(INPUT|TEXTAREA|SELECT)$/.test(act.tagName)) return;
-    if (route === 'hoje' || route === 'agenda' || P.today() !== lastDay) { lastDay = P.today(); P.render(); }
+    if (route === 'hoje' || route === 'agenda' || route === 'fin' || P.today() !== lastDay) { lastDay = P.today(); P.render(); }
   }, 60000);
 
   /* ---------- início ---------- */
