@@ -1,0 +1,168 @@
+/* ============================================================
+   PRISMA 2 — app: navegação, cliques e inicialização
+============================================================ */
+(function () {
+  const S = P.store;
+  const ROUTES = { hoje: 'Hoje', agenda: 'Agenda', areas: 'Áreas', notas: 'Notas', ajustes: 'Ajustes' };
+  let route = 'hoje';
+  let pendingRender = false;
+
+  /* ---------- tema ---------- */
+  const mq = window.matchMedia('(prefers-color-scheme: light)');
+  P.applyTheme = () => {
+    const t = S.settings().theme || 'prisma';
+    const resolved = t === 'auto' ? (mq.matches ? 'claro' : 'prisma') : t;
+    document.documentElement.setAttribute('data-theme', resolved);
+    try { localStorage.setItem('prisma2:theme', resolved); } catch (e) {}
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.content = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#08080d';
+  };
+  mq.addEventListener?.('change', () => S.settings().theme === 'auto' && P.applyTheme());
+
+  /* ---------- render ---------- */
+  P.render = () => {
+    const view = P.$('#view');
+    const act = document.activeElement;
+    const keepId = act && view.contains(act) && act.id ? act.id : null;
+    const caret = keepId && 'selectionStart' in act ? act.selectionStart : null;
+    const y = window.scrollY;
+    view.innerHTML = P.views[route]();
+    P.mounts?.[route]?.(view);
+    if (keepId) { const el = document.getElementById(keepId); if (el) { el.focus({ preventScroll: true }); if (caret !== null) try { el.setSelectionRange(caret, caret); } catch (e) {} } }
+    window.scrollTo(0, y);
+    pendingRender = false;
+  };
+
+  P.go = to => {
+    if (!ROUTES[to]) to = 'hoje';
+    if (location.hash !== '#' + to) { location.hash = to; return; }
+    route = to;
+    [...P.openSheets].forEach(sh => sh.close());
+    P.$$('[data-nav]').forEach(b => { const on = b.dataset.nav === to; b.classList.toggle('on', on); on ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current'); });
+    P.$('#mobile-title').textContent = ROUTES[to];
+    document.title = to === 'hoje' ? 'Prisma' : `${ROUTES[to]} · Prisma`;
+    P.render();
+    window.scrollTo(0, 0);
+  };
+  window.addEventListener('hashchange', () => P.go(location.hash.slice(1)));
+
+  P.renderSyncBadge = () => {
+    const st = P.sync?.state() || {};
+    const cls = !st.configured || !st.user ? 'local' : st.status;
+    const txt = !st.configured || !st.user ? 'Só neste aparelho' : P.sync.label();
+    P.$$('.sync-badge').forEach(el => { el.dataset.state = cls; el.querySelector('span').textContent = txt; el.title = txt; });
+  };
+
+  /* ---------- quando os dados mudam ---------- */
+  S.on(() => {
+    const act = document.activeElement;
+    const typing = act && P.$('#view').contains(act) && /^(INPUT|TEXTAREA|SELECT)$/.test(act.tagName) && !act.dataset.input && act.type !== 'checkbox';
+    if (typing) { pendingRender = true; return; }
+    P.render();
+    P.openSheets.forEach(s => s.refreshOnChange && s.refresh());
+    P.renderSyncBadge();
+  });
+  document.addEventListener('focusout', () => setTimeout(() => { if (pendingRender && !P.$('#view').contains(document.activeElement)) P.render(); }, 50));
+
+  /* ---------- cliques (data-act) ---------- */
+  Object.assign(P.actions, {
+    go: el => P.go(el.dataset.to),
+    capture: el => P.capture(el.dataset.type || 'tarefa', { due: el.dataset.due, area: el.dataset.area }),
+    openTask: el => P.openTask(el.dataset.id),
+    openItem: el => P.openItem(el.dataset.id),
+    openNote: el => P.openNote(el.dataset.id),
+    manageHabits: () => P.manageHabits(),
+    inc: el => P.bump(el.dataset.id, el.dataset.key, 1),
+    toggleTask: el => {
+      const t = S.get('tasks', el.dataset.id); if (!t) return;
+      const done = !t.done;
+      S.patch('tasks', t.id, { done, doneAt: done ? Date.now() : null });
+      if (done) P.toast(['Feito. ✦', 'Menos uma.', 'Riscado. O caos diminuiu.', 'Concluída. Pode se gabar.'][Math.floor(Math.random() * 4)], { undo: () => S.patch('tasks', t.id, { done: false, doneAt: null }) });
+    },
+    toggleStep: el => {
+      const t = S.get('tasks', el.dataset.id); if (!t) return;
+      const steps = t.steps.map(s => s.id === el.dataset.step ? { ...s, done: !s.done } : s);
+      const all = steps.every(s => s.done);
+      S.patch('tasks', t.id, { steps, ...(all ? { done: true, doneAt: Date.now() } : {}) });
+      P.toast(all ? `Todas as etapas feitas: “${t.title}” concluído.` : 'Etapa concluída.', { undo: () => S.patch('tasks', t.id, { steps: t.steps, done: t.done, doneAt: t.doneAt }) });
+    },
+    toggleHabit: el => {
+      const today = P.today();
+      S.patch('habits', el.dataset.id, h => { h.checks = { ...(h.checks || {}) }; if (h.checks[today]) delete h.checks[today]; else h.checks[today] = true; return h; });
+    },
+    toggleFav: el => { const n = S.get('notes', el.dataset.id); if (n) S.patch('notes', n.id, { fav: !n.fav }); },
+    agendaSel: el => { P.ui.agendaSel = el.dataset.d; P.ui.agendaMonth = el.dataset.d.slice(0, 7); P.saveUI(); P.render(); },
+    agendaMonth: el => {
+      const cur = P.ui.agendaMonth || (P.ui.agendaSel || P.today()).slice(0, 7);
+      const [y, m] = cur.split('-').map(Number); const d = new Date(y, m - 1 + Number(el.dataset.delta), 1);
+      P.ui.agendaMonth = P.iso(d).slice(0, 7); P.saveUI(); P.render();
+    },
+    agendaFilter: el => { P.ui.agendaFilter = el.dataset.f; P.saveUI(); P.render(); },
+    setArea: el => { P.ui.area = el.dataset.a; P.saveUI(); P.render(); },
+    areaFilter: el => { P.ui.areaFilter = el.dataset.f; P.saveUI(); P.render(); },
+    notesArea: el => { P.ui.notesArea = el.dataset.f; P.saveUI(); P.render(); },
+    notesTag: el => { P.ui.notesTag = P.ui.notesTag === el.dataset.t ? '' : el.dataset.t; P.saveUI(); P.render(); },
+    notesFav: () => { P.ui.notesFav = !P.ui.notesFav; P.saveUI(); P.render(); },
+    notesSort: () => { P.ui.notesAsc = !P.ui.notesAsc; P.saveUI(); P.render(); },
+    playlist: () => {
+      const id = S.settings().playlist; if (!id) return;
+      P.sheet({ title: 'Trilha de estudo', wide: true, render: () => `<div class="embed"><iframe src="https://www.youtube.com/embed/videoseries?list=${encodeURIComponent(id)}" title="Playlist do YouTube" allow="autoplay; encrypted-media" allowfullscreen></iframe></div>` });
+    }
+  });
+
+  document.addEventListener('click', e => {
+    const el = e.target.closest('[data-act]');
+    if (!el || el.disabled) return;
+    const fn = P.actions[el.dataset.act];
+    if (!fn) return;
+    if (el.tagName === 'A') e.preventDefault();
+    if (el.type === 'checkbox') { fn(el, e); return; }
+    fn(el, e);
+  });
+
+  document.addEventListener('input', e => {
+    const el = e.target.closest('[data-input]'); if (!el) return;
+    P.ui[el.dataset.input] = el.value; P.render();
+  });
+
+  document.addEventListener('submit', e => {
+    const f = e.target.closest('[data-form="quickTask"]'); if (!f) return;
+    e.preventDefault();
+    const raw = f.t.value.trim(); if (!raw) return;
+    const { title, due } = P.parseQuick(raw);
+    S.put('tasks', { title, due: due || P.today(), kind: 'tarefa', done: false, steps: [], itemId: null, area: null });
+    P.toast(`Adicionada para ${P.relDay(due || P.today())}.`);
+    f.t.value = '';
+    pendingRender = false; P.render();
+    setTimeout(() => P.$('#qa-today')?.focus(), 0);
+  });
+
+  document.addEventListener('keydown', e => {
+    if (P.openSheets.length || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName)) return;
+    if (e.key === 'n' || e.key === 'N') { e.preventDefault(); P.capture('tarefa'); }
+    const map = { '1': 'hoje', '2': 'agenda', '3': 'areas', '4': 'notas' };
+    if (map[e.key]) P.go(map[e.key]);
+  });
+
+  /* atualiza "em 20min", "agora" e a virada do dia */
+  let lastDay = P.today();
+  setInterval(() => {
+    if (P.openSheets.length) return;
+    const act = document.activeElement;
+    if (act && /^(INPUT|TEXTAREA|SELECT)$/.test(act.tagName)) return;
+    if (route === 'hoje' || route === 'agenda' || P.today() !== lastDay) { lastDay = P.today(); P.render(); }
+  }, 60000);
+
+  /* ---------- início ---------- */
+  P.start = () => {
+    S.load();
+    if (!P.ui.agendaSel || P.ui.agendaSel < P.addDays(P.today(), -60)) { P.ui.agendaSel = null; P.ui.agendaMonth = null; }
+    P.applyTheme();
+    P.go(location.hash.slice(1) || 'hoje');
+    P.renderSyncBadge();
+    P.sync?.init().then(() => P.renderSyncBadge());
+    P.push?.registration().then(() => P.push.check());
+    if (S.settings().notify.enabled) P.push?.resubscribe();
+  };
+})();
