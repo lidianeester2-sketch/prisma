@@ -97,8 +97,7 @@
     <header class="page-head fin-head">
       <div class="date-line">${P.DOW_LONG[new Date().getDay()]}, ${new Date().getDate()} de ${P.MONTHS[new Date().getMonth()]} <span class="sep">·</span> ciclo ${F.date(s.cycle.start)}–${endTxt}${s.cycle.projected ? ' (projetado)' : ''}</div>
       <div class="fin-title-row"><h1>${greet}${st.name ? ', ' + esc(st.name) : ''}.</h1>
-        <div class="fin-tools"><button class="icon-btn" type="button" data-act="finHide" aria-label="${F.hidden() ? 'Mostrar valores' : 'Esconder valores'}">${F.hidden() ? '◌' : '◉'}</button><button class="icon-btn" type="button" data-act="finLock" aria-label="Bloquear">🔒</button></div></div>
-      <p class="tagline">Seu dinheiro organizado. Seus sonhos em movimento.</p>
+        <div class="fin-tools"><button class="icon-btn" type="button" data-act="finHide" aria-label="${F.hidden() ? 'Mostrar valores' : 'Esconder valores'}">${F.hidden() ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.4 10.4 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4.2M6.6 6.6C3.8 8.4 2 12 2 12s3.5 7 10 7c1.6 0 3-.4 4.3-1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>' : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>'}</button><button class="icon-btn" type="button" data-act="finLock" aria-label="Bloquear"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></button></div></div>
     </header>
 
     ${needsOpening.length ? `<section class="block onboard"><div class="block-head"><h2>Comece por aqui</h2></div>
@@ -112,6 +111,7 @@
       <span class="eyebrow">Quanto posso gastar até ${endTxt}</span>
       <div class="fin-big">${F.money(s.canSpend)}</div>
       <div class="fin-sub">${s.canSpend > 0 ? `≈ ${F.money(s.perDay)} por dia · ` : ''}${s.daysLeft} dia${s.daysLeft === 1 ? '' : 's'} até o salário (${F.date(s.cycle.nextPay)})</div>
+      <div class="fin-mini"><span>Saldo real <b>${F.money(s.real)}</b></span><span>Contas até o salário <b>${F.money(s.committed)}</b></span>${s.reserved ? `<span>Reservado <b>${F.money(s.reserved)}</b></span>` : ''}</div>
       <details class="calc">
         <summary>Como calculei</summary>
         <div class="calc-table">
@@ -125,35 +125,27 @@
       </details>
     </section>
 
-    <div class="fin-kpis">
-      <div><span>Saldo real</span><b>${F.money(s.real)}</b></div>
-      <div><span>Receitas do ciclo</span><b class="in">${F.money(s.incomeCycle)}</b></div>
-      <div><span>Despesas do ciclo</span><b>${F.money(s.expenseCycle)}</b></div>
-      <div><span>Comprometido</span><b>${F.money(s.committed)}</b></div>
-    </div>
-
     <div class="cols">
       <section class="block main-col">
         <div class="block-head"><h2>Semana</h2>${s.week ? `<span class="faint small">${F.date(s.week.start)}–${F.date(s.week.end)}</span>` : ''}<button class="link" type="button" data-act="go" data-to="fin-orcamento">Orçamento →</button></div>
         ${s.week ? `<div class="week-card ${s.week.spent > s.week.limit ? 'over' : ''}">
             <div class="week-nums"><div><span>Gasto</span><b>${F.money(s.week.spent)}</b></div><div><span>Limite</span><b>${F.money(s.week.limit)}</b></div><div><span>${s.week.spent > s.week.limit ? 'Passou' : 'Restam'}</span><b>${F.money(Math.abs(s.week.limit - s.week.spent))}</b></div></div>
             ${bar(s.week.limit ? s.week.spent / s.week.limit * 100 : 100, s.week.spent > s.week.limit ? 'over' : '')}
-            <p class="hint">${s.week.label}. Conta só as categorias do dia a dia (alimentação, transporte, compras, lazer, outros).</p></div>`
+            <p class="hint">${s.week.label} · só gastos do dia a dia</p></div>`
           : `<div class="empty"><strong>Sem plano semanal ainda.</strong><span>Quando o salário cair, lance em + Lançar e o app divide o dinheiro livre pelas semanas.</span></div>`}
 
-        <div class="block-head sub"><h3>Próximas contas</h3><span class="count">${s.committedItems.length}</span></div>
-        <div class="list">${s.committedItems.length ? s.committedItems.slice(0, 6).map(t => `<div class="row fin-row ${t.date < today ? 'late' : ''}">
+        <div class="block-head sub"><h3>Próximas contas</h3><span class="count">${s.committedItems.length}</span>${s.committedItems.length > 4 ? '<button class="link" type="button" data-act="go" data-to="fin-orcamento">Ver todas →</button>' : ''}</div>
+        <div class="list">${s.committedItems.length ? s.committedItems.slice(0, 4).map(t => `<div class="row fin-row ${t.date < today ? 'late' : ''}">
             <button type="button" class="row-main" data-act="finTx" data-id="${t.id}"><span class="row-title">${esc(t.desc)}</span><span class="row-meta">${t.date < today ? '<b class="st-pendente">venceu</b> ' : 'vence '}${F.date(t.date)}${t.certainty === 'estimado' ? ' · estimado' : ''}</span></button>
             <span class="fin-amt">${F.money(t.amount)}</span><button class="btn ghost small" type="button" data-act="finPay" data-id="${t.id}">Pagar</button></div>`).join('')
           : '<div class="empty"><strong>Nenhuma conta prevista até o salário.</strong><span>Cadastre as contas fixas em Mais → Contas fixas.</span></div>'}</div>
       </section>
 
       <aside class="side-col">
-        ${alerts.length ? `<section class="block"><div class="block-head"><h2>O Prisma quer te avisar</h2></div><div class="alerts">${alerts.slice(0, 3).map(([k, m]) => `<div class="alert a-${k}">${esc(m)}</div>`).join('')}</div></section>` : ''}
+        ${alerts.length ? `<section class="block"><div class="block-head"><h2>Avisos</h2></div><div class="alerts">${alerts.slice(0, 2).map(([k, m]) => `<div class="alert a-${k}">${esc(m)}</div>`).join('')}</div></section>` : ''}
         <section class="block"><div class="block-head"><h2>Contas</h2><button class="link" type="button" data-act="finConcile">Conferir saldo</button></div>
           <div class="list">${s.balances.map(b => `<button type="button" class="row as-btn fin-row" data-act="finAccount" data-id="${b.account.id}"><span class="row-main as-text"><span class="row-title">${esc(b.account.name)}</span><span class="row-meta">${F.ACC_TYPES[b.account.type] || ''}${b.account.inAvailable === false ? ' · fora do disponível' : ''}${b.account.openingSet === false ? ' · <b class="st-pendente">falta o saldo inicial</b>' : ''}</span></span><span class="fin-amt ${b.balance < 0 ? 'neg' : ''}">${F.money(b.balance)}</span></button>`).join('')}</div>
         </section>
-        <section class="block soon"><div class="block-head"><h2>Chegando</h2></div><p class="faint small">Cartão de crédito Caixa e semanas editáveis na v7. Dívidas e metas na v8.</p></section>
       </aside>
     </div>`;
   };
@@ -180,7 +172,7 @@
         <div class="calc-total"><span>= Livre para o dia a dia</span><b>${F.money(c.base)}</b></div>
       </div></section>`}
 
-    ${s.weeks.length ? `<section class="block"><div class="block-head"><h2>Semanas</h2><span class="faint small">editar e reorganizar chega na v7</span></div>
+    ${s.weeks.length ? `<section class="block"><div class="block-head"><h2>Semanas</h2><span class="faint small">editar e reorganizar chega em breve</span></div>
       <div class="weeks">${s.weeks.map(w => { const cur = w.start <= today && today <= w.end, past = w.end < today, over = w.spent > w.limit; return `<div class="wk ${cur ? 'cur' : ''} ${past ? 'past' : ''} ${over ? 'over' : ''}">
         <div class="wk-head"><b>${w.label}</b><span class="faint small">${F.date(w.start)}–${F.date(w.end)}</span></div>
         <div class="wk-nums"><span>${F.money(w.spent)} de ${F.money(w.limit)}</span><span class="${over ? 'bad-t' : ''}">${over ? 'passou ' + F.money(w.spent - w.limit) : (past ? 'sobrou ' : 'restam ') + F.money(w.limit - w.spent)}</span></div>
@@ -247,7 +239,7 @@
         ${item('finHistory', 'Histórico de alterações', 'Tudo que foi criado ou mudado, com antes e depois')}
       </div></section>
       <section class="block set"><h2>Chegando</h2><div class="data-actions">
-        ${soon('Cartões de crédito e semanas editáveis', 'v7')}${soon('Dívidas e metas', 'v8')}${soon('Renda extra e relatórios', 'v9')}${soon('Assistente com IA', 'v10')}
+        ${soon('Cartões de crédito e semanas editáveis', 'v8')}${soon('Dívidas e metas', 'v9')}${soon('Renda extra e relatórios', 'v10')}${soon('Assistente com IA', 'v11')}
       </div></section>
     </div>`;
   };

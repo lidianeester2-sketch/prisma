@@ -6,7 +6,7 @@
   P.mounts = P.mounts || {};
 
   const THEMES = [
-    ['prisma', 'Prisma', 'Escuro com o espectro do ícone'],
+    ['prisma', 'Prisma', 'Escuro e sóbrio (padrão)'],
     ['claro', 'Claro', 'Fundo claro, ótimo de dia'],
     ['auto', 'Automático', 'Segue o tema do aparelho'],
     ['grafite', 'Grafite', 'Preto e branco, sem distração'],
@@ -109,7 +109,7 @@
         </div>
       </section>
 
-      <p class="credits">Prisma · versão 6 · Desenvolvido por Lidiane Tavares</p>
+      <p class="credits">Prisma · versão 7 · Desenvolvido por Lidiane Tavares</p>
     </div>`;
   };
 

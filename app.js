@@ -16,7 +16,7 @@
     document.documentElement.setAttribute('data-theme', resolved);
     try { localStorage.setItem('prisma2:theme', resolved); } catch (e) {}
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.content = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#08080d';
+    if (meta) meta.content = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#131316';
   };
   mq.addEventListener?.('change', () => S.settings().theme === 'auto' && P.applyTheme());
 
@@ -52,7 +52,7 @@
     P.$$('[data-nav]').forEach(b => { const on = b.dataset.nav === to; b.classList.toggle('on', on); on ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current'); });
     P.$('#mobile-title').textContent = ROUTES[to];
     document.title = to === 'hoje' ? 'Prisma' : to === 'fin' ? 'Financeiro+' : `${ROUTES[to]} · ${P.space() === 'fin' ? 'Financeiro+' : 'Prisma'}`;
-    const tc = document.querySelector('meta[name="theme-color"]'); if (tc) tc.content = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#08080d';
+    const tc = document.querySelector('meta[name="theme-color"]'); if (tc) tc.content = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#131316';
     P.render();
     window.scrollTo(0, 0);
   };
@@ -132,6 +132,9 @@
       P.sheet({ title: 'Trilha de estudo', wide: true, render: () => `<div class="embed"><iframe src="https://www.youtube.com/embed/videoseries?list=${encodeURIComponent(id)}" title="Playlist do YouTube" allow="autoplay; encrypted-media" allowfullscreen></iframe></div>` });
     }
   });
+
+  // blocos recolhíveis lembram se você deixou abertos
+  document.addEventListener('toggle', e => { const k = e.target?.dataset?.remember; if (k) P.ls.set(k, e.target.open); }, true);
 
   document.addEventListener('click', e => {
     const el = e.target.closest('[data-act]');

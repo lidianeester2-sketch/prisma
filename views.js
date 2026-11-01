@@ -197,12 +197,6 @@
       ${used.map(a => `<button type="button" class="chip ${af === a ? 'on' : ''}" data-act="hojeArea" data-f="${a}">${P.AREAS[a].icon} ${P.AREAS[a].label}</button>`).join('')}
     </div>` : '';
 
-    const ring = s => {
-      const r = 34, c = 2 * Math.PI * r, off = c * (1 - (s ?? 0) / 100);
-      return `<svg class="ring" viewBox="0 0 84 84" aria-hidden="true"><defs><linearGradient id="rg" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#7c5cff"/><stop offset=".45" stop-color="#ff4fd8"/><stop offset="1" stop-color="#ff9a3d"/></linearGradient></defs>
-        <circle cx="42" cy="42" r="${r}" class="ring-bg"/><circle cx="42" cy="42" r="${r}" class="ring-fg" stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}"/></svg>`;
-    };
-
     return `
     <header class="page-head hoje-head">
       <div class="date-line">${P.DOW_LONG[now.getDay()]}, ${now.getDate()} de ${P.MONTHS[now.getMonth()]}${semLeft !== null && semLeft >= 0 ? ` <span class="sep">·</span> ${semLeft === 0 ? 'último dia do semestre' : `faltam ${semLeft} dias pro fim do semestre`}` : ''}</div>
@@ -213,17 +207,12 @@
 
     <div class="hero-grid">
       ${ncHtml}
-      <div class="score-card">
-        <div class="score-ring">${ring(ws.score)}<span class="score-num">${ws.score === null ? '—' : ws.score + '<small>%</small>'}</span></div>
-        <div class="score-text">
-          <span class="eyebrow">Caos sob controle · semana</span>
-          <p>${scoreLine(ws.score)}</p>
-          <div class="score-stats">
-            <span><b class="${overdue.length ? 'bad-t' : ''}">${overdue.length}</b> atrasadas</span>
-            <span><b>${ws.done}/${ws.total}</b> prazos</span>
-            <span><b>${ws.hDone}/${ws.hTotal}</b> hábitos</span>
-          </div>
-        </div>
+      <div class="week-line" title="${esc(scoreLine(ws.score))}">
+        <span>Semana <b>${ws.score === null ? '—' : ws.score + '%'}</b></span>
+        ${ws.score !== null ? `<div class="bar"><div style="width:${ws.score}%"></div></div>` : ''}
+        <span><b class="${overdue.length ? 'bad-t' : ''}">${overdue.length}</b> atrasada${overdue.length === 1 ? '' : 's'}</span>
+        <span><b>${ws.done}/${ws.total}</b> prazos</span>
+        ${ws.hTotal ? `<span><b>${ws.hDone}/${ws.hTotal}</b> hábitos</span>` : ''}
       </div>
     </div>
 
@@ -244,11 +233,12 @@
         </div>
         ${doneToday.length ? `<details class="done-today"><summary>${doneToday.length} concluída${doneToday.length > 1 ? 's' : ''} hoje</summary><div class="list">${doneToday.map(t => P.taskRow(t, { noDate: true })).join('')}</div></details>` : ''}
 
-        ${inbox.length ? `<div class="block-head sub"><h3>Sem data</h3><span class="count">${inbox.length}</span></div>
-        <div class="list">${inbox.map(t => P.taskRow(t, { noDate: true })).join('')}</div>` : ''}
+        ${inbox.length ? `<details class="more"><summary>Sem data <span class="count">${inbox.length}</span></summary>
+          <div class="list">${inbox.map(t => P.taskRow(t, { noDate: true })).join('')}</div></details>` : ''}
 
-        <div class="block-head sub"><h3>Próximos 7 dias</h3><button class="link" type="button" data-act="go" data-to="agenda">Ver agenda →</button></div>
-        <div class="list">${upcoming.length ? upcoming.map(x => x.html).join('') : empty('Semana limpa.', 'Nenhum prazo nos próximos 7 dias.')}</div>
+        <details class="more" ${P.ls.get('prisma2:open7', false) ? 'open' : ''} data-remember="prisma2:open7"><summary>Próximos 7 dias <span class="count">${upcoming.length}</span></summary>
+          <div class="list">${upcoming.length ? upcoming.map(x => x.html).join('') : empty('Semana limpa.', 'Nenhum prazo nos próximos 7 dias.')}</div>
+          <button class="link" type="button" data-act="go" data-to="agenda">Ver agenda →</button></details>
       </section>
 
       <aside class="side-col">
@@ -284,19 +274,14 @@
   P.readingBlock = () => {
     const st = S.settings(), goal = st.reading || {};
     const today = P.today(), pages = P.pagesOn(today);
-    const week = Array.from({ length: 7 }, (_, k) => P.addDays(today, k - 6));
-    const max = Math.max(goal.daily || 0, ...week.map(P.pagesOn), 1);
     const done = P.finishedThisYear().length;
-    const reading = S.all('items').filter(i => i.area === 'leituras' && i.status === 'lendo');
     return `<section class="block">
       <div class="block-head"><h2>Leitura</h2><button class="link" type="button" data-act="go" data-to="ajustes">${goal.daily || goal.yearly ? 'Metas' : 'Definir metas'}</button></div>
       <div class="reading-card">
         <div class="reading-today"><span class="eyebrow">Hoje</span><strong>${pages}${goal.daily ? `<small> / ${goal.daily} páginas</small>` : '<small> páginas</small>'}</strong>
           ${goal.daily ? `<div class="bar"><div style="width:${Math.min(100, Math.round(pages / goal.daily * 100))}%; --c: var(--a-leituras)"></div></div>` : ''}</div>
-        <div class="reading-week" aria-label="Páginas nos últimos 7 dias">${week.map(d => { const v = P.pagesOn(d); return `<span title="${P.fmtDate(d)}: ${v} páginas"><i style="height:${Math.round(v / max * 100)}%"></i><b>${P.DOW[P.parse(d).getDay()].slice(0, 1)}</b></span>`; }).join('')}</div>
         <div class="reading-year"><span>${done}${goal.yearly ? ` de ${goal.yearly}` : ''} livro${(goal.yearly || done) === 1 ? '' : 's'} em ${new Date().getFullYear()}</span>
           ${goal.yearly ? `<div class="bar"><div style="width:${Math.min(100, Math.round(done / goal.yearly * 100))}%; --c: var(--a-leituras)"></div></div>` : ''}</div>
-        ${reading.length ? `<div class="reading-now">${reading.slice(0, 3).map(i => `<button type="button" class="reading-item" data-act="openItem" data-id="${i.id}"><span>${esc(i.title)}</span><small>${i.counters?.[0]?.done || 0}${i.counters?.[0]?.total ? '/' + i.counters[0].total : ''}</small></button>`).join('')}</div>` : `<p class="faint small">Nenhuma leitura em andamento.</p>`}
       </div>
     </section>`;
   };

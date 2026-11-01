@@ -43,7 +43,7 @@
               ${field('Categoria', `<select name="categoryId">${catOptions(tx.kind, tx.categoryId)}</select>`)}
               ${field(tx.kind === 'receita' ? 'Entrou na conta' : 'Conta', `<select name="accountId">${accOptions(tx.accountId)}</select>`)}
             </div>`}
-          ${tx.kind === 'despesa' ? field('Forma de pagamento', `<div class="chips compact" data-method>${['debito', 'pix', 'dinheiro', 'boleto', 'credito'].map(m => `<button type="button" class="chip ${tx.method === m ? 'on' : ''}" data-m="${m}" ${m === 'credito' ? 'disabled title="Chega na v7"' : ''}>${F.METHODS[m]}${m === 'credito' ? ' · v7' : ''}</button>`).join('')}</div>`) : ''}
+          ${tx.kind === 'despesa' ? field('Forma de pagamento', `<div class="chips compact" data-method>${['debito', 'pix', 'dinheiro', 'boleto', 'credito'].map(m => `<button type="button" class="chip ${tx.method === m ? 'on' : ''}" data-m="${m}" ${m === 'credito' ? 'disabled title="Chega na próxima versão"' : ''}>${F.METHODS[m]}${m === 'credito' ? ' · em breve' : ''}</button>`).join('')}</div>`) : ''}
           <div class="field"><span class="field-label">Situação</span><div class="chips compact" data-status>
             <button type="button" class="chip ${tx.status === 'realizado' ? 'on' : ''}" data-s="realizado">${tx.kind === 'receita' ? 'Já recebi' : tx.kind === 'transferencia' ? 'Já fiz' : 'Já paguei'}</button>
             <button type="button" class="chip ${tx.status === 'previsto' ? 'on' : ''}" data-s="previsto">${tx.kind === 'receita' ? 'Vou receber' : 'Vou pagar'}</button>
@@ -92,7 +92,7 @@
         f.onsubmit = e => {
           e.preventDefault(); keep();
           const err = msg => { const p = b.querySelector('.form-error'); p.textContent = msg; p.hidden = false; };
-          if (parsed?.method === 'credito' && !existing) return err('Compras no cartão de crédito chegam na v7. Por enquanto, registre o pagamento da fatura quando pagar.');
+          if (parsed?.method === 'credito' && !existing) return err('Compras no cartão de crédito chegam na próxima versão. Por enquanto, registre o pagamento da fatura quando pagar.');
           if (!Number.isInteger(tx.amount) || tx.amount <= 0) return err('Informe um valor maior que zero, por exemplo 50,48.');
           if (!tx.desc?.trim()) return err('Escreva uma descrição curta.');
           if (!tx.date) return err('Escolha a data.');
@@ -218,7 +218,7 @@
           ${p.commitments.length ? `<details class="done-today"><summary>${p.commitments.length === 1 ? 'Ver o compromisso' : `Ver os ${p.commitments.length} compromissos`}</summary><div class="list">${p.commitments.map(t => `<div class="row fin-row"><span class="row-main as-text"><span class="row-title">${esc(t.desc)}</span><span class="row-meta">${F.date(t.date)}${t.certainty === 'estimado' ? ' · estimado' : ''}</span></span><span class="fin-amt">${F.money(t.amount)}</span></div>`).join('')}</div></details>` : '<p class="faint small">Nenhuma conta prevista no período. Cadastre suas contas fixas em Mais → Contas fixas.</p>'}
           <div class="block-head sub"><h3>Sugestão para as semanas</h3><span class="faint small">proporcional aos dias</span></div>
           <div class="weeks-preview">${p.weeks.map(w => `<div><span>${w.label}</span><small>${F.date(w.start)}–${F.date(w.end)} · ${w.days} dia${w.days > 1 ? 's' : ''}</small><b>${F.money(w.limit)}</b></div>`).join('')}</div>
-          <p class="hint">Na v7 você poderá editar e travar o limite de cada semana.</p>
+          <p class="hint">Na próxima versão você poderá editar e travar o limite de cada semana.</p>
           ${p.base < 0 ? `<div class="notice">O dinheiro de agora não cobre as contas até o próximo salário. Faltam ${F.money(-p.base)}. Dá para começar mesmo assim e acompanhar pelo painel.</div>` : ''}
           <div class="form-actions"><button class="btn ghost" type="button" data-cancel>Agora não</button><button class="btn primary" type="button" data-go>${prev ? 'Refazer o plano' : 'Começar o ciclo'}</button></div>`;
       },
