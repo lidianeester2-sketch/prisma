@@ -19,7 +19,8 @@
     playlist: '',
     semesterEnd: '2026-12-08',
     notify: { enabled: false, daysBefore: [0, 1, 3], classReminder: true, digestHour: '08:00' },
-    tags: ['Conceito', 'Para a prova', 'Ideia', 'Referência', 'Citação', 'Decisão']
+    tags: ['Conceito', 'Para a prova', 'Ideia', 'Referência', 'Citação', 'Decisão'],
+    reading: { daily: null, yearly: null }
   };
 
   function blank() { const o = {}; COLS.forEach(c => (o[c] = {})); return o; }

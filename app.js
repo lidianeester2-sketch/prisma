@@ -112,6 +112,7 @@
       P.ui.agendaMonth = P.iso(d).slice(0, 7); P.saveUI(); P.render();
     },
     agendaFilter: el => { P.ui.agendaFilter = el.dataset.f; P.saveUI(); P.render(); },
+    hojeArea: el => { P.ui.hojeArea = el.dataset.f; P.saveUI(); P.render(); },
     setArea: el => { P.ui.area = el.dataset.a; P.saveUI(); P.render(); },
     areaFilter: el => { P.ui.areaFilter = el.dataset.f; P.saveUI(); P.render(); },
     notesArea: el => { P.ui.notesArea = el.dataset.f; P.saveUI(); P.render(); },
@@ -144,7 +145,7 @@
     e.preventDefault();
     const raw = f.t.value.trim(); if (!raw) return;
     const { title, due } = P.parseQuick(raw);
-    S.put('tasks', { title, due: due || P.today(), kind: 'tarefa', done: false, steps: [], itemId: null, area: null });
+    S.put('tasks', { title, due: due || P.today(), kind: 'tarefa', done: false, steps: [], itemId: null, area: f.t.dataset.area || null });
     P.toast(`Adicionada para ${P.relDay(due || P.today())}.`);
     f.t.value = '';
     pendingRender = false; P.render();

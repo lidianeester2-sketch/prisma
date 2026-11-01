@@ -34,6 +34,18 @@
       </section>
 
       <section class="block set">
+        <h2>Metas de leitura</h2>
+        <form class="form" data-form="reading">
+          <div class="row-fields">
+            <label class="field"><span class="field-label">Páginas por dia</span><input id="set-rd" name="daily" inputmode="numeric" value="${st.reading?.daily || ''}" placeholder="ex.: 20"></label>
+            <label class="field"><span class="field-label">Livros em ${new Date().getFullYear()}</span><input id="set-ry" name="yearly" inputmode="numeric" value="${st.reading?.yearly || ''}" placeholder="ex.: 12"></label>
+          </div>
+          <span class="hint">Deixe em branco para não ter meta. As páginas contam quando você usa +1, +10 ou “Parei na página” numa leitura.</span>
+          <div class="form-actions"><button class="btn primary small" type="submit">Salvar</button></div>
+        </form>
+      </section>
+
+      <section class="block set">
         <h2>Aparência</h2>
         <div class="themes">${THEMES.map(([k, l, d]) => `<button type="button" class="theme ${st.theme === k ? 'on' : ''}" data-act="setTheme" data-t="${k}" aria-pressed="${st.theme === k}"><span class="theme-sw sw-${k}"></span><strong>${l}</strong><small>${d}</small></button>`).join('')}</div>
       </section>
@@ -97,13 +109,18 @@
         </div>
       </section>
 
-      <p class="credits">Prisma · versão 4 · Desenvolvido por Lidiane Tavares</p>
+      <p class="credits">Prisma · versão 5 · Desenvolvido por Lidiane Tavares</p>
     </div>`;
   };
 
   P.mounts.ajustes = root => {
     const f = sel => root.querySelector(`[data-form="${sel}"]`);
     f('profile') && (f('profile').onsubmit = e => { e.preventDefault(); S.setSettings({ name: e.target.name.value.trim(), semesterEnd: e.target.semesterEnd.value || null }); P.toast('Salvo.'); });
+    f('reading') && (f('reading').onsubmit = e => {
+      e.preventDefault();
+      const n = v => { const x = parseInt(String(v).trim(), 10); return Number.isFinite(x) && x > 0 ? x : null; };
+      S.setSettings({ reading: { daily: n(e.target.daily.value), yearly: n(e.target.yearly.value) } }); P.toast('Metas salvas.');
+    });
     f('playlist') && (f('playlist').onsubmit = e => {
       e.preventDefault(); const v = e.target.pl.value.trim();
       const m = v.match(/[?&]list=([\w-]+)/) || v.match(/^([\w-]{12,})$/);

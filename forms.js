@@ -274,6 +274,7 @@
           schedule: area === 'faculdade' && !fd.get('online') ? schedule.filter(s => s.start) : [],
           start: fd.get('start') || it.start || null, end: fd.get('end') || null, touchedAt: Date.now()
         };
+        Object.assign(rec, P.finishFields(it, status));
         delete rec.seed;
         const saved = S.put('items', rec);
         P.toast(existing ? 'Salvo.' : `${title} criado${area === 'leituras' ? 'a' : ''}.`);
@@ -320,6 +321,11 @@
                 <button class="icon-btn accent" type="button" data-inc="${c.key}" aria-label="Mais 1 ${esc(c.label)}">+</button>
               </div>
               ${c.total ? `<div class="bar"><div style="width:${Math.min(100, Math.round(c.done / c.total * 100))}%"></div></div>` : `<button type="button" class="link small" data-edit>Definir total</button>`}
+              ${it.area === 'leituras' ? `<div class="counter-extra">
+                <button class="btn ghost small" type="button" data-inc10="${c.key}">+10</button>
+                <form class="set-page" data-setv="${c.key}"><input type="number" inputmode="numeric" min="0" name="v" placeholder="Parei ${c.label === 'páginas' ? 'na página' : 'em'}…" aria-label="Onde parei"><button class="btn ghost small" type="submit">Salvar</button></form>
+              </div>
+              ${(() => { const days = Array.from({ length: 7 }, (_, k) => P.addDays(P.today(), k - 6)); const tot = days.reduce((a, d) => a + (it.readLog?.[d] || 0), 0); return tot ? `<span class="faint small">${tot} ${esc(c.label)} nos últimos 7 dias</span>` : ''; })()}` : ''}
             </div>`).join('')}</div>
 
           <div class="block-head sub"><h3>Prazos e tarefas</h3><button class="btn ghost small" type="button" data-new-task>+ Prazo</button></div>
@@ -342,7 +348,12 @@
         P.$$('[data-edit]', b).forEach(x => x.onclick = () => { editing = true; api.refresh(); });
         P.$$('[data-inc]', b).forEach(x => x.onclick = () => { P.bump(id, x.dataset.inc, 1); api.refresh(); });
         P.$$('[data-dec]', b).forEach(x => x.onclick = () => { P.bump(id, x.dataset.dec, -1); api.refresh(); });
-        P.$$('[data-status]', b).forEach(x => x.onclick = () => { S.patch('items', id, { status: x.dataset.status }); api.refresh(); });
+        P.$$('[data-inc10]', b).forEach(x => x.onclick = () => { P.bump(id, x.dataset.inc10, 10); api.refresh(); });
+        P.$$('[data-setv]', b).forEach(f => f.onsubmit = e => {
+          e.preventDefault(); const v = parseInt(f.v.value, 10); if (!Number.isFinite(v) || v < 0) return;
+          const c = S.get('items', id).counters.find(x => x.key === f.dataset.setv); P.bump(id, f.dataset.setv, v - c.done); api.refresh();
+        });
+        P.$$('[data-status]', b).forEach(x => x.onclick = () => { S.patch('items', id, { status: x.dataset.status, ...P.finishFields(S.get('items', id), x.dataset.status) }); api.refresh(); });
         P.$$('[data-rate]', b).forEach(x => x.onclick = () => { S.patch('items', id, { rating: +x.dataset.rate }); api.refresh(); });
         b.querySelector('[data-new-task]').onclick = () => P.capture('prazo', { itemId: id });
         b.querySelector('[data-new-note]').onclick = () => P.capture('nota', { itemId: id });
@@ -359,17 +370,41 @@
   };
 
   /* contador +1 / −1 com desfazer */
+  P.finishFields = (it, status) => ['concluido', 'concluida'].includes(status)
+    ? { finishedAt: it?.finishedAt || P.today() }
+    : { finishedAt: null };
+
   P.bump = (id, key, delta) => {
     const it = S.get('items', id); if (!it) return;
     const c = it.counters.find(x => x.key === key); if (!c) return;
     const nextDone = Math.max(0, c.done + delta);
-    if (nextDone === c.done) return;
-    S.patch('items', id, cur => { cur.counters = cur.counters.map(x => x.key === key ? { ...x, done: nextDone } : x); cur.touchedAt = Date.now(); if (cur.area === 'leituras' && cur.status === 'quero' && delta > 0) cur.status = 'lendo'; return cur; });
-    if (delta > 0) {
+    const real = nextDone - c.done;
+    if (!real) return;
+    const today = P.today();
+    S.patch('items', id, cur => {
+      cur.counters = cur.counters.map(x => x.key === key ? { ...x, done: nextDone } : x);
+      cur.touchedAt = Date.now();
+      if (cur.area === 'leituras') {
+        // diário de leitura: quantas páginas em cada dia (para a meta diária)
+        cur.readLog = { ...(cur.readLog || {}) };
+        cur.readLog[today] = Math.max(0, (cur.readLog[today] || 0) + real);
+        // guarda só os últimos 60 dias
+        Object.keys(cur.readLog).forEach(d => { if (d < P.addDays(today, -60)) delete cur.readLog[d]; });
+        if (cur.status === 'quero' && real > 0) cur.status = 'lendo';
+      }
+      return cur;
+    });
+    if (real > 0) {
       const after = S.get('items', id); const pct = P.pct(after);
-      const msg = c.total && nextDone >= c.total ? `${it.title}: ${c.label} completas! ✦` : `+1 ${c.label.replace(/s$/, '')} em ${it.title}`;
-      P.toast(msg, { undo: () => P.bump(id, key, -1) });
+      const unit = real === 1 ? c.label.replace(/s$/, '') : c.label;
+      const msg = c.total && nextDone >= c.total ? `${it.title}: ${c.label} completas! ✦` : `+${real} ${unit} em ${it.title}`;
+      P.toast(msg, { undo: () => P.bump(id, key, -real) });
       if (pct === 100 && P.isActive(after)) setTimeout(() => P.toast('Chegou a 100%. Quer marcar como concluído? Abra o item.'), 600);
+      const goal = S.settings().reading?.daily;
+      if (it.area === 'leituras' && goal && c.label === 'páginas') {
+        const before = P.pagesOn(today) - real;
+        if (before < goal && before + real >= goal) setTimeout(() => P.toast(`Meta de leitura do dia batida: ${goal} páginas. ✦`), 900);
+      }
     }
   };
 

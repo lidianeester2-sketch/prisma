@@ -104,7 +104,9 @@
       'Faça direito. Depois você reclama.', 'Você pediu uma vida organizada. Agora aguenta.', 'Seu semestre mandou lembranças. E alguns prazos.', 'A faculdade não vai se formar sozinha.',
       'Você não está atrasada. Está trabalhando com uma margem estratégica questionável.', 'O plano perfeito continua sendo inferior ao plano que você realmente executa.',
       'Não é procrastinação se você estiver organizando a procrastinação.', 'Tudo bem. O Prisma está aqui. Pode parar de fingir que lembra de tudo.', 'Você trouxe os problemas. Eu trouxe os cards.',
-      'Hora de pensar o que o Naruto faria...', 'Taylor Swift ficaria orgulhosa!', 'Vamos descobrir o que está pegando fogo hoje.'],
+      'Hora de pensar o que o Naruto faria...', 'Taylor Swift ficaria orgulhosa!', 'Vamos descobrir o que está pegando fogo hoje.',
+      'Projeto pessoal também tem prazo. Só que a chefe é você.', 'Dez páginas hoje ainda são dez páginas a mais que ontem.',
+      'Aquele livro na fila não vai se ler sozinho.', 'Ideia boa anotada vale mais que ideia genial esquecida.'],
     morning: ['Bom dia. Infelizmente, o semestre continua.', 'Bom dia. Seu café ainda não está cadastrado no sistema.', 'Seu futuro agradece. Seu presente queria estar dormindo.'],
     night: ['Boa noite. Sobreviver ao dia também foi uma entrega.', 'Encerrando o expediente. O cérebro já pediu demissão.', 'Hoje acabou. Amanhã a gente finge que começa renovada.',
       'Você fez o que deu. O que não deu fica para a versão de amanhã.', 'Hora de descansar antes que você comece a estudar por culpa.']
@@ -127,34 +129,73 @@
     const today = P.today(), st = S.settings();
     const now = new Date(), h = now.getHours();
     const greet = h < 5 ? 'Boa madrugada' : h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
-    const tasks = S.all('tasks');
+    // filtro de área (Tudo / Faculdade / Projetos / Leituras)
+    const allItems = S.all('items');
+    const used = Object.keys(P.AREAS).filter(a => allItems.some(i => i.area === a && i.status !== 'arquivada'));
+    let af = P.ui.hojeArea || 'all';
+    if (af !== 'all' && !used.includes(af)) af = 'all';
+    const areaOf = t => t.area || (t.itemId && S.get('items', t.itemId)?.area) || null;
+    const inArea = t => af === 'all' || areaOf(t) === af;
+    const showFac = af === 'all' || af === 'faculdade';
+    const hasFac = allItems.some(i => i.area === 'faculdade' && i.status === 'cursando');
+
+    const tasks = S.all('tasks').filter(inArea);
     const open = tasks.filter(t => !t.done);
     const overdue = open.filter(t => t.due && t.due < today).sort((a, b) => a.due.localeCompare(b.due));
     const dueToday = open.filter(t => t.due === today);
     const steps = open.flatMap(t => (t.steps || []).filter(s => !s.done && s.date <= today && s.date !== t.due).map(s => ({ t, s })));
-    const classes = P.classesOn(today);
-    const evToday = S.all('events').filter(e => e.date === today);
+    const classes = showFac ? P.classesOn(today) : [];
+    const events = showFac ? S.all('events') : [];
+    const evToday = events.filter(e => e.date === today);
     const doneToday = tasks.filter(t => t.done && t.doneAt && P.iso(t.doneAt) === today);
     const inbox = open.filter(t => !t.due).sort((a, b) => a.createdAt - b.createdAt);
     const in7 = P.addDays(today, 7);
     const upcoming = [
       ...open.filter(t => t.due > today && t.due <= in7).map(t => ({ d: t.due, html: P.taskRow(t) })),
-      ...S.all('events').filter(e => e.date > today && e.date <= in7).map(e => ({ d: e.date, html: P.eventRow(e) }))
+      ...events.filter(e => e.date > today && e.date <= in7).map(e => ({ d: e.date, html: P.eventRow(e) }))
     ].sort((a, b) => a.d.localeCompare(b.d));
     const ws = P.weekScore();
-    const nc = P.nextClass();
-    const active = S.all('items').filter(P.isActive).sort((a, b) => (b.touchedAt || b.updatedAt) - (a.touchedAt || a.updatedAt)).slice(0, 8);
+    const nc = hasFac && showFac ? P.nextClass() : null;
+    const active = allItems.filter(i => P.isActive(i) && (af === 'all' || i.area === af)).sort((a, b) => (b.touchedAt || b.updatedAt) - (a.touchedAt || a.updatedAt));
     const habits = S.all('habits').sort((a, b) => a.order - b.order);
     const wsDay = P.weekStart(today);
     const todayCount = overdue.length + dueToday.length + steps.length;
-    const semLeft = st.semesterEnd ? P.daysUntil(st.semesterEnd) : null;
+    const semLeft = hasFac && showFac && st.semesterEnd ? P.daysUntil(st.semesterEnd) : null;
+    const showReading = (af === 'all' || af === 'leituras') && (allItems.some(i => i.area === 'leituras') || st.reading?.daily || st.reading?.yearly);
 
-    const ncHtml = nc ? `<button class="now-card" type="button" data-act="openItem" data-id="${nc.item.id}" style="--c:${P.color(nc.item.color)}">
+    let ncHtml;
+    if (nc) {
+      ncHtml = `<button class="now-card" type="button" data-act="openItem" data-id="${nc.item.id}" style="--c:${P.color(nc.item.color)}">
         <span class="eyebrow">${nc.offset === 0 ? 'Próxima aula · hoje' : nc.offset === 1 ? 'Próxima aula · amanhã' : 'Próxima aula · ' + P.DOW_LONG[P.parse(nc.day).getDay()]}</span>
         <span class="now-time">${esc(nc.start)}</span>
         <span class="now-title">${esc(nc.item.emoji || '')} ${esc(nc.item.title)}</span>
         <span class="now-meta">${nc.end ? 'até ' + esc(nc.end) : ''}${nc.item.sub ? ' · ' + esc(nc.item.sub) : ''}</span>
-      </button>` : `<div class="now-card quiet"><span class="eyebrow">Próxima aula</span><span class="now-title">Nenhuma aula nos próximos dias</span><span class="now-meta">Cadastre horários nas matérias em Áreas.</span></div>`;
+      </button>`;
+    } else {
+      // sem aula pela frente: mostra o que está em foco (o item mexido por último)
+      const focus = active.find(i => i.area !== 'faculdade') || active[0];
+      if (focus) {
+        const pct = P.pct(focus), c = focus.counters?.[0];
+        ncHtml = `<div class="now-card focus" style="--c:${P.color(focus.color)}">
+          <button class="now-open" type="button" data-act="openItem" data-id="${focus.id}">
+            <span class="eyebrow">Em foco · ${focus.area === 'leituras' ? 'leitura' : focus.area === 'projetos' ? 'projeto' : 'matéria'}</span>
+            <span class="now-time">${pct === null ? '—' : pct + '<small>%</small>'}</span>
+            <span class="now-title">${esc(focus.emoji || P.AREAS[focus.area].icon)} ${esc(focus.title)}</span>
+            <span class="now-meta">${c ? `${c.done}${c.total ? ' de ' + c.total : ''} ${esc(c.label)}` : ''}${focus.sub ? ' · ' + esc(focus.sub) : ''}</span>
+          </button>
+          ${c ? `<button class="plus" type="button" data-act="inc" data-id="${focus.id}" data-key="${c.key}" aria-label="Mais 1 ${esc(c.label)}">+1</button>` : ''}
+        </div>`;
+      } else if (af === 'faculdade') {
+        ncHtml = `<div class="now-card quiet"><span class="eyebrow">Próxima aula</span><span class="now-title">Nenhuma aula nos próximos dias</span><span class="now-meta">Cadastre horários nas matérias em Áreas.</span></div>`;
+      } else {
+        ncHtml = `<button class="now-card quiet" type="button" data-act="capture" data-type="item" data-area="${af === 'all' ? 'projetos' : af}"><span class="eyebrow">Em foco</span><span class="now-title">Nada em andamento ainda</span><span class="now-meta">Toque para criar uma matéria, um projeto ou uma leitura.</span></button>`;
+      }
+    }
+
+    const filterHtml = used.length > 1 ? `<div class="chips hoje-filter" role="group" aria-label="Mostrar">
+      <button type="button" class="chip ${af === 'all' ? 'on' : ''}" data-act="hojeArea" data-f="all">Tudo</button>
+      ${used.map(a => `<button type="button" class="chip ${af === a ? 'on' : ''}" data-act="hojeArea" data-f="${a}">${P.AREAS[a].icon} ${P.AREAS[a].label}</button>`).join('')}
+    </div>` : '';
 
     const ring = s => {
       const r = 34, c = 2 * Math.PI * r, off = c * (1 - (s ?? 0) / 100);
@@ -168,6 +209,7 @@
       <h1>${greet}${st.name ? ', ' + esc(st.name) : ''}.</h1>
       <p class="prisma-says"><span class="says-mark">✦ Prisma</span>${esc(phrase())}</p>
     </header>
+    ${filterHtml}
 
     <div class="hero-grid">
       ${ncHtml}
@@ -189,7 +231,7 @@
       <section class="block main-col">
         <div class="block-head"><h2>Para hoje</h2><span class="count">${todayCount + classes.length + evToday.length}</span></div>
         <form class="quick-add" data-form="quickTask">
-          <input id="qa-today" name="t" autocomplete="off" placeholder="Nova tarefa… ex.: ler cap. 3 amanhã" aria-label="Nova tarefa">
+          <input id="qa-today" name="t" autocomplete="off" placeholder="${af === 'projetos' ? 'Nova tarefa de projeto… ex.: revisar briefing sex' : af === 'leituras' ? 'Anotar pra ler… ex.: artigo sobre branding' : 'Nova tarefa… ex.: ler cap. 3 amanhã'}" aria-label="Nova tarefa" data-area="${af === 'all' ? '' : af}">
           <button class="btn primary small" type="submit">Adicionar</button>
         </form>
         <div class="list">
@@ -210,6 +252,7 @@
       </section>
 
       <aside class="side-col">
+        ${showReading ? P.readingBlock() : ''}
         <section class="block">
           <div class="block-head"><h2>Hábitos</h2><button class="link" type="button" data-act="manageHabits">Editar</button></div>
           <div class="habits">
@@ -219,7 +262,7 @@
               return `<button class="habit ${on ? 'on' : ''}" type="button" data-act="toggleHabit" data-id="${hb.id}" aria-pressed="${on}">
                 <span class="habit-check"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>
                 <span class="habit-name">${esc(hb.name)}</span><span class="habit-week" aria-hidden="true">${dots}</span></button>`;
-            }).join('') : empty('Sem hábitos ainda.', 'Pequenas rotinas ajudam o semestre inteiro.', 'data-act="manageHabits"', 'Criar hábito')}
+            }).join('') : empty('Sem hábitos ainda.', 'Pequenas rotinas mudam o mês inteiro.', 'data-act="manageHabits"', 'Criar hábito')}
           </div>
         </section>
 
@@ -231,7 +274,30 @@
 
     <section class="block">
       <div class="block-head"><h2>Em andamento</h2><button class="link" type="button" data-act="go" data-to="areas">Todas as áreas →</button></div>
-      ${active.length ? `<div class="strip">${active.map(P.itemMini).join('')}</div>` : empty('Nada em andamento.', 'Crie uma matéria, projeto ou leitura para acompanhar o progresso.', 'data-act="capture" data-type="item"', 'Criar')}
+      ${active.length ? `<div class="strip">${active.slice(0, 10).map(P.itemMini).join('')}</div>` : empty('Nada em andamento.', 'Crie uma matéria, projeto ou leitura para acompanhar o progresso.', 'data-act="capture" data-type="item"', 'Criar')}
+    </section>`;
+  };
+
+  /* bloco de leitura: meta do dia + livros do ano */
+  P.pagesOn = iso => S.all('items').filter(i => i.area === 'leituras').reduce((sum, i) => sum + ((i.counters?.[0]?.label === 'páginas' ? i.readLog?.[iso] : 0) || 0), 0);
+  P.finishedThisYear = () => { const y = String(new Date().getFullYear()); return S.all('items').filter(i => i.area === 'leituras' && i.status === 'concluido' && (i.finishedAt || '').startsWith(y)); };
+  P.readingBlock = () => {
+    const st = S.settings(), goal = st.reading || {};
+    const today = P.today(), pages = P.pagesOn(today);
+    const week = Array.from({ length: 7 }, (_, k) => P.addDays(today, k - 6));
+    const max = Math.max(goal.daily || 0, ...week.map(P.pagesOn), 1);
+    const done = P.finishedThisYear().length;
+    const reading = S.all('items').filter(i => i.area === 'leituras' && i.status === 'lendo');
+    return `<section class="block">
+      <div class="block-head"><h2>Leitura</h2><button class="link" type="button" data-act="go" data-to="ajustes">${goal.daily || goal.yearly ? 'Metas' : 'Definir metas'}</button></div>
+      <div class="reading-card">
+        <div class="reading-today"><span class="eyebrow">Hoje</span><strong>${pages}${goal.daily ? `<small> / ${goal.daily} páginas</small>` : '<small> páginas</small>'}</strong>
+          ${goal.daily ? `<div class="bar"><div style="width:${Math.min(100, Math.round(pages / goal.daily * 100))}%; --c: var(--a-leituras)"></div></div>` : ''}</div>
+        <div class="reading-week" aria-label="Páginas nos últimos 7 dias">${week.map(d => { const v = P.pagesOn(d); return `<span title="${P.fmtDate(d)}: ${v} páginas"><i style="height:${Math.round(v / max * 100)}%"></i><b>${P.DOW[P.parse(d).getDay()].slice(0, 1)}</b></span>`; }).join('')}</div>
+        <div class="reading-year"><span>${done}${goal.yearly ? ` de ${goal.yearly}` : ''} livro${(goal.yearly || done) === 1 ? '' : 's'} em ${new Date().getFullYear()}</span>
+          ${goal.yearly ? `<div class="bar"><div style="width:${Math.min(100, Math.round(done / goal.yearly * 100))}%; --c: var(--a-leituras)"></div></div>` : ''}</div>
+        ${reading.length ? `<div class="reading-now">${reading.slice(0, 3).map(i => `<button type="button" class="reading-item" data-act="openItem" data-id="${i.id}"><span>${esc(i.title)}</span><small>${i.counters?.[0]?.done || 0}${i.counters?.[0]?.total ? '/' + i.counters[0].total : ''}</small></button>`).join('')}</div>` : `<p class="faint small">Nenhuma leitura em andamento.</p>`}
+      </div>
     </section>`;
   };
 
@@ -356,7 +422,33 @@
     let summary = '';
     if (area === 'faculdade') { const n = all.filter(i => i.status === 'cursando').length; const left = st.semesterEnd ? P.daysUntil(st.semesterEnd) : null; summary = `${n} matéria${n !== 1 ? 's' : ''} cursando${left !== null && left >= 0 ? ` · semestre termina em ${left} dias` : ''}`; }
     if (area === 'projetos') { const n = all.filter(i => i.status === 'ativo').length; summary = `${n} projeto${n !== 1 ? 's' : ''} ativo${n !== 1 ? 's' : ''}`; }
-    if (area === 'leituras') { const n = all.filter(i => i.status === 'lendo').length, q = all.filter(i => i.status === 'quero').length, c = all.filter(i => i.status === 'concluido').length; summary = `${n} lendo · ${q} na fila · ${c} concluída${c !== 1 ? 's' : ''}`; }
+    if (area === 'leituras') { const n = all.filter(i => i.status === 'lendo').length, q = all.filter(i => i.status === 'quero').length, c = P.finishedThisYear().length, g = st.reading?.yearly; summary = `${n} lendo · ${q} na fila · ${c}${g ? ' de ' + g : ''} concluída${c !== 1 || g ? 's' : ''} em ${new Date().getFullYear()}`; }
+
+    const card = it => {
+        const pct = P.pct(it); const nx = nextFor(it.id);
+        const sched = it.area === 'faculdade' ? (it.online ? 'on-line' : (it.schedule || []).map(s => `${P.DOW[s.dow]} ${s.start}`).join(' · ')) : '';
+        const extra = it.area === 'leituras' && it.status === 'concluido' && it.finishedAt ? `terminado em ${P.fmtDate(it.finishedAt)}${it.rating ? ' · ' + '★'.repeat(it.rating) : ''}` : '';
+        return `<article class="item-card" style="--c:${P.color(it.color)}">
+          <button class="item-open" type="button" data-act="openItem" data-id="${it.id}">
+            <span class="item-top"><span class="item-emoji">${esc(it.emoji || A.icon)}</span><span class="pill">${P.statusLabel(it.area, it.status)}</span></span>
+            <span class="item-title">${esc(it.title)}</span>
+            <span class="item-sub">${[it.code, it.sub, sched].filter(Boolean).map(esc).join(' · ') || '&nbsp;'}</span>
+            <span class="item-progress">${bar(pct)}<span class="mono">${pct === null ? 'sem meta' : pct + '%'}</span></span>
+            <span class="item-counters">${extra ? `<span>${esc(extra)}</span>` : (it.counters || []).map(c => `<span>${c.done}${c.total ? '/' + c.total : ''} ${esc(c.label)}</span>`).join('')}</span>
+            ${nx ? `<span class="item-next ${nx.due < P.today() ? 'bad' : ''}">${P.KINDS[nx.kind]?.icon || '○'} ${esc(nx.title)} · ${P.relDay(nx.due)}</span>` : ''}
+          </button>
+          ${it.counters?.[0] && P.isActive(it) ? `<button class="plus" type="button" data-act="inc" data-id="${it.id}" data-key="${it.counters[0].key}" aria-label="Mais 1 ${esc(it.counters[0].label)}">+1 ${esc(it.counters[0].label.replace(/s$/, ''))}</button>` : ''}
+        </article>`;
+    };
+    const addCard = `<button class="item-card add" type="button" data-act="capture" data-type="item" data-area="${area}"><span>+</span>${area === 'projetos' ? 'Novo projeto' : area === 'leituras' ? 'Nova leitura' : 'Nova matéria'}</button>`;
+    let groupsHtml;
+    if (area === 'leituras' && filt === 'ativos') {
+      // leituras: separadas em Lendo agora / Na fila / Pausadas
+      const groups = [['lendo', 'Lendo agora'], ['quero', 'Na fila'], ['pausado', 'Pausadas']].map(([st, label]) => [label, list.filter(i => i.status === st)]).filter(([, l]) => l.length);
+      groupsHtml = groups.length ? groups.map(([label, l], gi) => `<div class="group-title"><h3>${label}</h3><span class="count">${l.length}</span></div><div class="item-grid">${l.map(card).join('')}${gi === groups.length - 1 ? addCard : ''}</div>`).join('') : `<div class="item-grid">${addCard}</div>`;
+    } else {
+      groupsHtml = `<div class="item-grid">${list.map(card).join('')}${addCard}</div>`;
+    }
 
     return `
     <header class="page-head"><h1>Áreas</h1><p class="lede">${summary}</p></header>
@@ -366,24 +458,7 @@
     <div class="chips">
       ${[['ativos', 'Em andamento'], ['todos', 'Todos'], ['arquivo', 'Concluídos e arquivados']].map(([k, l]) => `<button type="button" class="chip ${filt === k ? 'on' : ''}" data-act="areaFilter" data-f="${k}">${l}</button>`).join('')}
     </div>
-    <div class="item-grid">
-      ${list.map(it => {
-        const pct = P.pct(it); const nx = nextFor(it.id);
-        const sched = it.area === 'faculdade' ? (it.online ? 'on-line' : (it.schedule || []).map(s => `${P.DOW[s.dow]} ${s.start}`).join(' · ')) : '';
-        return `<article class="item-card" style="--c:${P.color(it.color)}">
-          <button class="item-open" type="button" data-act="openItem" data-id="${it.id}">
-            <span class="item-top"><span class="item-emoji">${esc(it.emoji || A.icon)}</span><span class="pill">${P.statusLabel(it.area, it.status)}</span></span>
-            <span class="item-title">${esc(it.title)}</span>
-            <span class="item-sub">${[it.code, it.sub, sched].filter(Boolean).map(esc).join(' · ') || '&nbsp;'}</span>
-            <span class="item-progress">${bar(pct)}<span class="mono">${pct === null ? 'sem meta' : pct + '%'}</span></span>
-            <span class="item-counters">${(it.counters || []).map(c => `<span>${c.done}${c.total ? '/' + c.total : ''} ${esc(c.label)}</span>`).join('')}</span>
-            ${nx ? `<span class="item-next ${nx.due < P.today() ? 'bad' : ''}">${P.KINDS[nx.kind]?.icon || '○'} ${esc(nx.title)} · ${P.relDay(nx.due)}</span>` : ''}
-          </button>
-          ${it.counters?.[0] && P.isActive(it) ? `<button class="plus" type="button" data-act="inc" data-id="${it.id}" data-key="${it.counters[0].key}" aria-label="Mais 1 ${esc(it.counters[0].label)}">+1 ${esc(it.counters[0].label.replace(/s$/, ''))}</button>` : ''}
-        </article>`;
-      }).join('')}
-      <button class="item-card add" type="button" data-act="capture" data-type="item" data-area="${area}"><span>+</span>Nova ${A.one === 'projeto' ? 'projeto' : A.one}</button>
-    </div>`.replace('Nova projeto', 'Novo projeto');
+    ${groupsHtml}`;
   };
 
   /* ============================================================
