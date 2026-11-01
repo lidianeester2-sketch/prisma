@@ -97,7 +97,7 @@
         </div>
       </section>
 
-      <p class="credits">Prisma 2.0 · Desenvolvido por Lidiane Tavares</p>
+      <p class="credits">Prisma · versão 1 · Desenvolvido por Lidiane Tavares</p>
     </div>`;
   };
 

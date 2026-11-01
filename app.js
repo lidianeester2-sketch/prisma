@@ -26,8 +26,16 @@
     const keepId = act && view.contains(act) && act.id ? act.id : null;
     const caret = keepId && 'selectionStart' in act ? act.selectionStart : null;
     const y = window.scrollY;
-    view.innerHTML = P.views[route]();
-    P.mounts?.[route]?.(view);
+    try {
+      if (typeof P.views[route] !== 'function') throw new Error(`A tela "${route}" não carregou. Provavelmente falta o arquivo ${route === 'ajustes' ? 'settings.js' : route === 'hoje' || route === 'agenda' || route === 'areas' || route === 'notas' ? 'views.js' : 'da tela'} no GitHub.`);
+      view.innerHTML = P.views[route]();
+      P.mounts?.[route]?.(view);
+    } catch (err) {
+      console.error(err);
+      view.innerHTML = `<header class="page-head"><h1>Ops.</h1><p class="lede">Esta tela não abriu. Copie a mensagem abaixo e mande para quem está te ajudando.</p></header>
+        <pre class="err-box">${P.esc(err.message)}\n${P.esc((err.stack || '').split('\n').slice(1, 4).join('\n'))}</pre>
+        <div class="form-actions split"><button class="btn primary" type="button" data-act="repair">Reparar e recarregar</button><span class="grow"></span></div>`;
+    }
     if (keepId) { const el = document.getElementById(keepId); if (el) { el.focus({ preventScroll: true }); if (caret !== null) try { el.setSelectionRange(caret, caret); } catch (e) {} } }
     window.scrollTo(0, y);
     pendingRender = false;
@@ -67,6 +75,12 @@
   /* ---------- cliques (data-act) ---------- */
   Object.assign(P.actions, {
     go: el => P.go(el.dataset.to),
+    repair: async () => {
+      // apaga a cópia guardada do app (não apaga seus dados) e recarrega
+      try { const regs = await navigator.serviceWorker?.getRegistrations?.() || []; await Promise.all(regs.map(r => r.unregister())); } catch (e) {}
+      try { const keys = await caches.keys(); await Promise.all(keys.map(k => caches.delete(k))); } catch (e) {}
+      location.reload();
+    },
     capture: el => P.capture(el.dataset.type || 'tarefa', { due: el.dataset.due, area: el.dataset.area }),
     openTask: el => P.openTask(el.dataset.id),
     openItem: el => P.openItem(el.dataset.id),
