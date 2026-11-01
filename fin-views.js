@@ -111,7 +111,6 @@
       <span class="eyebrow">Quanto posso gastar até ${endTxt}</span>
       <div class="fin-big">${F.money(s.canSpend)}</div>
       <div class="fin-sub">${s.canSpend > 0 ? `≈ ${F.money(s.perDay)} por dia · ` : ''}${s.daysLeft} dia${s.daysLeft === 1 ? '' : 's'} até o salário (${F.date(s.cycle.nextPay)})</div>
-      <div class="fin-mini"><span>Saldo real <b>${F.money(s.real)}</b></span><span>Contas até o salário <b>${F.money(s.committed)}</b></span>${s.reserved ? `<span>Reservado <b>${F.money(s.reserved)}</b></span>` : ''}</div>
       <details class="calc">
         <summary>Como calculei</summary>
         <div class="calc-table">
@@ -124,6 +123,12 @@
         <ul class="premissas">${s.premissas.map(p => `<li>${esc(p)}</li>`).join('')}</ul>
       </details>
     </section>
+
+    <div class="tiles three">
+      ${P.tile('c4 money', F.money(s.real), 'Saldo real', 'data-act="finConcile"')}
+      ${P.tile('c2 money', F.money(s.committed), 'Contas até o salário', 'data-act="go" data-to="fin-orcamento"')}
+      ${P.tile('c3 money', F.money(s.expenseCycle), 'Gastos do ciclo', 'data-act="go" data-to="fin-lanc"')}
+    </div>
 
     <div class="cols">
       <section class="block main-col">
@@ -223,7 +228,7 @@
   ============================================================ */
   P.views['fin-mais'] = () => {
     const item = (act, title, sub, extra = '') => `<button type="button" class="data-btn" data-act="${act}" ${extra}><strong>${title}</strong><small>${sub}</small></button>`;
-    const soon = (title, v) => `<div class="data-btn soon-item"><strong>${title}</strong><small>chega na ${v}</small></div>`;
+    const soon = (title, v) => `<div class="data-btn soon-item"><strong>${title}</strong><small>${v === "próxima" ? "chega na próxima versão" : "em breve"}</small></div>`;
     return `
     <header class="page-head"><h1>Mais</h1><p class="lede">Configurações e o que vem por aí.</p></header>
     <div class="settings">
@@ -239,7 +244,7 @@
         ${item('finHistory', 'Histórico de alterações', 'Tudo que foi criado ou mudado, com antes e depois')}
       </div></section>
       <section class="block set"><h2>Chegando</h2><div class="data-actions">
-        ${soon('Cartões de crédito e semanas editáveis', 'v8')}${soon('Dívidas e metas', 'v9')}${soon('Renda extra e relatórios', 'v10')}${soon('Assistente com IA', 'v11')}
+        ${soon('Cartões de crédito e semanas editáveis', 'próxima')}${soon('Dívidas e metas', 'em breve')}${soon('Renda extra e relatórios', 'em breve')}${soon('Assistente com IA', 'em breve')}
       </div></section>
     </div>`;
   };

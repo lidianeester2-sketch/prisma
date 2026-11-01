@@ -125,6 +125,11 @@
   /* ============================================================
      HOJE
   ============================================================ */
+  // bloco de resumo em tom pastel, com uma "ondinha" decorativa
+  const WAVES = ['M2 14c4 0 4-10 8-10s4 16 8 16 4-12 8-12 4 8 8 8 4-6 8-6 4 4 8 4', 'M2 12c3-6 6-6 9 0s6 6 9 0 6-6 9 0 6 6 9 0 6-6 9 0', 'M2 16c4-2 6-12 10-12s5 14 9 14 5-10 9-10 5 6 9 6 4-4 8-4', 'M2 10c3 4 5 6 8 2s5-8 8-2 5 8 8 2 5-6 8-2 5 4 8 2'];
+  P.tile = (cls, num, label, attrs) => `<button type="button" class="tile ${cls}" ${attrs || ''}><svg class="wave" viewBox="0 0 54 24" aria-hidden="true"><path d="${WAVES[(parseInt(cls.slice(1), 10) - 1) % 4]}"/></svg><b>${num}</b><span>${label}</span></button>`;
+  const tile = P.tile;
+
   P.views.hoje = () => {
     const today = P.today(), st = S.settings();
     const now = new Date(), h = now.getHours();
@@ -199,25 +204,27 @@
 
     return `
     <header class="page-head hoje-head">
-      <div class="date-line">${P.DOW_LONG[now.getDay()]}, ${now.getDate()} de ${P.MONTHS[now.getMonth()]}${semLeft !== null && semLeft >= 0 ? ` <span class="sep">·</span> ${semLeft === 0 ? 'último dia do semestre' : `faltam ${semLeft} dias pro fim do semestre`}` : ''}</div>
-      <h1>${greet}${st.name ? ', ' + esc(st.name) : ''}.</h1>
-      <p class="prisma-says"><span class="says-mark">✦ Prisma</span>${esc(phrase())}</p>
+      <div class="hello"><span class="avatar" aria-hidden="true">${esc((st.name || 'P').trim().charAt(0).toUpperCase())}</span>
+        <div class="hello-text"><span class="eyebrow">${greet} · ${P.DOW_LONG[now.getDay()]}, ${now.getDate()} de ${P.MONTHS[now.getMonth()]}</span>
+        <h1>${st.name ? esc(st.name) : 'Olá!'}</h1></div></div>
+      <p class="prisma-says">${esc(phrase())}</p>
+      <span class="score-pill" title="${esc(scoreLine(ws.score))}">Caos sob controle <b>${ws.score === null ? '—' : ws.score + '%'}</b>${semLeft !== null && semLeft >= 0 ? ` · ${semLeft === 0 ? 'último dia do semestre' : `${semLeft} dias pro fim do semestre`}` : ''}</span>
     </header>
     ${filterHtml}
 
+    <div class="tiles">
+      ${tile('c1', todayCount + classes.length + evToday.length, 'Para hoje', 'data-act="scrollTo" data-id="para-hoje"')}
+      ${tile('c2', overdue.length, overdue.length === 1 ? 'Atrasada' : 'Atrasadas', 'data-act="scrollTo" data-id="para-hoje"')}
+      ${tile('c3', upcoming.length, 'Próximos 7 dias', 'data-act="go" data-to="agenda"')}
+      ${tile('c4', active.length, 'Em andamento', 'data-act="go" data-to="areas"')}
+    </div>
+
     <div class="hero-grid">
       ${ncHtml}
-      <div class="week-line" title="${esc(scoreLine(ws.score))}">
-        <span>Semana <b>${ws.score === null ? '—' : ws.score + '%'}</b></span>
-        ${ws.score !== null ? `<div class="bar"><div style="width:${ws.score}%"></div></div>` : ''}
-        <span><b class="${overdue.length ? 'bad-t' : ''}">${overdue.length}</b> atrasada${overdue.length === 1 ? '' : 's'}</span>
-        <span><b>${ws.done}/${ws.total}</b> prazos</span>
-        ${ws.hTotal ? `<span><b>${ws.hDone}/${ws.hTotal}</b> hábitos</span>` : ''}
-      </div>
     </div>
 
     <div class="cols">
-      <section class="block main-col">
+      <section class="block main-col" id="para-hoje">
         <div class="block-head"><h2>Para hoje</h2><span class="count">${todayCount + classes.length + evToday.length}</span></div>
         <form class="quick-add" data-form="quickTask">
           <input id="qa-today" name="t" autocomplete="off" placeholder="${af === 'projetos' ? 'Nova tarefa de projeto… ex.: revisar briefing sex' : af === 'leituras' ? 'Anotar pra ler… ex.: artigo sobre branding' : 'Nova tarefa… ex.: ler cap. 3 amanhã'}" aria-label="Nova tarefa" data-area="${af === 'all' ? '' : af}">

@@ -11,12 +11,14 @@
   /* ---------- tema ---------- */
   const mq = window.matchMedia('(prefers-color-scheme: light)');
   P.applyTheme = () => {
-    const t = S.settings().theme || 'prisma';
-    const resolved = t === 'auto' ? (mq.matches ? 'claro' : 'prisma') : t;
+    // temas antigos viram os novos (claro → Lavanda, grafite → Escuro, âmbar → Sol)
+    const OLD = { claro: 'prisma', grafite: 'escuro', ambar: 'sol' };
+    const t = OLD[S.settings().theme] || S.settings().theme || 'prisma';
+    const resolved = t === 'auto' ? (mq.matches ? 'prisma' : 'escuro') : t;
     document.documentElement.setAttribute('data-theme', resolved);
     try { localStorage.setItem('prisma2:theme', resolved); } catch (e) {}
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.content = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#131316';
+    if (meta) meta.content = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#eef0fa';
   };
   mq.addEventListener?.('change', () => S.settings().theme === 'auto' && P.applyTheme());
 
@@ -52,7 +54,7 @@
     P.$$('[data-nav]').forEach(b => { const on = b.dataset.nav === to; b.classList.toggle('on', on); on ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current'); });
     P.$('#mobile-title').textContent = ROUTES[to];
     document.title = to === 'hoje' ? 'Prisma' : to === 'fin' ? 'Financeiro+' : `${ROUTES[to]} · ${P.space() === 'fin' ? 'Financeiro+' : 'Prisma'}`;
-    const tc = document.querySelector('meta[name="theme-color"]'); if (tc) tc.content = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#131316';
+    const tc = document.querySelector('meta[name="theme-color"]'); if (tc) tc.content = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#eef0fa';
     P.render();
     window.scrollTo(0, 0);
   };
@@ -79,6 +81,7 @@
   /* ---------- cliques (data-act) ---------- */
   Object.assign(P.actions, {
     go: el => P.go(el.dataset.to),
+    scrollTo: el => { const t = document.getElementById(el.dataset.id); if (t) window.scrollTo({ top: t.getBoundingClientRect().top + window.scrollY - (innerWidth <= 700 ? 70 : 20), behavior: 'smooth' }); },
     repair: async () => {
       // apaga a cópia guardada do app (não apaga seus dados) e recarrega
       try { const regs = await navigator.serviceWorker?.getRegistrations?.() || []; await Promise.all(regs.map(r => r.unregister())); } catch (e) {}

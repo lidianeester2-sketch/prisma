@@ -6,11 +6,12 @@
   P.mounts = P.mounts || {};
 
   const THEMES = [
-    ['prisma', 'Prisma', 'Escuro e sóbrio (padrão)'],
-    ['claro', 'Claro', 'Fundo claro, ótimo de dia'],
-    ['auto', 'Automático', 'Segue o tema do aparelho'],
-    ['grafite', 'Grafite', 'Preto e branco, sem distração'],
-    ['ambar', 'Âmbar', 'Escuro quente, tons de cobre']
+    ['prisma', 'Lavanda', 'Claro, com lilás (padrão)'],
+    ['menta', 'Menta', 'Claro, com verde'],
+    ['malva', 'Malva', 'Tons rosados e terrosos'],
+    ['sol', 'Sol', 'Ameixa, coral e amarelo'],
+    ['escuro', 'Escuro', 'Mesmo estilo, fundo escuro'],
+    ['auto', 'Automático', 'Lavanda de dia, Escuro à noite']
   ];
 
   P.views.ajustes = () => {
@@ -47,7 +48,7 @@
 
       <section class="block set">
         <h2>Aparência</h2>
-        <div class="themes">${THEMES.map(([k, l, d]) => `<button type="button" class="theme ${st.theme === k ? 'on' : ''}" data-act="setTheme" data-t="${k}" aria-pressed="${st.theme === k}"><span class="theme-sw sw-${k}"></span><strong>${l}</strong><small>${d}</small></button>`).join('')}</div>
+        <div class="themes">${THEMES.map(([k, l, d]) => `<button type="button" class="theme ${({ claro: 'prisma', grafite: 'escuro', ambar: 'sol' }[st.theme] || st.theme) === k ? 'on' : ''}" data-act="setTheme" data-t="${k}" aria-pressed="${st.theme === k}"><span class="theme-sw sw-${k}"></span><strong>${l}</strong><small>${d}</small></button>`).join('')}</div>
       </section>
 
       <section class="block set">
@@ -109,7 +110,7 @@
         </div>
       </section>
 
-      <p class="credits">Prisma · versão 7 · Desenvolvido por Lidiane Tavares</p>
+      <p class="credits">Prisma · versão 8 · Desenvolvido por Lidiane Tavares</p>
     </div>`;
   };
 
