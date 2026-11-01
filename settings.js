@@ -93,11 +93,11 @@
           <button class="data-btn" type="button" data-act="importOld"><strong>Trazer dados do Prisma antigo</strong><small>Matérias, progresso, prazos, tarefas, projetos, leituras, notas e hábitos.</small></button>
           <button class="data-btn" type="button" data-act="exportBackup"><strong>Baixar backup</strong><small>Um arquivo .json com tudo. Bom de guardar antes de mudanças grandes.</small></button>
           <label class="data-btn"><strong>Restaurar backup</strong><small>Substitui os dados deste aparelho pelos do arquivo.</small><input type="file" id="backup-file" accept="application/json,.json" data-change="restore" hidden></label>
-          <button class="data-btn danger" type="button" data-act="wipe"><strong>Apagar tudo neste aparelho</strong><small>Volta ao começo. Não dá pra desfazer.</small></button>
+          <button class="data-btn danger" type="button" data-act="wipe"><strong>Apagar todos os registros</strong><small>Matérias, projetos, leituras, tarefas, notas, hábitos e calendário somem de todos os aparelhos. Suas preferências continuam. Não dá pra desfazer.</small></button>
         </div>
       </section>
 
-      <p class="credits">Prisma · versão 3 · Desenvolvido por Lidiane Tavares</p>
+      <p class="credits">Prisma · versão 4 · Desenvolvido por Lidiane Tavares</p>
     </div>`;
   };
 
@@ -147,7 +147,7 @@
       document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
       P.toast('Backup baixado.');
     },
-    wipe: async () => { if (await P.ask('Apagar todos os dados deste aparelho? Se a sincronização estiver ligada, os dados também somem dos outros aparelhos.', 'Apagar tudo')) { S.wipe(); P.toast('Tudo apagado.'); } },
+    wipe: async () => { if (await P.ask('Apagar matérias, projetos, leituras, tarefas, notas, hábitos e todas as datas do calendário? Some do computador e do celular. Nome, tema e notificações continuam como estão.', 'Apagar tudo')) { S.wipe(); P.toast('Tudo apagado. Prisma zerado. ✦'); } },
     manageEvents: () => manageEvents(),
     importOld: () => importOldSheet()
   });

@@ -117,7 +117,12 @@
       if (!db.meta.settings) db.meta.settings = { ...DEFAULT_SETTINGS };
       S.markAllDirty(); emit({ col: '*' });
     },
-    wipe() { db = blank(); dirty = new Set(); seed(); S.markAllDirty(); emit({ col: '*' }); },
+    /* Apaga todos os registros, mas guarda as preferências (nome, tema, notificações).
+       Cada registro vira uma "lápide" (deleted) para o apagamento chegar na nuvem e nos outros aparelhos. */
+    wipe() {
+      ['items', 'tasks', 'notes', 'events', 'habits'].forEach(c => Object.values(db[c]).forEach(r => { if (!r.deleted) touch(c, { id: r.id, deleted: true, createdAt: r.createdAt }); }));
+      emit({ col: '*' });
+    },
     removeSeeded() { ['items', 'tasks', 'notes', 'habits'].forEach(c => Object.values(db[c]).forEach(r => { if (r.seed && !r.deleted) touch(c, { id: r.id, deleted: true }); })); },
     raw() { return db; }
   };
