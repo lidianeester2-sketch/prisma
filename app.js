@@ -175,8 +175,8 @@
     P.applyTheme();
     P.go(location.hash.slice(1) || 'hoje');
     P.renderSyncBadge();
-    P.sync?.init().then(() => P.renderSyncBadge());
     P.push?.registration().then(() => P.push.check());
-    if (S.settings().notify.enabled) P.push?.resubscribe();
+    // depois que a sincronização conecta, confirma o cadastro deste aparelho no robô
+    P.sync?.init().then(() => { P.renderSyncBadge(); if (S.settings().notify.enabled) P.push?.resubscribe(); });
   };
 })();

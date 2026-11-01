@@ -1,13 +1,13 @@
 /* ============================================================
    PRISMA 2 — notificações
-   Etapa atual: avisos enquanto o app está aberto (ou quando você
-   abre). O "carteiro" que avisa com o app fechado (push) é a
-   Etapa 3: falta cadastrar o aparelho no Appwrite e criar o
-   robô que envia.
+   Dois carteiros:
+   1) este arquivo avisa enquanto o app está aberto;
+   2) o robô no Appwrite (pasta prisma-robo) avisa com o app
+      fechado. Aqui o aparelho só se cadastra para receber.
 ============================================================ */
 (function () {
   const S = P.store;
-  const VAPID_PUBLIC = 'BDoe_EQ9o0vuNVRojuU8v3SpCqPXbR0nuLOWJDaXYg3hORWnk-fbCi7aFkyK4zABgr3qWSX6fofNyZEpv--YdDk';
+  const VAPID_PUBLIC = 'BC2jQjccygX050toPlNib2O1RKjDryMwBRmR-6ZXoClSXgxGX_33xZxC9lAu39xkxKUQ7y4yUjnQJLmxAz5-Ky0';
   let reg = null;
 
   async function registration() {
@@ -30,8 +30,15 @@
     const r = await registration(); if (!r || !('PushManager' in window)) return null;
     try {
       let sub = await r.pushManager.getSubscription();
+      // se o aparelho estava cadastrado com a chave antiga (Prisma antigo), refaz o cadastro
+      if (sub) {
+        const cur = sub.options?.applicationServerKey;
+        const curB64 = cur ? btoa(String.fromCharCode(...new Uint8Array(cur))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '') : null;
+        if (curB64 && curB64 !== VAPID_PUBLIC) { await sub.unsubscribe(); sub = null; }
+      }
       if (!sub) sub = await r.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64(VAPID_PUBLIC) });
-      await P.sync?.savePush?.(sub.toJSON());
+      const ok = await P.sync?.savePush?.(sub.toJSON());
+      if (ok) P.ls.set('prisma2:pushSaved', true);
       return sub;
     } catch (e) { console.warn('Prisma: push não cadastrado.', e); return null; }
   }
@@ -85,8 +92,8 @@
   P.push = {
     registration, check,
     label() {
-      const c = P.sync?.user();
-      return c ? 'Avisos com o app aberto. Os avisos com o app fechado chegam na Etapa 3.' : 'Avisos com o app aberto. Para receber com o app fechado, ative a sincronização (Etapa 3).';
+      if (!P.sync?.user()) return 'Só com o app aberto. Entre na sincronização para receber com o app fechado.';
+      return P.ls.get('prisma2:pushSaved') ? 'Chegam mesmo com o app fechado.' : 'Só com o app aberto por enquanto. Toque em Desativar e Ativar de novo para cadastrar este aparelho.';
     },
     async enable() {
       if (!('Notification' in window)) return;

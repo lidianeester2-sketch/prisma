@@ -61,9 +61,9 @@
     } catch (e) { setStatus('offline', e.message); }
   }
 
-  async function pushOne(d) {
-    const id = await rowId(d.id);
-    const payload = { rid: d.id, col: d.col, data: JSON.stringify(d.rec), deleted: !!d.rec.deleted };
+  async function upsertRow(rid, col, payloadData, deleted = false) {
+    const id = await rowId(rid);
+    const payload = { rid, col, data: JSON.stringify(payloadData), deleted: !!deleted };
     try {
       await retry(() => db.updateDocument(DB, TABLE, id, payload));
     } catch (e) {
@@ -71,6 +71,16 @@
       const perms = [A.Permission.read(A.Role.user(user.$id)), A.Permission.update(A.Role.user(user.$id)), A.Permission.delete(A.Role.user(user.$id))];
       await retry(() => db.createDocument(DB, TABLE, id, payload, perms));
     }
+  }
+  const pushOne = d => upsertRow(d.id, d.col, d.rec, d.rec.deleted);
+
+  /* cadastra este aparelho para receber avisos do robô (Etapa 3) */
+  async function savePush(sub) {
+    if (!db || !user || !sub?.endpoint) return false;
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(sub.endpoint));
+    const rid = 'push-' + [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 24);
+    await upsertRow(rid, 'push', { endpoint: sub.endpoint, keys: sub.keys, tz: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Sao_Paulo', ua: navigator.userAgent.slice(0, 160), updatedAt: Date.now() });
+    return true;
   }
 
   async function now(manual = false) {
@@ -181,7 +191,7 @@
     },
     async signOut() { try { await account?.deleteSession('current'); } catch (e) {} user = null; setStatus('idle'); },
     user: () => user,
-    savePush: async () => {} // Etapa 3
+    savePush
   };
 
   S.on(info => { if (!info.remote) schedule(); });
