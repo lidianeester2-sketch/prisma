@@ -6,7 +6,7 @@
    - CSS/JS/ícones: usa o guardado e atualiza em segundo plano.
    - Ao publicar uma versão nova, mude o número em VERSION.
 ============================================================ */
-const VERSION = 'prisma-v1';
+const VERSION = 'prisma-v2';
 const SHELL = [
   './', './index.html', './manifest.json', './app.css',
   './config.js', './util.js', './store.js', './views.js', './forms.js',

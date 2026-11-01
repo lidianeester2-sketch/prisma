@@ -180,6 +180,7 @@
       return true;
     },
     async signOut() { try { await account?.deleteSession('current'); } catch (e) {} user = null; setStatus('idle'); },
+    user: () => user,
     savePush: async () => {} // Etapa 3
   };
 
