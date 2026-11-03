@@ -3,7 +3,7 @@
 ============================================================ */
 (function () {
   const S = P.store;
-  const ROUTES = { hoje: 'Hoje', agenda: 'Agenda', areas: 'Áreas', notas: 'Notas', ajustes: 'Ajustes', fin: 'Financeiro+', 'fin-orcamento': 'Orçamento', 'fin-lanc': 'Lançamentos', 'fin-mais': 'Mais' };
+  const ROUTES = { hoje: 'Hoje', agenda: 'Agenda', areas: 'Áreas', notas: 'Notas', ajustes: 'Ajustes', fin: 'Financeiro+', 'fin-orcamento': 'Orçamento', 'fin-lanc': 'Lançamentos', 'fin-mais': 'Mais', 'fin-relatorio': 'Relatório' };
   P.space = () => (route.startsWith('fin') ? 'fin' : 'prisma');
   let route = 'hoje';
   let pendingRender = false;

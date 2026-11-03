@@ -78,6 +78,25 @@
       C.occurrences(eff, from, to).forEach(o => { if (!raw[o.id]) S.seed('fin_lanc', o); });
     });
     F.ensureParcOccurrences(from, to);
+    F.ensureInvoices(from, to);
+  };
+  // Fatura de cada cartão (precisa do dia de vencimento): vira conta a pagar com a soma das parcelas
+  // que caem nela. O valor é "estimado" até você conferir: compras fora do app não entram sozinhas.
+  const MS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+  F.ymTxt = ym => { const [y, m] = ym.split('-'); return `${MS[+m - 1]}/${y.slice(2)}`; };
+  F.ensureInvoices = (from, to) => {
+    const raw = S.raw().fin_lanc;
+    F.cards().filter(c => c.dueDay).forEach(card => {
+      for (let ym = C.addMonths(from.slice(0, 7), -1); ym <= to.slice(0, 7); ym = C.addMonths(ym, 1)) {
+        const due = C.invoiceDue(ym, card); if (due < from || due > to) continue;
+        const parts = C.invoiceParts(card.id, ym, F.parcs(), F.txs()), total = parts.reduce((s, x) => s + x.amount, 0);
+        const id = `fatura-${card.id}-${ym}`, ex = raw[id];
+        if (!ex) { if (total > 0) S.seed('fin_lanc', { id, kind: 'despesa', desc: `Fatura ${card.name} · ${F.ymTxt(ym)}`, amount: total, date: due, status: 'previsto', certainty: 'estimado', method: 'boleto', accountId: F.accounts()[0]?.id || null, categoryId: 'cat-cartao', origin: 'fatura', autoInvoice: true, cardId: card.id, invoiceMonth: ym }); continue; }
+        if (ex.deleted || ex.status !== 'previsto' || ex.manualAmount) continue;
+        if (total > 0 && (ex.amount !== total || ex.date !== due)) F.save('fin_lanc', { ...ex, amount: total, date: due, status: 'previsto' }, `Fatura ${card.name} · ${F.ymTxt(ym)} recalculada pelas parcelas (${C.formatMoney(total)})`);
+        if (total === 0 && ex.updatedAt) F.save('fin_lanc', { ...ex, status: 'cancelado' }, `Fatura ${card.name} · ${F.ymTxt(ym)} sem parcelas: saiu dos compromissos`);
+      }
+    });
   };
   // Carnês (ex.: multa paga todo mês): cada parcela vira um compromisso no ciclo que começa naquele mês.
   // Id fixo parc-<id>-<n>: nunca duplica. Compras no CARTÃO não viram lançamento: estão na fatura.

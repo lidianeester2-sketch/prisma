@@ -93,6 +93,7 @@
         status: 'previsto', certainty: d.teto ? 'estimado' : (d.certeza || 'confirmado'), method: d.forma || 'pix', accountId: found?.accountId || mainAcc?.id || null, categoryId: cid,
         origin: found?.origin || (parc ? 'parcelamento' : 'planejamento') };
       if (parc) Object.assign(rec, { parcId: parc.id, parcNum: d.parcela });
+      if (found?.autoInvoice) Object.assign(rec, { manualAmount: true, date: found.date, noDue: false });
       if (d.teto) Object.assign(rec, { envelope: true, envStart: cycle.start, envEnd: cycle.end });
       actions.push({ col: 'fin_lanc', rec, what: found ? (found.id === ownId ? 'atualiza' : `usa o que já existe (“${found.desc}”)`) : 'nova', label: `${d.desc} · ${F.money(amount)}${d.teto ? ' · teto' : ''}${parc ? ` · parcela ${d.parcela}/${parc.n}` : ''}`, amount, kind: 'despesa' });
     });

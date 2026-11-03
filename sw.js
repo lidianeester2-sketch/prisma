@@ -6,11 +6,11 @@
    - CSS/JS/ícones: usa o guardado e atualiza em segundo plano.
    - Ao publicar uma versão nova, mude o número em VERSION.
 ============================================================ */
-const VERSION = 'prisma-v11';
+const VERSION = 'prisma-v13';
 const SHELL = [
   './', './index.html', './manifest.json', './app.css',
   './config.js', './util.js', './store.js', './views.js', './forms.js',
-  './settings.js', './fin-core.js', './fin.js', './fin-forms.js', './fin-views.js', './fin-plan.js', './sync.js', './notify.js', './app.js',
+  './settings.js', './fin-core.js', './fin.js', './fin-forms.js', './fin-views.js', './fin-plan.js', './fin-report.js', './sync.js', './notify.js', './app.js',
   './icon-192.png', './icon-512.png', './favicon-64.png',
   './apple-touch-icon.png', './notification-icon.png'
 ];

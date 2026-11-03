@@ -92,7 +92,7 @@
     const alerts = [];
     if (s.canSpend < 0) alerts.push(['bad', `O dinheiro disponível não cobre as contas até ${endTxt}. Faltam ${F.money(-s.canSpend)}. Vale olhar as contas previstas e ver o que pode esperar.`]);
     if (overdue.length) alerts.push(['warn', `${overdue.length} conta${overdue.length > 1 ? 's' : ''} já venceu e continua como prevista. Se já pagou, é só marcar como paga.`]);
-    if (s.week && s.week.spent > s.week.limit) alerts.push(['warn', `A ${s.week.label.toLowerCase()} passou ${F.money(s.week.spent - s.week.limit)} do previsto. Ainda dá para reorganizar o restante do ciclo.`]);
+    if (s.week && s.week.spent > s.week.limit && !(s.week.ackOver >= s.week.spent)) alerts.push(['warn', `A ${s.week.label.toLowerCase()} passou ${F.money(s.week.spent - s.week.limit)} do previsto. Ainda dá para reorganizar o restante do ciclo.`]);
     if (s.cycle.projected && s.cycle.start <= today && !F.txs().some(t => t.categoryId === 'cat-salario' && t.status === 'realizado' && t.date >= s.cycle.start)) alerts.push(['info', `O salário estava previsto para ${F.date(s.cycle.start)}. Quando cair, registre para montar o plano do ciclo.`]);
     const lastConc = S.all('fin_conc').sort((a, b) => b.date.localeCompare(a.date))[0];
     if (F.txs().length > 5 && (!lastConc || C.diffDays(lastConc.date, today) > 7)) alerts.push(['info', 'Faz mais de uma semana que você não confere o saldo com o banco. Leva 30 segundos.']);
@@ -151,7 +151,13 @@
       </section>
 
       <aside class="side-col">
-        ${alerts.length ? `<section class="block"><div class="block-head"><h2>Avisos</h2></div><div class="alerts">${alerts.slice(0, 2).map(([k, m]) => `<div class="alert a-${k}">${esc(m)}</div>`).join('')}</div></section>` : ''}
+        ${(() => { const fresh = C.diffDays(s.cycle.start, today) < 7, c = fresh ? F.cycleAt(-1) : s.cycle;
+          const r = C.cycleReport(F.state(), { start: c.start, end: c.end }, null, today);
+          return `<section class="block"><button type="button" class="rep-link" data-act="finReport">
+            <span class="eyebrow">${fresh && r.count ? 'O relatório do ciclo que fechou está pronto' : 'Relatório do ciclo'}</span>
+            <b>${r.count ? `Você gastou ${F.money(r.total)}` : 'Ainda sem gastos pagos'}</b>
+            <small>${r.top ? `Onde mais foi: ${esc(r.top.name)} (${F.money(r.top.total)})` : 'Veja onde o dinheiro vai'} →</small></button></section>`; })()}
+        ${alerts.length ? `<section class="block"><div class="block-head"><h2>Avisos</h2></div><div class="alerts">${alerts.slice(0, 2).map(([k, m]) => `<div class="alert a-${k}">${esc(m)}${k === 'warn' && /passou/.test(m) && s.week ? ` <button class="link" type="button" data-act="finOver" data-i="${s.weeks.indexOf(s.week)}">Decidir agora →</button>` : ''}</div>`).join('')}</div></section>` : ''}
         <section class="block"><div class="block-head"><h2>Contas</h2><button class="link" type="button" data-act="finConcile">Conferir saldo</button></div>
           <div class="list">${s.balances.filter(b => b.account.type !== 'cartao').map(b => `<button type="button" class="row as-btn fin-row" data-act="finAccount" data-id="${b.account.id}"><span class="row-main as-text"><span class="row-title">${esc(b.account.name)}</span><span class="row-meta">${F.ACC_TYPES[b.account.type] || ''}${b.account.inAvailable === false ? ' · fora do disponível' : ''}${b.account.openingSet === false ? ' · <b class="st-pendente">falta o saldo inicial</b>' : ''}</span></span><span class="fin-amt ${b.balance < 0 ? 'neg' : ''}">${F.money(b.balance)}</span></button>`).join('')}</div>
         </section>
@@ -190,7 +196,7 @@
         <div><b>${label}</b><span>${F.date(c.start)} a ${F.date(c.end)} · salário ${F.date(c.start)} ${c.projected ? cert('projetado') : cert('confirmado')}</span></div>
         <button class="icon-btn" type="button" data-act="finCycle" data-d="1" aria-label="Próximo ciclo">›</button>
       </div>
-      ${ofs ? '<button class="link back-link" type="button" data-act="finCycle" data-d="0">← Voltar para o ciclo atual</button>' : ''}</header>
+      <div class="head-links">${ofs ? '<button class="link" type="button" data-act="finCycle" data-d="0">← Voltar para o ciclo atual</button>' : ''}<button class="link" type="button" data-act="finReport">Ver relatório do ciclo →</button></div></header>
 
     <section class="block">
       <div class="block-head"><h2>Resumo do ciclo</h2></div>
@@ -241,11 +247,13 @@
         <div class="calc-total"><span>= Livre para o dia a dia</span><b>${F.money(c.base)}</b></div>
       </div></section>`) : ''}
 
-    ${ofs === 0 && s.weeks.length ? `<section class="block"><div class="block-head"><h2>Semanas</h2><span class="faint small">editar e reorganizar chega em breve</span></div>
+    ${ofs === 0 && s.weeks.length ? `<section class="block"><div class="block-head"><h2>Semanas</h2><button class="link" type="button" data-act="finWeeks">Editar semanas</button></div>
       <div class="weeks">${s.weeks.map(w => { const cur = w.start <= today && today <= w.end, past = w.end < today, over = w.spent > w.limit; return `<div class="wk ${cur ? 'cur' : ''} ${past ? 'past' : ''} ${over ? 'over' : ''}">
         <div class="wk-head"><b>${w.label}</b><span class="faint small">${F.date(w.start)}–${F.date(w.end)}</span></div>
         <div class="wk-nums"><span>${F.money(w.spent)} de ${F.money(w.limit)}</span><span class="${over ? 'bad-t' : ''}">${over ? 'passou ' + F.money(w.spent - w.limit) : (past ? 'sobrou ' : 'restam ') + F.money(w.limit - w.spent)}</span></div>
-        ${bar(w.limit ? w.spent / w.limit * 100 : (w.spent ? 100 : 0), over ? 'over' : '')}</div>`; }).join('')}</div></section>` : ''}`;
+        ${bar(w.limit ? w.spent / w.limit * 100 : (w.spent ? 100 : 0), over ? 'over' : '')}
+        ${w.locked ? '<span class="faint small">travada</span>' : ''}
+        ${over && !(w.ackOver >= w.spent) && w.start <= today ? `<button class="btn ghost small" type="button" data-act="finOver" data-i="${s.weeks.indexOf(w)}">O que fazer com o excesso?</button>` : over && w.ackOver >= w.spent ? '<span class="faint small">excesso mantido</span>' : ''}</div>`; }).join('')}</div></section>` : ''}`;
   };
 
   /* ============================================================
@@ -292,7 +300,11 @@
         ${item('finConcile', 'Conferir saldo', 'Compare com o saldo do banco e ajuste a diferença')}
         ${item('finCardNew', 'Gasto no cartão (parcelado)', 'Compra no crédito em 1× ou parcelada: as parcelas vão para as faturas, sem contar como gasto do ciclo')}
         ${item('finCards', 'Compras no cartão', 'Ver, editar ou cancelar as compras parceladas')}
+        ${item('finCardsCfg', 'Cartões', 'Fechamento e vencimento: a fatura vira conta a pagar no ciclo certo')}
         ${item('finImport', 'Importar planejamento', 'Cadastra de uma vez as contas de um mês a partir de um arquivo .json')}
+      </div></section>
+      <section class="block set"><h2>Relatórios</h2><div class="data-actions">
+        ${item('finReport', 'Relatório do ciclo', 'Onde você mais gastou, onde gastou menos e a comparação com o ciclo anterior')}
       </div></section>
       <section class="block set"><h2>Preferências</h2><div class="data-actions">
         ${item('finProfile', 'Perfil financeiro', 'Renda, dia do salário, regra de feriado, reserva')}
@@ -300,17 +312,18 @@
         ${item('finHistory', 'Histórico de alterações', 'Tudo que foi criado ou mudado, com antes e depois')}
       </div></section>
       <section class="block set"><h2>Chegando</h2><div class="data-actions">
-        ${soon('Fechamento e vencimento do cartão, semanas editáveis', 'próxima')}${soon('Dívidas e metas', 'em breve')}${soon('Renda extra e relatórios', 'em breve')}${soon('Assistente com IA', 'em breve')}
+        ${soon('Dívidas e metas', 'em breve')}${soon('Renda extra e metas de economia', 'em breve')}${soon('Assistente com IA', 'em breve')}
       </div></section>
     </div>`;
   };
 
   /* ---------------- portão do PIN ---------------- */
-  ['fin', 'fin-orcamento', 'fin-lanc', 'fin-mais'].forEach(r => {
+  F.gate = r => {
     const view = P.views[r];
     P.views[r] = () => (F.locked() ? lockView() : view());
     P.mounts[r] = root => { if (F.locked()) lockMount(root); };
-  });
+  };
+  ['fin', 'fin-orcamento', 'fin-lanc', 'fin-mais'].forEach(F.gate);
 
   /* ---------------- ações ---------------- */
   Object.assign(P.actions, {
@@ -338,6 +351,9 @@
     finCycle: el => { const d = +el.dataset.d; P.ui.finCycleOfs = d === 0 ? 0 : Math.max(-12, Math.min(12, (P.ui.finCycleOfs || 0) + d)); P.render(); window.scrollTo(0, 0); },
     finImport: () => F.importPick(),
     finCardNew: () => F.cardForm(),
+    finCardsCfg: () => F.cardsSheet(),
+    finWeeks: () => F.weeksSheet(),
+    finOver: el => F.overSheet(+el.dataset.i),
     finCards: () => F.cardList(),
     finFilter: el => { P.ui[el.dataset.k] = el.dataset.v; P.saveUI(); P.render(); }
   });

@@ -219,6 +219,59 @@
     return { list, paidCount: paid.length, left: open.length, paidAmount: paid.reduce((s, i) => s + i.amount, 0), leftAmount: open.reduce((s, i) => s + i.amount, 0), next: open[0] || null };
   }
 
+  /* ---------------- cartão: fechamento, vencimento e fatura ---------------- */
+  // Fatura do mês M = a que VENCE em M. Compra no dia do fechamento ou depois vai para a próxima.
+  // Se o vencimento é antes do fechamento no calendário (fecha 25, vence 5), a fatura vence no mês seguinte ao fechamento.
+  function invoiceMonth(purchaseIso, card) {
+    const ym = purchaseIso.slice(0, 7), day = Number(purchaseIso.slice(8, 10));
+    if (!card || !card.closingDay) return addMonths(ym, 1);
+    const closeYm = day < card.closingDay ? ym : addMonths(ym, 1);
+    return card.dueDay && card.dueDay <= card.closingDay ? addMonths(closeYm, 1) : closeYm;
+  }
+  function invoiceDue(ym, card) { const [y, m] = ym.split('-').map(Number); return toISO(y, m, Math.min(card.dueDay || 10, daysInMonth(y, m))); }
+  // O que já está dentro da fatura de um cartão num mês (parcelas cadastradas no app)
+  function invoiceParts(cardId, ym, parcs, txs = []) {
+    return parcs.filter(p => !p.deleted && !p.canceled && p.type === 'cartao' && p.accountId === cardId)
+      .flatMap(p => installments(p, txs).filter(i => i.month === ym).map(i => ({ desc: p.desc, n: i.n, of: p.n, amount: i.amount, parcId: p.id })));
+  }
+
+  /* ---------------- semanas editáveis ---------------- */
+  // Muda o limite de algumas semanas; as semanas futuras SEM cadeado dividem o que sobrar
+  // (proporcional aos dias), para a soma continuar igual ao "livre para o dia a dia".
+  function rebalanceWeeks(weeks, base, changes, today) {
+    const out = weeks.map((w, i) => (changes && changes[i] !== undefined ? { ...w, limit: changes[i], locked: true } : { ...w }));
+    const flex = out.map((w, i) => i).filter(i => !out[i].locked && out[i].end >= today && (!changes || changes[i] === undefined));
+    const fixedSum = out.reduce((s, w, i) => s + (flex.includes(i) ? 0 : w.limit), 0);
+    const rest = base - fixedSum;
+    if (!flex.length) return { ok: rest === 0, weeks: out, rest, reason: rest === 0 ? null : 'sem-semanas-livres' };
+    if (rest < 0) return { ok: false, weeks: out, rest, reason: 'nao-cabe' };
+    const parts = allocate(rest, flex.map(i => out[i].days));
+    flex.forEach((i, k) => { out[i].limit = parts[k]; });
+    return { ok: true, weeks: out, rest };
+  }
+  // Semana que passou do limite: 3 caminhos. Nada muda sem você escolher.
+  //  'proximas' → tira o excesso das próximas semanas sem cadeado
+  //  'reserva'  → usa a reserva do ciclo (o "livre" aumenta)
+  //  'manter'   → só registra que você viu; os números ficam como estão
+  function coverOverspend(cycle, idx, spent, option) {
+    const w = cycle.weeks[idx], over = spent - w.limit;
+    if (over <= 0) return { ok: false, reason: 'nao-passou' };
+    if (option === 'manter') return { ok: true, cycle: { ...cycle, weeks: cycle.weeks.map((x, i) => (i === idx ? { ...x, ackOver: spent } : x)) }, over };
+    if (option === 'reserva') {
+      if ((cycle.reserve || 0) < over) return { ok: false, reason: 'reserva-insuficiente', over };
+      return { ok: true, over, cycle: { ...cycle, reserve: cycle.reserve - over, base: cycle.base + over, weeks: cycle.weeks.map((x, i) => (i === idx ? { ...x, limit: x.limit + over } : x)) } };
+    }
+    if (option === 'proximas') {
+      const next = cycle.weeks.map((x, i) => i).filter(i => i > idx && !cycle.weeks[i].locked);
+      const room = next.reduce((s, i) => s + cycle.weeks[i].limit, 0);
+      if (!next.length || room < over) return { ok: false, reason: 'proximas-insuficientes', over, room };
+      const cut = allocate(over, next.map(i => cycle.weeks[i].limit));
+      const weeks = cycle.weeks.map((x, i) => (i === idx ? { ...x, limit: x.limit + over } : next.includes(i) ? { ...x, limit: x.limit - cut[next.indexOf(i)] } : x));
+      return { ok: true, over, cycle: { ...cycle, weeks } };
+    }
+    return { ok: false, reason: 'opcao' };
+  }
+
   /* ---------------- resumo de um ciclo (pago × pendente × futuro) ---------------- */
   // range: { start, end } de um ciclo. Não depende de saldo de banco: é a conta do planejamento.
   function cycleSummary(state, range, today) {
@@ -244,6 +297,50 @@
         'Compras de casa funcionam como teto: cada compra nessa categoria abate o que falta; se passar, o excesso entra no total.',
         'Parcelas no cartão não são despesa do ciclo: elas já estão dentro da fatura do mês, e só a fatura é paga.'
       ]
+    };
+  }
+
+  /* ---------------- relatório do ciclo ---------------- */
+  // Só o que foi REALIZADO (pago de verdade). Data que vale: o dia em que pagou.
+  // Compras no cartão aparecem à parte (por categoria), porque a despesa que sai
+  // do saldo é a fatura: somar as duas seria contar duas vezes.
+  function cycleReport(state, range, prevRange, today) {
+    const { txs = [], categories = [], parcs = [] } = state;
+    const when = t => t.paidDate || t.date;
+    const spentIn = r => txs.filter(t => done(t) && t.kind === 'despesa' && t.method !== 'credito' && when(t) >= r.start && when(t) <= r.end);
+    const catName = id => (categories.find(c => c.id === id) || {}).name || 'Sem categoria';
+    const group = list => {
+      const m = {};
+      list.forEach(t => { const k = t.categoryId || '_'; (m[k] = m[k] || { id: k, name: catName(t.categoryId), total: 0, count: 0, items: [] }); m[k].total += t.amount; m[k].count++; m[k].items.push(t); });
+      return Object.values(m).sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
+    };
+    const exp = spentIn(range), total = exp.reduce((s, t) => s + t.amount, 0);
+    const cats = group(exp);
+    cats.forEach(c => { c.share = total ? c.total / total : 0; c.items.sort((a, b) => b.amount - a.amount); });
+    let prev = null;
+    if (prevRange) {
+      const pc = group(spentIn(prevRange)), pt = pc.reduce((s, c) => s + c.total, 0);
+      prev = { range: prevRange, total: pt, cats: pc };
+      cats.forEach(c => { const o = pc.find(x => x.id === c.id); c.prev = o ? o.total : 0; c.delta = c.total - c.prev; });
+    }
+    const income = txs.filter(t => done(t) && t.kind === 'receita' && when(t) >= range.start && when(t) <= range.end).reduce((s, t) => s + t.amount, 0);
+    const end = today < range.end ? today : range.end;
+    const days = Math.max(1, diffDays(range.start, end) + 1), totalDays = diffDays(range.start, range.end) + 1;
+    const PLANNED = new Set(['recorrencia', 'planejamento', 'parcelamento']);
+    const fixed = exp.filter(t => PLANNED.has(t.origin)).reduce((s, t) => s + t.amount, 0);
+    const weeks = weekRanges(range.start, range.end).map(w => ({ ...w, total: exp.filter(t => when(t) >= w.start && when(t) <= w.end).reduce((s, t) => s + t.amount, 0) }));
+    const byDay = {}; exp.forEach(t => { byDay[when(t)] = (byDay[when(t)] || 0) + t.amount; });
+    const topDay = Object.entries(byDay).sort((a, b) => b[1] - a[1])[0] || null;
+    const biggest = exp.slice().sort((a, b) => b.amount - a.amount)[0] || null;
+    const cardBuys = parcs.filter(p => !p.deleted && !p.canceled && p.type === 'cartao' && p.purchaseDate && p.purchaseDate >= range.start && p.purchaseDate <= range.end);
+    const envelopes = txs.filter(t => live(t) && t.envelope && t.envStart >= range.start && t.envStart <= range.end).map(t => ({ desc: t.desc, limit: t.amount, used: envUsed(t, txs) }));
+    return {
+      range, closed: today > range.end, daysLeft: Math.max(0, diffDays(today, range.end)), days, totalDays,
+      total, income, left: income - total, count: exp.length, perDay: Math.round(total / days),
+      cats, top: cats[0] || null, least: cats.length > 1 ? cats[cats.length - 1] : null, prev,
+      fixed, variable: total - fixed, weeks, topDay: topDay ? { date: topDay[0], total: topDay[1] } : null, biggest,
+      cardBuys: group(cardBuys.map(p => ({ categoryId: p.categoryId, amount: p.total }))), cardBuysTotal: cardBuys.reduce((s, p) => s + p.total, 0), cardBuysCount: cardBuys.length,
+      envelopes
     };
   }
 
@@ -411,7 +508,7 @@
     addDays, diffDays, weekday, easter, bankHolidays, isBusinessDay, shiftBusiness,
     paydayIn, nextPayday, prevPayday, cycleFor, weekRanges, splitWeeks,
     occurrences, effectOn, balance, snapshot, cyclePlan, parsePhrase, diff,
-    addMonths, installments, parcProgress, pendingAmount, envUsed, cycleSummary
+    addMonths, installments, parcProgress, pendingAmount, envUsed, cycleSummary, cycleReport, invoiceMonth, invoiceDue, invoiceParts, rebalanceWeeks, coverOverspend
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) { root.P = root.P || {}; root.P.finCore = api; }

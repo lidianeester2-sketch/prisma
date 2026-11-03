@@ -107,6 +107,7 @@
           if (rec.kind === 'transferencia') { delete rec.categoryId; rec.method = 'transferencia'; } else delete rec.toAccountId;
           if (rec.kind === 'receita') rec.method = 'transferencia';
           if (rec.status === 'realizado' && !rec.paidDate) rec.paidDate = rec.date;
+          if (existing?.autoInvoice && rec.amount !== existing.amount) rec.manualAmount = true;
           if (!existing && rec.kind === 'receita' && rec.categoryId === 'cat-salario' && rec.status === 'realizado') {
             const planned = F.txs().find(t => t.kind === 'receita' && t.categoryId === 'cat-salario' && t.status === 'previsto' && Math.abs(C.diffDays(t.date, rec.date)) <= 12);
             if (planned) { rec.id = planned.id; rec.createdAt = planned.createdAt; }
@@ -142,11 +143,13 @@
         const acc = F.acc(t.accountId), to = F.acc(t.toAccountId), cat = F.cat(t.categoryId);
         return `<div class="fin-detail-amount ${t.kind}">${F.money(t.kind === 'despesa' ? -t.amount : t.amount)}</div>
           <div class="detail-meta"><span class="pill st-${st}">${F.STATUS_LABEL[st]}</span><span class="pill cert-${t.certainty || 'confirmado'}">${t.certainty === 'estimado' ? 'valor estimado' : 'valor confirmado'}</span>${t.origin === 'recorrencia' ? '<span class="pill">conta fixa</span>' : ''}${t.parcId ? '<span class="pill">parcelamento</span>' : ''}${t.envelope ? '<span class="pill">teto</span>' : ''}</div>
+          ${t.autoInvoice && t.status === 'previsto' ? `<p class="hint">${t.manualAmount ? 'Você ajustou o valor desta fatura, então o app não muda mais sozinho.' : 'O valor é a soma das parcelas que estão no app. Quando a fatura chegar, toque em Editar e coloque o valor real (compras fora do app entram aí).'}</p>` : ''}
           ${t.envelope && t.status === 'previsto' ? '<p class="hint">Não precisa pagar este item. Cada compra que você lançar na categoria dele, dentro do ciclo, desconta daqui. Se passar do teto, o excesso aparece no total do ciclo.</p>' : ''}
           <dl class="info">
             <div><dt>${t.status === 'previsto' ? 'Vencimento' : 'Data'}</dt><dd>${t.noDue && t.status === 'previsto' ? 'sem data definida (até ' + F.date(t.date) + ')' : F.date(t.date)}</dd></div>
             ${t.envelope ? `<div><dt>Teto do ciclo</dt><dd>usado ${F.money(C.envUsed(t, F.txs()))} de ${F.money(t.amount)}</dd></div>` : ''}
             ${parcInfo(t)}
+            ${t.autoInvoice ? (() => { const parts = C.invoiceParts(t.cardId, t.invoiceMonth, F.parcs(), F.txs()); return `<div><dt>Parcelas nesta fatura</dt><dd>${parts.length ? parts.map(x => `${esc(x.desc)} ${x.n}/${x.of} (${F.money(x.amount)})`).join(' · ') : 'nenhuma'}</dd></div>`; })() : ''}
             ${t.paidDate && t.paidDate !== t.date ? `<div><dt>Pago em</dt><dd>${F.date(t.paidDate)}</dd></div>` : ''}
             ${cat ? `<div><dt>Categoria</dt><dd>${esc(cat.name)}</dd></div>` : ''}
             ${acc ? `<div><dt>${t.kind === 'transferencia' ? 'De' : 'Conta'}</dt><dd>${esc(acc.name)}</dd></div>` : ''}
@@ -467,11 +470,7 @@
   ============================================================ */
   const ymAdd = (ym, n) => C.addMonths(ym, n);
   const ymTxt = ym => { const [y, m] = ym.split('-'); return `${['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'][+m - 1]}/${y.slice(2)}`; };
-  const firstInvoice = (date, card) => {   // compra depois do fechamento → fatura do mês seguinte ao próximo
-    const ym = date.slice(0, 7), day = +date.slice(8, 10);
-    if (!card?.closingDay) return ymAdd(ym, 1);
-    return day < card.closingDay ? ym : ymAdd(ym, 1);
-  };
+  const firstInvoice = (date, card) => C.invoiceMonth(date, card);   // usa o fechamento/vencimento do cartão
 
   F.cardForm = (preset = {}, existing = null) => {
     const today = P.today();
@@ -489,7 +488,7 @@
           <div class="row-fields">${field('Parcelas', `<select name="n">${Array.from({ length: 24 }, (_, i) => i + 1).map(k => `<option value="${k}" ${st.n === k ? 'selected' : ''}>${k === 1 ? 'À vista (1×)' : k + '×'}</option>`).join('')}</select>`)}
           ${field('Data da compra', `<input type="date" name="date" value="${st.date}">`)}</div>
           <div class="row-fields">${field('Cartão', cards.length ? `<select name="accountId">${cards.map(c => `<option value="${c.id}" ${c.id === st.accountId ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}<option value="__new">+ Outro cartão…</option></select>` : `<input name="newCard" placeholder="ex.: Caixa crédito" value="Caixa crédito">`, cards.length ? '' : 'Vou criar esse cartão. Só o nome, nada de número ou senha.')}
-          ${field('Primeira parcela na fatura de', `<input type="month" name="firstMonth" value="${st.firstMonth}">`, 'Se a compra foi depois do fechamento do cartão, ela cai na fatura seguinte.')}</div>
+          ${field('Primeira parcela na fatura de', `<input type="month" name="firstMonth" value="${st.firstMonth}">`, (F.acc(st.accountId)?.closingDay ? `Calculado pelo fechamento (dia ${F.acc(st.accountId).closingDay}) e vencimento (dia ${F.acc(st.accountId).dueDay || '?'}) do cartão.` : 'Cadastre o fechamento e o vencimento em Mais → Cartões para o app acertar sozinho.'))}</div>
           ${field('Categoria', `<select name="categoryId">${catOptions('despesa', st.categoryId)}</select>`)}
           ${field('Observação', `<input name="notes" value="${esc(st.notes || '')}" placeholder="opcional, ex.: sem juros">`)}
           ${sched.length ? `<div class="weeks-preview">${sched.map(i => `<div><span>Parcela ${i.n}/${st.n}</span><small>fatura de ${ymTxt(i.month)}</small><b>${F.money(i.amount)}</b></div>`).join('')}</div>
@@ -503,7 +502,7 @@
         const keep = () => {
           const fd = new FormData(f);
           st = { ...st, desc: fd.get('desc'), total: C.parseMoney(fd.get('total')), n: +fd.get('n'), date: fd.get('date'), categoryId: fd.get('categoryId'), notes: fd.get('notes'), firstMonth: fd.get('firstMonth') || st.firstMonth };
-          if (fd.has('accountId')) st.accountId = fd.get('accountId');
+          if (fd.has('accountId') && fd.get('accountId') !== st.accountId) { st.accountId = fd.get('accountId'); if (!monthTouched) st.firstMonth = firstInvoice(st.date, F.acc(st.accountId)); }
           if (fd.has('newCard')) st.newCard = fd.get('newCard');
         };
         const redraw = () => setTimeout(() => api.refresh(), 0);
@@ -512,7 +511,7 @@
         f.firstMonth.onchange = () => { monthTouched = true; keep(); redraw(); };
         f.date.onchange = () => { keep(); if (!monthTouched) st.firstMonth = firstInvoice(st.date, F.acc(st.accountId)); redraw(); };
         if (f.accountId) f.accountId.onchange = async () => {
-          if (f.accountId.value !== '__new') { keep(); return; }
+          if (f.accountId.value !== '__new') { keep(); redraw(); return; }
           const name = prompt('Nome do cartão (ex.: Nubank crédito):');
           if (name && name.trim()) {
             const c = F.save('fin_conta', { name: name.trim(), type: 'cartao', inAvailable: false, opening: 0, openingSet: true, openingDate: today, order: 9 }, `Criou o cartão “${name.trim()}”`);
@@ -565,4 +564,112 @@
       P.$$('[data-p]', api.body).forEach(x => x.onclick = () => { api.close(); setTimeout(() => F.cardForm({}, F.parc(x.dataset.p)), 220); });
     }
   });
+  /* ============================================================
+     CARTÕES (fechamento e vencimento)
+  ============================================================ */
+  F.cardsSheet = () => P.sheet({
+    title: 'Cartões', kicker: 'fechamento e vencimento', live: true,
+    render: () => `${F.cards().length ? `<div class="list">${F.cards().map(c => `<button type="button" class="row as-btn" data-c="${c.id}"><span class="row-main as-text"><span class="row-title">${esc(c.name)}</span>
+        <span class="row-meta">${c.closingDay ? `fecha dia ${c.closingDay} · vence dia ${c.dueDay || '?'}` : '<b class="st-pendente">falta o fechamento e o vencimento</b>'}</span></span></button>`).join('')}</div>`
+      : '<div class="empty"><strong>Nenhum cartão ainda.</strong><span>Cadastre só o nome e os dias. Nada de número do cartão ou senha.</span></div>'}
+      <p class="hint">Com o vencimento, cada fatura vira uma conta a pagar no ciclo certo, com a soma das parcelas que estão no app. O limite do cartão nunca conta como dinheiro.</p>
+      <div class="form-actions"><button class="btn primary" type="button" data-new>+ Cartão</button></div>`,
+    mount: api => {
+      api.body.querySelector('[data-new]').onclick = () => F.cardCfgForm();
+      P.$$('[data-c]', api.body).forEach(x => x.onclick = () => F.cardCfgForm(F.acc(x.dataset.c)));
+    }
+  });
+  F.cardCfgForm = (card = null) => P.sheet({
+    title: card ? card.name : 'Novo cartão', kicker: 'cartão de crédito',
+    render: () => `<form class="form">
+      ${field('Nome', `<input name="name" required value="${esc(card?.name || '')}" placeholder="ex.: Caixa crédito">`)}
+      <div class="row-fields">${field('Dia do fechamento', `<input name="closingDay" type="number" min="1" max="31" value="${card?.closingDay || ''}" placeholder="ex.: 3">`, 'Compras a partir desse dia vão para a fatura seguinte.')}
+      ${field('Dia do vencimento', `<input name="dueDay" type="number" min="1" max="31" value="${card?.dueDay || ''}" placeholder="ex.: 10">`, 'Dia em que você paga a fatura.')}</div>
+      <p class="form-error" hidden></p>
+      <div class="form-actions"><button class="btn primary" type="submit">Salvar</button></div></form>`,
+    mount: api => {
+      api.body.querySelector('form').onsubmit = e => {
+        e.preventDefault(); const f = e.target;
+        const err = m => { const p = api.body.querySelector('.form-error'); p.textContent = m; p.hidden = false; };
+        const name = f.name.value.trim(), cd = parseInt(f.closingDay.value, 10), dd = parseInt(f.dueDay.value, 10);
+        if (!name) return err('Dê um nome ao cartão.');
+        if (f.closingDay.value && !(cd >= 1 && cd <= 31)) return err('O fechamento é um dia entre 1 e 31.');
+        if (f.dueDay.value && !(dd >= 1 && dd <= 31)) return err('O vencimento é um dia entre 1 e 31.');
+        if ((cd && !dd) || (!cd && dd)) return err('Preencha os dois dias, fechamento e vencimento.');
+        F.save('fin_conta', { ...(card || { type: 'cartao', inAvailable: false, opening: 0, openingSet: true, openingDate: P.today(), order: 9 }), name, closingDay: cd || null, dueDay: dd || null }, card ? `Alterou o cartão “${name}”` : `Criou o cartão “${name}”`);
+        api.close(); P.toast(cd ? `${name}: fecha dia ${cd}, vence dia ${dd}.` : 'Cartão salvo.');
+      };
+    }
+  });
+
+  /* ============================================================
+     SEMANAS: editar limites e decidir o que fazer quando passar
+  ============================================================ */
+  const curCycleRec = () => { const c = F.snap().cycle; return c.id ? S.get('fin_ciclo', c.id) : null; };
+  F.weeksSheet = () => {
+    const cyc = curCycleRec(); if (!cyc) return P.toast('As semanas aparecem depois que você confirma o plano do ciclo.');
+    const today = P.today(), spent = F.snap().weeks.map(w => w.spent);
+    let draft = cyc.weeks.map(w => ({ ...w })), changes = {}, msg = '';
+    P.sheet({
+      title: 'Editar semanas', kicker: `livre para o dia a dia: ${F.money(cyc.base)}`, wide: true,
+      render: () => {
+        const sum = draft.reduce((a, w) => a + w.limit, 0);
+        return `<p class="lede">Mude o limite de uma semana e as semanas sem cadeado se ajustam sozinhas para a soma continuar ${F.money(cyc.base)}. Nada é salvo até você confirmar.</p>
+        <div class="wk-edit">${draft.map((w, i) => { const past = w.end < today; return `<div class="wk-edit-row ${past ? 'past' : ''}">
+          <div><b>${w.label}</b><small>${F.date(w.start)}–${F.date(w.end)} · gasto ${F.money(spent[i] || 0)}</small></div>
+          <input class="money-input" data-w="${i}" inputmode="decimal" value="${inMoney(w.limit)}" ${past ? 'disabled' : ''} aria-label="Limite da ${w.label}">
+          <label class="check-line small"><input type="checkbox" data-lock="${i}" ${w.locked ? 'checked' : ''} ${past ? 'disabled' : ''}> travar</label></div>`; }).join('')}</div>
+        <div class="calc-table" style="margin-top:12px"><div class="calc-total ${sum !== cyc.base ? 'bad' : ''}"><span>Soma das semanas</span><b>${F.money(sum)} de ${F.money(cyc.base)}</b></div></div>
+        ${msg ? `<p class="form-error">${esc(msg)}</p>` : ''}
+        <div class="form-actions"><button class="btn ghost" type="button" data-reset>Dividir igual de novo</button><span class="grow"></span><button class="btn primary" type="button" data-save ${sum !== cyc.base ? 'disabled' : ''}>Salvar semanas</button></div>`;
+      },
+      mount: api => {
+        const b = api.body, again = () => setTimeout(() => api.refresh(), 0);
+        P.$$('[data-w]', b).forEach(inp => inp.onchange = () => {
+          const v = C.parseMoney(inp.value); const i = +inp.dataset.w;
+          if (v === null || v < 0) { msg = 'Valor inválido.'; return again(); }
+          changes[i] = v;
+          const r = C.rebalanceWeeks(cyc.weeks.map((w, k) => ({ ...w, locked: draft[k].locked })), cyc.base, changes, today);
+          msg = r.ok ? '' : r.reason === 'nao-cabe' ? `Não cabe: as outras semanas ficariam negativas (faltam ${F.money(-r.rest)}).` : 'Não sobrou semana sem cadeado para ajustar. Destrave alguma.';
+          if (r.ok) draft = r.weeks; else delete changes[i];
+          again();
+        });
+        P.$$('[data-lock]', b).forEach(x => x.onchange = () => { draft[+x.dataset.lock].locked = x.checked; });
+        b.querySelector('[data-reset]').onclick = () => {
+          const fresh = C.splitWeeks(cyc.start, cyc.end, cyc.base); changes = {}; msg = '';
+          // semanas que já passaram ficam como estavam; o resto se divide de novo
+          const r = C.rebalanceWeeks(cyc.weeks.map((w, k) => ({ ...w, limit: w.end < today ? w.limit : fresh[k].limit, locked: false })), cyc.base, null, today);
+          draft = r.weeks.map(w => ({ ...w, locked: false })); again();
+        };
+        b.querySelector('[data-save]').onclick = async () => {
+          const lines = draft.map((w, i) => (w.limit !== cyc.weeks[i].limit ? `${w.label}: ${F.money(cyc.weeks[i].limit)} → ${F.money(w.limit)}` : null)).filter(Boolean);
+          if (!lines.length && draft.every((w, i) => w.locked === cyc.weeks[i].locked)) { api.close(); return; }
+          if (!(await P.ask(`Vou mudar o plano das semanas:\n${lines.join('\n') || 'só os cadeados'}\nConfirma?`, 'Salvar semanas', false))) return;
+          F.save('fin_ciclo', { ...cyc, weeks: draft.map(({ spent: _s, ...w }) => w) }, `Reorganizou as semanas: ${lines.join('; ') || 'cadeados'}`);
+          api.close(); P.toast('Semanas atualizadas.');
+        };
+      }
+    });
+  };
+
+  F.overSheet = idx => {
+    const cyc = curCycleRec(); if (!cyc) return;
+    const w = F.snap().weeks[idx], spent = w.spent, over = spent - w.limit;
+    const opts = ['proximas', 'reserva', 'manter'].map(o => ({ o, r: C.coverOverspend(cyc, idx, spent, o) }));
+    const TXT = {
+      proximas: ['Tirar das próximas semanas', r => r.ok ? `As semanas seguintes ficam com: ${r.cycle.weeks.slice(idx + 1).map(x => `${x.label} ${F.money(x.limit)}`).join(' · ')}.` : `Não dá: as próximas semanas sem cadeado só têm ${F.money(r.room || 0)}.`],
+      reserva: ['Usar a reserva do ciclo', r => r.ok ? `A reserva fica com ${F.money(r.cycle.reserve)} (era ${F.money(cyc.reserve)}).` : `A reserva tem ${F.money(cyc.reserve || 0)} e não cobre ${F.money(over)}.`],
+      manter: ['Deixar como está', () => 'Os números não mudam. O aviso some e o excesso fica registrado nesta semana.']
+    };
+    P.sheet({
+      title: `${w.label} passou ${F.money(over)}`, kicker: `gasto ${F.money(spent)} de ${F.money(w.limit)}`,
+      render: () => `<p class="lede">Acontece. Escolha o que fazer com esse excesso. Nada muda sem você escolher.</p>
+        <div class="data-actions">${opts.map(({ o, r }) => `<button type="button" class="data-btn" data-o="${o}" ${r.ok ? '' : 'disabled'}><strong>${TXT[o][0]}</strong><small>${esc(TXT[o][1](r))}</small></button>`).join('')}</div>`,
+      mount: api => P.$$('[data-o]', api.body).forEach(x => x.onclick = () => {
+        const { r } = opts.find(y => y.o === x.dataset.o); if (!r.ok) return;
+        F.save('fin_ciclo', { ...r.cycle, weeks: r.cycle.weeks.map(({ spent: _s, ...k }) => k) }, `${w.label} passou ${C.formatMoney(over)}: ${TXT[x.dataset.o][0].toLowerCase()}`);
+        api.close(); P.toast('Plano do ciclo atualizado.');
+      })
+    });
+  };
 })();
