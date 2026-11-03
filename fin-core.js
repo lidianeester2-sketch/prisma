@@ -205,7 +205,7 @@
   // parc: { id, type: 'carne' (paga mês a mês pela conta) | 'cartao' (entra na fatura de cada mês),
   //         total, n, firstMonth 'AAAA-MM', paidBefore (parcelas já pagas antes do app) }
   function installments(parc, txs = []) {
-    if (!parc || parc.deleted || !parc.n) return [];
+    if (!parc || parc.deleted || parc.canceled || !parc.n) return [];
     const amounts = allocate(parc.total, Array(parc.n).fill(1));
     const linked = txs.filter(t => live(t) && t.parcId === parc.id);
     return amounts.map((amount, i) => {
@@ -389,7 +389,7 @@
     if (!out.desc) out.missing.push('descricao');
     if (out.kind !== 'transferencia' && !out.categoryKey) out.missing.push('categoria');
     if (!out.method && out.kind === 'despesa') out.missing.push('forma');
-    if (out.method === 'credito') out.notes.push('Compras no cartão de crédito chegam numa próxima versão.');
+    if (out.method === 'credito') out.notes.push(out.installments > 1 ? `Compra no cartão em ${out.installments}×: não conta como gasto deste ciclo.` : 'Compra no cartão: não conta como gasto deste ciclo.');
     return out;
   }
 

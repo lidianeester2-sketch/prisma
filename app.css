@@ -1023,3 +1023,4 @@ body[data-space="fin"] .fin-hero { --hero-bg: #1f9e66; }
 .parc-row .bar { margin-top: 4px; }
 @media (max-width: 700px) { .sum-card { grid-template-columns: minmax(0, 1fr); } .sum-card b { font-size: 20px; } }
 .back-link { justify-self: start; }
+input[type="month"], input[type="date"] { min-width: 0; max-width: 100%; }

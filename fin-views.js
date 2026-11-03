@@ -176,7 +176,7 @@
     const sum = F.summary({ start: c.start, end: c.end });
     const label = ofs === 0 ? 'Ciclo atual' : ofs === 1 ? 'Próximo ciclo' : ofs === -1 ? 'Ciclo anterior' : ofs > 0 ? `Daqui a ${ofs} ciclos` : `${-ofs} ciclos atrás`;
     const carnes = F.parcs().filter(p => !p.deleted && p.type === 'carne');
-    const cardParcs = F.parcs().filter(p => !p.deleted && p.type === 'cartao');
+    const cardParcs = F.parcs().filter(p => !p.deleted && !p.canceled && p.type === 'cartao' && C.installments(p).some(i => i.month >= c.start.slice(0, 7)));
     const futureByMonth = {}; sum.cardFuture.forEach(i => (futureByMonth[i.month] = futureByMonth[i.month] || []).push(i));
 
     const pendRow = t => `<div class="row fin-row ${t.date < today && !t.envelope && !t.noDue ? 'late' : ''}">
@@ -290,6 +290,8 @@
         ${item('finRecs', 'Contas fixas', 'Aluguel, luz, academia, assinaturas: viram compromissos em cada ciclo')}
         ${item('finCats', 'Categorias', 'Padrão + as suas; quais entram no limite semanal')}
         ${item('finConcile', 'Conferir saldo', 'Compare com o saldo do banco e ajuste a diferença')}
+        ${item('finCardNew', 'Gasto no cartão (parcelado)', 'Compra no crédito em 1× ou parcelada: as parcelas vão para as faturas, sem contar como gasto do ciclo')}
+        ${item('finCards', 'Compras no cartão', 'Ver, editar ou cancelar as compras parceladas')}
         ${item('finImport', 'Importar planejamento', 'Cadastra de uma vez as contas de um mês a partir de um arquivo .json')}
       </div></section>
       <section class="block set"><h2>Preferências</h2><div class="data-actions">
@@ -298,7 +300,7 @@
         ${item('finHistory', 'Histórico de alterações', 'Tudo que foi criado ou mudado, com antes e depois')}
       </div></section>
       <section class="block set"><h2>Chegando</h2><div class="data-actions">
-        ${soon('Cartões de crédito e semanas editáveis', 'próxima')}${soon('Dívidas e metas', 'em breve')}${soon('Renda extra e relatórios', 'em breve')}${soon('Assistente com IA', 'em breve')}
+        ${soon('Fechamento e vencimento do cartão, semanas editáveis', 'próxima')}${soon('Dívidas e metas', 'em breve')}${soon('Renda extra e relatórios', 'em breve')}${soon('Assistente com IA', 'em breve')}
       </div></section>
     </div>`;
   };
@@ -335,6 +337,8 @@
     finLock: () => { F.lock(); P.render(); },
     finCycle: el => { const d = +el.dataset.d; P.ui.finCycleOfs = d === 0 ? 0 : Math.max(-12, Math.min(12, (P.ui.finCycleOfs || 0) + d)); P.render(); window.scrollTo(0, 0); },
     finImport: () => F.importPick(),
+    finCardNew: () => F.cardForm(),
+    finCards: () => F.cardList(),
     finFilter: el => { P.ui[el.dataset.k] = el.dataset.v; P.saveUI(); P.render(); }
   });
 })();

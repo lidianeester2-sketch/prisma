@@ -43,7 +43,7 @@
               ${field('Categoria', `<select name="categoryId">${catOptions(tx.kind, tx.categoryId)}</select>`)}
               ${field(tx.kind === 'receita' ? 'Entrou na conta' : 'Conta', `<select name="accountId">${accOptions(tx.accountId)}</select>`)}
             </div>`}
-          ${tx.kind === 'despesa' ? field('Forma de pagamento', `<div class="chips compact" data-method>${['debito', 'pix', 'dinheiro', 'boleto', 'credito'].map(m => `<button type="button" class="chip ${tx.method === m ? 'on' : ''}" data-m="${m}" ${m === 'credito' ? 'disabled title="Chega na próxima versão"' : ''}>${F.METHODS[m]}${m === 'credito' ? ' · em breve' : ''}</button>`).join('')}</div>`) : ''}
+          ${tx.kind === 'despesa' ? field('Forma de pagamento', `<div class="chips compact" data-method>${['debito', 'pix', 'dinheiro', 'boleto', 'credito'].map(m => `<button type="button" class="chip ${tx.method === m ? 'on' : ''}" data-m="${m}" ${m === 'credito' && existing ? 'disabled' : ''}>${F.METHODS[m]}${m === 'credito' ? ' (parcelar)' : ''}</button>`).join('')}</div>`) : ''}
           <div class="field"><span class="field-label">Situação</span><div class="chips compact" data-status>
             <button type="button" class="chip ${tx.status === 'realizado' ? 'on' : ''}" data-s="realizado">${tx.kind === 'receita' ? 'Já recebi' : tx.kind === 'transferencia' ? 'Já fiz' : 'Já paguei'}</button>
             <button type="button" class="chip ${tx.status === 'previsto' ? 'on' : ''}" data-s="previsto">${tx.kind === 'receita' ? 'Vou receber' : 'Vou pagar'}</button>
@@ -58,7 +58,8 @@
         const keep = () => { const fd = new FormData(f); tx = { ...tx, amount: C.parseMoney(fd.get('amount')) ?? tx.amount, date: fd.get('date'), desc: fd.get('desc'), accountId: fd.get('accountId') || tx.accountId, toAccountId: fd.get('toAccountId') ?? tx.toAccountId, categoryId: fd.get('categoryId') ?? tx.categoryId, notes: fd.get('notes'), certainty: fd.get('estimado') ? 'estimado' : 'confirmado' }; };
         const redraw = () => { const v = b.querySelector('#fin-frase')?.value; api.refresh(); const fr = b.querySelector('#fin-frase'); if (fr && v) { fr.value = v; showParsed(); } };
         P.$$('[data-kind]', b).forEach(x => x.onclick = () => { keep(); tx.kind = x.dataset.kind; tx.categoryId = ''; redraw(); });
-        P.$$('[data-m]', b).forEach(x => x.onclick = () => { if (x.disabled) return; tx.method = x.dataset.m; P.$$('[data-m]', b).forEach(y => y.classList.toggle('on', y === x)); });
+        const toCard = () => { keep(); api.close(); setTimeout(() => F.cardForm({ desc: tx.desc, total: tx.amount, n: parsed?.installments, categoryId: tx.categoryId, date: tx.date }), 220); };
+        P.$$('[data-m]', b).forEach(x => x.onclick = () => { if (x.disabled) return; if (x.dataset.m === 'credito') return toCard(); tx.method = x.dataset.m; P.$$('[data-m]', b).forEach(y => y.classList.toggle('on', y === x)); });
         P.$$('[data-s]', b).forEach(x => x.onclick = () => { keep(); tx.status = x.dataset.s; redraw(); });
         f.date.onchange = () => { keep(); if (!existing && tx.date > today && tx.status === 'realizado') { tx.status = 'previsto'; redraw(); } };
 
@@ -70,7 +71,8 @@
             parsed.date !== today ? F.date(parsed.date) : 'hoje'].filter(Boolean);
           const miss = { valor: 'o valor', categoria: 'a categoria', forma: 'a forma de pagamento', descricao: 'a descrição' };
           const missing = parsed.missing.filter(m => miss[m]).map(m => miss[m]);
-          out.innerHTML = `<b>Entendi:</b> ${esc(bits.join(' · '))}${missing.length ? `<br><span class="warn-t">Falta confirmar ${missing.join(', ')}.</span>` : ''}${parsed.notes.length ? `<br><span class="warn-t">${esc(parsed.notes.join(' '))}</span>` : ''}`;
+          out.innerHTML = `<b>Entendi:</b> ${esc(bits.join(' · '))}${missing.length ? `<br><span class="warn-t">Falta confirmar ${missing.join(', ')}.</span>` : ''}${parsed.notes.length ? `<br><span class="warn-t">${esc(parsed.notes.join(' '))}</span>` : ''}${parsed.method === 'credito' ? '<br><button type="button" class="btn primary small" data-tocard style="margin-top:8px">Continuar como compra no cartão →</button>' : ''}`;
+          const tc = out.querySelector('[data-tocard]'); if (tc) tc.onclick = () => toCard();
         };
         const fr = b.querySelector('#fin-frase');
         if (fr) fr.oninput = P.debounce(() => {
@@ -92,7 +94,7 @@
         f.onsubmit = e => {
           e.preventDefault(); keep();
           const err = msg => { const p = b.querySelector('.form-error'); p.textContent = msg; p.hidden = false; };
-          if (parsed?.method === 'credito' && !existing) return err('Compras no cartão de crédito chegam na próxima versão. Por enquanto, registre o pagamento da fatura quando pagar.');
+          if (parsed?.method === 'credito' && !existing) return toCard();
           if (!Number.isInteger(tx.amount) || tx.amount <= 0) return err('Informe um valor maior que zero, por exemplo 50,48.');
           if (!tx.desc?.trim()) return err('Escreva uma descrição curta.');
           if (!tx.date) return err('Escolha a data.');
@@ -455,6 +457,112 @@
     render: () => {
       const list = S.all('fin_hist').sort((a, b) => b.at - a.at).slice(0, 150);
       return list.length ? `<div class="hist-list">${list.map(histRow).join('')}</div>` : '<p class="faint">Nenhuma alteração ainda.</p>';
+    }
+  });
+  /* ============================================================
+     COMPRA NO CARTÃO (parcelada ou à vista)
+     Não é despesa do ciclo e não sai do saldo: as parcelas entram
+     na fatura de cada mês. O que conta como despesa é só o
+     pagamento da fatura. Assim nada é contado duas vezes.
+  ============================================================ */
+  const ymAdd = (ym, n) => C.addMonths(ym, n);
+  const ymTxt = ym => { const [y, m] = ym.split('-'); return `${['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'][+m - 1]}/${y.slice(2)}`; };
+  const firstInvoice = (date, card) => {   // compra depois do fechamento → fatura do mês seguinte ao próximo
+    const ym = date.slice(0, 7), day = +date.slice(8, 10);
+    if (!card?.closingDay) return ymAdd(ym, 1);
+    return day < card.closingDay ? ym : ymAdd(ym, 1);
+  };
+
+  F.cardForm = (preset = {}, existing = null) => {
+    const today = P.today();
+    let cards = F.cards();
+    let st = existing ? { ...existing } : { desc: preset.desc || '', total: preset.total ?? null, n: preset.n || 1, date: preset.date || today, accountId: cards[0]?.id || '', categoryId: preset.categoryId || '', firstMonth: null, notes: '' };
+    if (!st.firstMonth) st.firstMonth = firstInvoice(st.date, F.acc(st.accountId));
+    let monthTouched = !!existing;
+    P.sheet({
+      title: existing ? 'Editar compra no cartão' : 'Compra no cartão', kicker: 'Financeiro+', live: false,
+      render: () => {
+        const sched = Number.isInteger(st.total) && st.total > 0 && st.n >= 1 ? C.installments({ id: 'x', type: 'cartao', total: st.total, n: st.n, firstMonth: st.firstMonth }) : [];
+        return `<form class="form" data-card>
+          <div class="row-fields">${field('O que comprou', `<input name="desc" required value="${esc(st.desc || '')}" placeholder="ex.: Compra Tayná">`)}
+          ${field('Valor total', `<input name="total" inputmode="decimal" class="money-input" required value="${inMoney(st.total)}" placeholder="0,00">`)}</div>
+          <div class="row-fields">${field('Parcelas', `<select name="n">${Array.from({ length: 24 }, (_, i) => i + 1).map(k => `<option value="${k}" ${st.n === k ? 'selected' : ''}>${k === 1 ? 'À vista (1×)' : k + '×'}</option>`).join('')}</select>`)}
+          ${field('Data da compra', `<input type="date" name="date" value="${st.date}">`)}</div>
+          <div class="row-fields">${field('Cartão', cards.length ? `<select name="accountId">${cards.map(c => `<option value="${c.id}" ${c.id === st.accountId ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}<option value="__new">+ Outro cartão…</option></select>` : `<input name="newCard" placeholder="ex.: Caixa crédito" value="Caixa crédito">`, cards.length ? '' : 'Vou criar esse cartão. Só o nome, nada de número ou senha.')}
+          ${field('Primeira parcela na fatura de', `<input type="month" name="firstMonth" value="${st.firstMonth}">`, 'Se a compra foi depois do fechamento do cartão, ela cai na fatura seguinte.')}</div>
+          ${field('Categoria', `<select name="categoryId">${catOptions('despesa', st.categoryId)}</select>`)}
+          ${field('Observação', `<input name="notes" value="${esc(st.notes || '')}" placeholder="opcional, ex.: sem juros">`)}
+          ${sched.length ? `<div class="weeks-preview">${sched.map(i => `<div><span>Parcela ${i.n}/${st.n}</span><small>fatura de ${ymTxt(i.month)}</small><b>${F.money(i.amount)}</b></div>`).join('')}</div>
+            <p class="hint">Não conta como gasto deste ciclo e não sai do saldo. Cada parcela aparece em Orçamento → Cartão · parcelas futuras. A despesa entra quando você pagar a fatura.</p>` : ''}
+          <p class="form-error" hidden></p>
+          <div class="form-actions split">${existing ? '<button class="btn ghost danger-t" type="button" data-del>Cancelar compra</button>' : ''}<span class="grow"></span><button class="btn primary" type="submit">${existing ? 'Salvar' : 'Cadastrar compra'}</button></div>
+        </form>`;
+      },
+      mount: api => {
+        const b = api.body, f = b.querySelector('form');
+        const keep = () => {
+          const fd = new FormData(f);
+          st = { ...st, desc: fd.get('desc'), total: C.parseMoney(fd.get('total')), n: +fd.get('n'), date: fd.get('date'), categoryId: fd.get('categoryId'), notes: fd.get('notes'), firstMonth: fd.get('firstMonth') || st.firstMonth };
+          if (fd.has('accountId')) st.accountId = fd.get('accountId');
+          if (fd.has('newCard')) st.newCard = fd.get('newCard');
+        };
+        const redraw = () => setTimeout(() => api.refresh(), 0);
+        f.n.onchange = () => { keep(); redraw(); };
+        f.total.onchange = () => { keep(); redraw(); };
+        f.firstMonth.onchange = () => { monthTouched = true; keep(); redraw(); };
+        f.date.onchange = () => { keep(); if (!monthTouched) st.firstMonth = firstInvoice(st.date, F.acc(st.accountId)); redraw(); };
+        if (f.accountId) f.accountId.onchange = async () => {
+          if (f.accountId.value !== '__new') { keep(); return; }
+          const name = prompt('Nome do cartão (ex.: Nubank crédito):');
+          if (name && name.trim()) {
+            const c = F.save('fin_conta', { name: name.trim(), type: 'cartao', inAvailable: false, opening: 0, openingSet: true, openingDate: today, order: 9 }, `Criou o cartão “${name.trim()}”`);
+            cards = F.cards(); keep(); st.accountId = c.id;
+          } else keep();
+          redraw();
+        };
+        const del = b.querySelector('[data-del]');
+        if (del) del.onclick = async () => {
+          if (!(await P.ask(`Cancelar a compra “${existing.desc}”? As parcelas saem das faturas futuras, mas ficam no histórico.`, 'Cancelar compra'))) return;
+          F.save('fin_parc', { ...existing, canceled: true }, `Cancelou a compra no cartão “${existing.desc}”`); api.close(); P.toast('Compra cancelada.');
+        };
+        f.onsubmit = e => {
+          e.preventDefault(); keep();
+          const err = m => { const p = b.querySelector('.form-error'); p.textContent = m; p.hidden = false; };
+          if (!st.desc?.trim()) return err('Escreva o que comprou.');
+          if (!Number.isInteger(st.total) || st.total <= 0) return err('Informe o valor total, por exemplo 284,70.');
+          if (!/^\d{4}-\d{2}$/.test(st.firstMonth || '')) return err('Escolha o mês da primeira fatura.');
+          let accountId = st.accountId;
+          if (!cards.length) {
+            const name = (st.newCard || '').trim(); if (!name) return err('Dê um nome ao cartão.');
+            accountId = F.save('fin_conta', { name, type: 'cartao', inAvailable: false, opening: 0, openingSet: true, openingDate: today, order: 9 }, `Criou o cartão “${name}”`).id;
+          }
+          if (!accountId || accountId === '__new') return err('Escolha o cartão.');
+          const rec = { ...(existing || {}), type: 'cartao', desc: st.desc.trim(), total: st.total, n: st.n, firstMonth: st.firstMonth, purchaseDate: st.date, accountId, categoryId: st.categoryId || null, notes: st.notes || '', paidBefore: 0 };
+          const sched = C.installments({ ...rec, id: 'x' });
+          F.save('fin_parc', rec, existing ? `Editou a compra no cartão “${rec.desc}”` : `Compra no cartão “${rec.desc}” (${C.formatMoney(rec.total)} em ${rec.n}×)`);
+          api.close();
+          P.toast(rec.n > 1 ? `${rec.n}× ${C.formatMoney(sched[0].amount)}, a 1ª na fatura de ${ymTxt(rec.firstMonth)}. Não conta como gasto deste ciclo.` : `Na fatura de ${ymTxt(rec.firstMonth)}. Não conta como gasto deste ciclo.`);
+        };
+      }
+    });
+  };
+
+  F.cardList = () => P.sheet({
+    title: 'Compras no cartão', kicker: 'parceladas e à vista', live: true,
+    render: () => {
+      const list = F.parcs().filter(p => p.type === 'cartao' && !p.deleted).sort((a, b) => (b.purchaseDate || b.firstMonth).localeCompare(a.purchaseDate || a.firstMonth));
+      const now = P.today().slice(0, 7);
+      return `${list.length ? `<div class="list">${list.map(p => {
+        const sch = C.installments(p), left = sch.filter(i => i.month >= now), card = F.acc(p.accountId);
+        return `<button type="button" class="row as-btn fin-row ${p.canceled ? 'st-row-cancelado' : ''}" data-p="${p.id}"><span class="row-main as-text"><span class="row-title">${esc(p.desc)}</span>
+          <span class="row-meta">${card ? esc(card.name) + ' · ' : ''}${p.n}× ${F.money(sch[0]?.amount)} · ${ymTxt(sch[0].month)} a ${ymTxt(sch[sch.length - 1].month)}${p.canceled ? ' · <b class="st-cancelado">cancelada</b>' : left.length ? ` · faltam ${left.length} (${F.money(left.reduce((a, i) => a + i.amount, 0))})` : ' · quitada'}</span></span>
+          <span class="fin-amt ${p.canceled ? 'cancel' : ''}">${F.money(p.total)}</span></button>`; }).join('')}</div>`
+        : '<div class="empty"><strong>Nenhuma compra no cartão ainda.</strong><span>Cadastre aqui as compras parceladas para ver quanto já está comprometido nas próximas faturas.</span></div>'}
+        <div class="form-actions"><button class="btn primary" type="button" data-new>+ Compra no cartão</button></div>`;
+    },
+    mount: api => {
+      api.body.querySelector('[data-new]').onclick = () => { api.close(); setTimeout(() => F.cardForm(), 220); };
+      P.$$('[data-p]', api.body).forEach(x => x.onclick = () => { api.close(); setTimeout(() => F.cardForm({}, F.parc(x.dataset.p)), 220); });
     }
   });
 })();
