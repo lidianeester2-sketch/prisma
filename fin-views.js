@@ -9,6 +9,10 @@
   P.ui.finStatus = P.ui.finStatus || 'all';
   P.ui.finPeriod = P.ui.finPeriod || 'ciclo';
 
+  // "vence 10/11", "venceu 02/11", "até 06/12" (sem data definida) ou "teto · usado X de Y"
+  const envTxt = t => { const u = C.envUsed(t, F.txs()); return `teto do ciclo · usado ${F.money(u)} de ${F.money(t.amount)}${u > t.amount ? ` · <b class="st-pendente">passou ${F.money(u - t.amount)}</b>` : ''}`; };
+  const dueTxt = (t, today) => t.envelope ? envTxt(t)
+    : t.noDue ? `sem data · até ${F.date(t.date)}` : t.date < today ? `<b class="st-pendente">venceu</b> ${F.date(t.date)}` : `vence ${F.date(t.date)}`;
   const cert = c => `<span class="cert cert-${c}">${c}</span>`;
   const bar = (pct, tone = '') => `<div class="bar ${tone}"><div style="width:${Math.max(0, Math.min(100, pct))}%"></div></div>`;
 
@@ -82,7 +86,7 @@
     const needsOpening = F.accounts().filter(a => a.openingSet === false);
     const tone = s.canSpend < 0 ? 'bad' : s.canSpend < prof.income * 0.05 ? 'warn' : 'ok';
     const endTxt = F.date(s.cycle.end);
-    const overdue = s.committedItems.filter(t => t.date < today);
+    const overdue = s.committedItems.filter(t => t.date < today && !t.envelope);
 
     // alertas (no máximo 3, sem julgamento)
     const alerts = [];
@@ -141,15 +145,15 @@
 
         <div class="block-head sub"><h3>Próximas contas</h3><span class="count">${s.committedItems.length}</span>${s.committedItems.length > 4 ? '<button class="link" type="button" data-act="go" data-to="fin-orcamento">Ver todas →</button>' : ''}</div>
         <div class="list">${s.committedItems.length ? s.committedItems.slice(0, 4).map(t => `<div class="row fin-row ${t.date < today ? 'late' : ''}">
-            <button type="button" class="row-main" data-act="finTx" data-id="${t.id}"><span class="row-title">${esc(t.desc)}</span><span class="row-meta">${t.date < today ? '<b class="st-pendente">venceu</b> ' : 'vence '}${F.date(t.date)}${t.certainty === 'estimado' ? ' · estimado' : ''}</span></button>
-            <span class="fin-amt">${F.money(t.amount)}</span><button class="btn ghost small" type="button" data-act="finPay" data-id="${t.id}">Pagar</button></div>`).join('')
+            <button type="button" class="row-main" data-act="finTx" data-id="${t.id}"><span class="row-title">${esc(t.desc)}</span><span class="row-meta">${dueTxt(t, today)}${t.certainty === 'estimado' ? ' · estimado' : ''}</span></button>
+            <span class="fin-amt">${F.money(t.remaining ?? t.amount)}</span>${t.envelope ? '' : `<button class="btn ghost small" type="button" data-act="finPay" data-id="${t.id}">Pagar</button>`}</div>`).join('')
           : '<div class="empty"><strong>Nenhuma conta prevista até o salário.</strong><span>Cadastre as contas fixas em Mais → Contas fixas.</span></div>'}</div>
       </section>
 
       <aside class="side-col">
         ${alerts.length ? `<section class="block"><div class="block-head"><h2>Avisos</h2></div><div class="alerts">${alerts.slice(0, 2).map(([k, m]) => `<div class="alert a-${k}">${esc(m)}</div>`).join('')}</div></section>` : ''}
         <section class="block"><div class="block-head"><h2>Contas</h2><button class="link" type="button" data-act="finConcile">Conferir saldo</button></div>
-          <div class="list">${s.balances.map(b => `<button type="button" class="row as-btn fin-row" data-act="finAccount" data-id="${b.account.id}"><span class="row-main as-text"><span class="row-title">${esc(b.account.name)}</span><span class="row-meta">${F.ACC_TYPES[b.account.type] || ''}${b.account.inAvailable === false ? ' · fora do disponível' : ''}${b.account.openingSet === false ? ' · <b class="st-pendente">falta o saldo inicial</b>' : ''}</span></span><span class="fin-amt ${b.balance < 0 ? 'neg' : ''}">${F.money(b.balance)}</span></button>`).join('')}</div>
+          <div class="list">${s.balances.filter(b => b.account.type !== 'cartao').map(b => `<button type="button" class="row as-btn fin-row" data-act="finAccount" data-id="${b.account.id}"><span class="row-main as-text"><span class="row-title">${esc(b.account.name)}</span><span class="row-meta">${F.ACC_TYPES[b.account.type] || ''}${b.account.inAvailable === false ? ' · fora do disponível' : ''}${b.account.openingSet === false ? ' · <b class="st-pendente">falta o saldo inicial</b>' : ''}</span></span><span class="fin-amt ${b.balance < 0 ? 'neg' : ''}">${F.money(b.balance)}</span></button>`).join('')}</div>
         </section>
       </aside>
     </div>`;
@@ -158,16 +162,76 @@
   /* ============================================================
      ORÇAMENTO (ciclo)
   ============================================================ */
+  const MONTHS_SHORT = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+  const ymTxt = ym => { const [y, m] = ym.split('-'); return `${MONTHS_SHORT[+m - 1]}/${y.slice(2)}`; };
+  P.ui.finCycleOfs = P.ui.finCycleOfs || 0;
+
   P.views['fin-orcamento'] = () => {
     F.ensureSeeds();
-    let s = F.snap(); F.ensureOccurrences(s.cycle.start, s.cycle.end); s = F.snap();
-    const c = s.cycle, today = P.today();
-    const cycleTx = F.txs().filter(t => t.kind === 'despesa' && t.date >= c.start && t.date <= c.end && t.origin === 'recorrencia').sort((a, b) => a.date.localeCompare(b.date));
+    const ofs = P.ui.finCycleOfs || 0;
+    let s = F.snap(); F.ensureOccurrences(s.cycle.start, s.cycle.end);
+    const c0 = F.cycleAt(ofs); if (ofs) F.ensureOccurrences(c0.start, c0.end);
+    s = F.snap();
+    const c = ofs ? c0 : s.cycle, today = P.today();
+    const sum = F.summary({ start: c.start, end: c.end });
+    const label = ofs === 0 ? 'Ciclo atual' : ofs === 1 ? 'Próximo ciclo' : ofs === -1 ? 'Ciclo anterior' : ofs > 0 ? `Daqui a ${ofs} ciclos` : `${-ofs} ciclos atrás`;
+    const carnes = F.parcs().filter(p => !p.deleted && p.type === 'carne');
+    const cardParcs = F.parcs().filter(p => !p.deleted && p.type === 'cartao');
+    const futureByMonth = {}; sum.cardFuture.forEach(i => (futureByMonth[i.month] = futureByMonth[i.month] || []).push(i));
+
+    const pendRow = t => `<div class="row fin-row ${t.date < today && !t.envelope && !t.noDue ? 'late' : ''}">
+        <button type="button" class="row-main" data-act="finTx" data-id="${t.id}"><span class="row-title">${esc(t.desc)}</span><span class="row-meta">${esc(F.cat(t.categoryId)?.name || '')} · ${dueTxt(t, today)}${t.certainty === 'estimado' ? ' · estimado' : ''}</span></button>
+        <span class="fin-amt">${F.money(t.remaining)}</span>${t.envelope ? '' : `<button class="btn ghost small" type="button" data-act="finPay" data-id="${t.id}">Pagar</button>`}</div>`;
+
     return `
     <header class="page-head"><h1>Orçamento</h1>
-      <p class="lede">Ciclo de ${F.date(c.start)} a ${F.date(c.end)} · próximo salário ${F.date(c.nextPay)} ${c.projected ? cert('projetado') : cert('confirmado')}</p></header>
+      <div class="cycle-nav">
+        <button class="icon-btn" type="button" data-act="finCycle" data-d="-1" aria-label="Ciclo anterior">‹</button>
+        <div><b>${label}</b><span>${F.date(c.start)} a ${F.date(c.end)} · salário ${F.date(c.start)} ${c.projected ? cert('projetado') : cert('confirmado')}</span></div>
+        <button class="icon-btn" type="button" data-act="finCycle" data-d="1" aria-label="Próximo ciclo">›</button>
+      </div>
+      ${ofs ? '<button class="link back-link" type="button" data-act="finCycle" data-d="0">← Voltar para o ciclo atual</button>' : ''}</header>
 
-    ${c.projected ? `<section class="block"><div class="notice">Este ciclo ainda é uma projeção pelas regras do seu perfil (salário dia ${F.profile().payday}, adiando em fim de semana e feriado). Quando o salário cair, lance e confirme o plano.</div>
+    <section class="block">
+      <div class="block-head"><h2>Resumo do ciclo</h2></div>
+      <div class="sum-card">
+        <div><span>Receitas ${sum.incomeDone ? cert('confirmado') : cert('projetado')}</span><b class="in">${F.money(sum.income)}</b><small>${sum.incomeDone ? `recebido ${F.money(sum.incomeDone)}` : 'ainda não recebido'}${sum.incomePlanned && sum.incomeDone ? ` · falta ${F.money(sum.incomePlanned)}` : ''}</small></div>
+        <div><span>Total comprometido</span><b>${F.money(sum.committed)}</b><small>pago ${F.money(sum.paidTotal)} · falta pagar ${F.money(sum.pendingTotal)}</small></div>
+        <div class="${sum.projected < 0 ? 'neg' : ''}"><span>Saldo projetado ${cert('projetado')}</span><b>${F.money(sum.projected)}</b><small>receitas − comprometido</small></div>
+      </div>
+      <details class="calc"><summary>Como calculei</summary><ul class="premissas">${sum.premissas.map(p => `<li>${esc(p)}</li>`).join('')}</ul></details>
+    </section>
+
+    <div class="cols">
+      <section class="block main-col">
+        <div class="block-head"><h2>Pendentes</h2><span class="count">${sum.pending.length}</span><span class="faint small">${F.money(sum.pendingTotal)}</span></div>
+        <div class="list">${sum.pending.length ? sum.pending.map(pendRow).join('') : '<div class="empty"><strong>Nada pendente neste ciclo.</strong></div>'}</div>
+
+        <details class="more" ${sum.paid.length ? 'open' : ''}><summary>Pagas <span class="count">${sum.paid.length}</span> <span class="faint small">${F.money(sum.paidTotal)}</span></summary>
+          <div class="list">${sum.paid.length ? sum.paid.map(txRow).join('') : '<div class="empty"><span>Nenhuma despesa paga ainda neste ciclo.</span></div>'}</div></details>
+      </section>
+
+      <aside class="side-col">
+        <section class="block"><div class="block-head"><h2>Parcelamentos</h2></div>
+          <div class="list">${carnes.length || cardParcs.length ? carnes.map(p => { const pr = C.parcProgress(p, F.txs()); return `<div class="row parc-row"><span class="row-main as-text">
+              <span class="row-title">${esc(p.desc)}</span>
+              <span class="row-meta">${pr.paidCount} de ${p.n} pagas · faltam ${pr.left} · ${F.money(pr.leftAmount)}</span>
+              ${bar(pr.paidCount / p.n * 100)}</span></div>`; }).join('')
+            + cardParcs.map(p => { const list = C.installments(p, F.txs()); const card = F.acc(p.accountId); return `<div class="row parc-row"><span class="row-main as-text">
+              <span class="row-title">${esc(p.desc)}</span>
+              <span class="row-meta">${card ? esc(card.name) + ' · ' : ''}${p.n}× ${F.money(list[0]?.amount)} · total ${F.money(p.total)} · de ${ymTxt(list[0].month)} a ${ymTxt(list[list.length - 1].month)}</span></span></div>`; }).join('')
+            : '<div class="empty"><span>Nenhum parcelamento cadastrado.</span></div>'}</div></section>
+
+        <section class="block"><div class="block-head"><h2>Cartão · parcelas futuras</h2><span class="faint small">${F.money(sum.cardFutureTotal)}</span></div>
+          ${sum.cardThis.length ? `<p class="hint">Nesta fatura (${ymTxt(c.start.slice(0, 7))}) já estão ${F.money(sum.cardThisTotal)} em parcelas: ${sum.cardThis.map(i => `${esc(i.desc)} ${i.n}/${i.of}`).join(', ')}. Elas não somam de novo: só a fatura é paga.</p>` : ''}
+          <div class="list">${Object.keys(futureByMonth).length ? Object.entries(futureByMonth).map(([m, items]) => `<div class="row"><span class="row-main as-text"><span class="row-title">Fatura de ${ymTxt(m)}</span>
+              <span class="row-meta">${items.map(i => `${esc(i.desc)} ${i.n}/${i.of}`).join(' · ')}</span></span><span class="fin-amt">${F.money(items.reduce((a, i) => a + i.amount, 0))}</span></div>`).join('')
+            : '<div class="empty"><span>Nenhuma parcela de cartão para os próximos meses.</span></div>'}</div>
+          <p class="hint">Não entram como despesa deste ciclo. Entram quando você pagar a fatura do mês.</p></section>
+      </aside>
+    </div>
+
+    ${ofs === 0 ? (c.projected ? `<section class="block"><div class="notice">Este ciclo ainda é uma projeção pelas regras do seu perfil (salário dia ${F.profile().payday}, adiando em fim de semana e feriado). Quando o salário cair, lance e confirme o plano.</div>
       <div class="form-actions split"><button class="btn primary" type="button" data-act="finSalary">Lançar o salário</button><button class="btn ghost" type="button" data-act="finPlanNow">Montar plano com o saldo de hoje</button><span class="grow"></span></div></section>`
     : `<section class="block"><div class="block-head"><h2>Plano confirmado em ${F.date(c.plannedAt || c.start)}</h2><button class="link" type="button" data-act="finReplan">Refazer plano</button></div>
       <div class="calc-table">
@@ -175,24 +239,13 @@
         <div><span>− Contas e compromissos do ciclo</span><b>${F.money(-c.committed)}</b></div>
         <div><span>− Reserva de segurança</span><b>${F.money(-c.reserve)}</b></div>
         <div class="calc-total"><span>= Livre para o dia a dia</span><b>${F.money(c.base)}</b></div>
-      </div></section>`}
+      </div></section>`) : ''}
 
-    ${s.weeks.length ? `<section class="block"><div class="block-head"><h2>Semanas</h2><span class="faint small">editar e reorganizar chega em breve</span></div>
+    ${ofs === 0 && s.weeks.length ? `<section class="block"><div class="block-head"><h2>Semanas</h2><span class="faint small">editar e reorganizar chega em breve</span></div>
       <div class="weeks">${s.weeks.map(w => { const cur = w.start <= today && today <= w.end, past = w.end < today, over = w.spent > w.limit; return `<div class="wk ${cur ? 'cur' : ''} ${past ? 'past' : ''} ${over ? 'over' : ''}">
         <div class="wk-head"><b>${w.label}</b><span class="faint small">${F.date(w.start)}–${F.date(w.end)}</span></div>
         <div class="wk-nums"><span>${F.money(w.spent)} de ${F.money(w.limit)}</span><span class="${over ? 'bad-t' : ''}">${over ? 'passou ' + F.money(w.spent - w.limit) : (past ? 'sobrou ' : 'restam ') + F.money(w.limit - w.spent)}</span></div>
-        ${bar(w.limit ? w.spent / w.limit * 100 : (w.spent ? 100 : 0), over ? 'over' : '')}</div>`; }).join('')}</div></section>` : ''}
-
-    <section class="block"><div class="block-head"><h2>Ciclo até agora</h2></div>
-      <div class="fin-kpis">
-        <div><span>Receitas</span><b class="in">${F.money(s.incomeCycle)}</b></div>
-        <div><span>Despesas</span><b>${F.money(s.expenseCycle)}</b></div>
-        <div><span>Comprometido</span><b>${F.money(s.committed)}</b></div>
-        <div><span>Posso gastar</span><b>${F.money(s.canSpend)}</b></div>
-      </div></section>
-
-    <section class="block"><div class="block-head"><h2>Contas fixas deste ciclo</h2><button class="link" type="button" data-act="finRecs">Editar contas fixas</button></div>
-      <div class="list">${cycleTx.length ? cycleTx.map(txRow).join('') : '<div class="empty"><strong>Nenhuma conta fixa.</strong><span>Cadastre aluguel, luz, academia e assinaturas para elas entrarem no plano.</span></div>'}</div></section>`;
+        ${bar(w.limit ? w.spent / w.limit * 100 : (w.spent ? 100 : 0), over ? 'over' : '')}</div>`; }).join('')}</div></section>` : ''}`;
   };
 
   /* ============================================================
@@ -217,7 +270,7 @@
       <label class="search"><span aria-hidden="true">⌕</span><input id="fin-q" type="search" placeholder="Buscar" value="${esc(u.finQ || '')}" data-input="finQ" aria-label="Buscar lançamentos"></label>
       <div class="chips">${chips('finPeriod', [['ciclo', 'Ciclo atual'], ['mes', 'Este mês'], ['tudo', 'Tudo']])}</div>
       <div class="chips">${chips('finKind', [['all', 'Todos'], ['despesa', 'Despesas'], ['receita', 'Receitas'], ['transferencia', 'Transferências'], ['ajuste', 'Ajustes']])}</div>
-      <div class="chips">${chips('finStatus', [['all', 'Qualquer situação'], ['realizado', 'Realizados'], ['previsto', 'Previstos'], ['pendente', 'Pendentes'], ['cancelado', 'Cancelados']])}</div>
+      <div class="chips">${chips('finStatus', [['all', 'Qualquer situação'], ['realizado', 'Realizados'], ['previsto', 'Pendentes'], ['pendente', 'Vencidas'], ['cancelado', 'Cancelados']])}</div>
     </div>
     ${list.length ? Object.entries(groups).map(([d, items]) => `<div class="day-group"><div class="day-label">${P.relDay(d) === 'hoje' ? 'Hoje' : P.relDay(d) === 'ontem' ? 'Ontem' : F.date(d)}</div><div class="list">${items.map(txRow).join('')}</div></div>`).join('')
       : '<div class="empty"><strong>Nada por aqui.</strong><span>Toque em + Lançar e escreva do seu jeito, por exemplo “gastei 23,90 de uber no pix”.</span></div>'}`;
@@ -237,6 +290,7 @@
         ${item('finRecs', 'Contas fixas', 'Aluguel, luz, academia, assinaturas: viram compromissos em cada ciclo')}
         ${item('finCats', 'Categorias', 'Padrão + as suas; quais entram no limite semanal')}
         ${item('finConcile', 'Conferir saldo', 'Compare com o saldo do banco e ajuste a diferença')}
+        ${item('finImport', 'Importar planejamento', 'Cadastra de uma vez as contas de um mês a partir de um arquivo .json')}
       </div></section>
       <section class="block set"><h2>Preferências</h2><div class="data-actions">
         ${item('finProfile', 'Perfil financeiro', 'Renda, dia do salário, regra de feriado, reserva')}
@@ -267,7 +321,7 @@
     finAccount: el => F.accountForm(F.acc(el.dataset.id)),
     finAccounts: () => P.sheet({
       title: 'Contas', live: true,
-      render: () => `<div class="list">${F.snap().balances.map(b => `<button type="button" class="row as-btn fin-row" data-a="${b.account.id}"><span class="row-main as-text"><span class="row-title">${esc(b.account.name)}</span><span class="row-meta">${F.ACC_TYPES[b.account.type] || ''}${b.account.inAvailable === false ? ' · fora do disponível' : ''}</span></span><span class="fin-amt">${F.money(b.balance)}</span></button>`).join('')}</div>
+      render: () => `<div class="list">${F.snap().balances.filter(b => b.account.type !== 'cartao').map(b => `<button type="button" class="row as-btn fin-row" data-a="${b.account.id}"><span class="row-main as-text"><span class="row-title">${esc(b.account.name)}</span><span class="row-meta">${F.ACC_TYPES[b.account.type] || ''}${b.account.inAvailable === false ? ' · fora do disponível' : ''}</span></span><span class="fin-amt">${F.money(b.balance)}</span></button>`).join('')}</div>
         <div class="form-actions"><button class="btn primary" type="button" data-new>+ Conta</button></div>`,
       mount: api => { P.$$('[data-a]', api.body).forEach(x => x.onclick = () => F.accountForm(F.acc(x.dataset.a))); api.body.querySelector('[data-new]').onclick = () => F.accountForm(); }
     }),
@@ -279,6 +333,8 @@
     finHistory: () => F.historySheet(),
     finHide: () => { P.ls.set('prisma2:finHide', !F.hidden()); P.render(); },
     finLock: () => { F.lock(); P.render(); },
+    finCycle: el => { const d = +el.dataset.d; P.ui.finCycleOfs = d === 0 ? 0 : Math.max(-12, Math.min(12, (P.ui.finCycleOfs || 0) + d)); P.render(); window.scrollTo(0, 0); },
+    finImport: () => F.importPick(),
     finFilter: el => { P.ui[el.dataset.k] = el.dataset.v; P.saveUI(); P.render(); }
   });
 })();

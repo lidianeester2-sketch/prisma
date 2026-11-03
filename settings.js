@@ -110,7 +110,7 @@
         </div>
       </section>
 
-      <p class="credits">Prisma · versão 8 · Desenvolvido por Lidiane Tavares</p>
+      <p class="credits">Prisma · versão 9 · Desenvolvido por Lidiane Tavares</p>
     </div>`;
   };
 

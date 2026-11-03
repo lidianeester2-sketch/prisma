@@ -1004,3 +1004,22 @@ body[data-space="fin"] .fin-hero { --hero-bg: #1f9e66; }
   .fin-hero { padding: 20px; }
   .sheet, .sheet.wide { border-radius: 24px 24px 0 0; }
 }
+
+/* ---------- v9: orçamento por ciclo ---------- */
+.cycle-nav { display: flex; align-items: center; gap: 12px; margin-top: 6px; }
+.cycle-nav > div { display: grid; gap: 2px; min-width: 0; }
+.cycle-nav b { font-size: 15px; }
+.cycle-nav span { font-size: 13px; color: var(--muted); }
+.cycle-nav .icon-btn { font-size: 20px; line-height: 1; }
+.sum-card { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.sum-card > div { display: grid; gap: 4px; padding: 16px 18px; border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--soft); min-width: 0; }
+.sum-card > div:nth-child(1) { background: var(--t4); } .sum-card > div:nth-child(2) { background: var(--t2); } .sum-card > div:nth-child(3) { background: var(--t1); }
+.sum-card > div.neg { background: color-mix(in srgb, var(--bad) 14%, var(--surface)); }
+.sum-card span { font-size: 13px; font-weight: 600; color: var(--text); opacity: .85; }
+.sum-card b { font: 800 22px/1.15 var(--f-body); font-variant-numeric: tabular-nums; }
+.sum-card b.in { color: var(--text); }
+.sum-card small { font-size: 12px; color: var(--muted); }
+.parc-row .row-main { gap: 6px; }
+.parc-row .bar { margin-top: 4px; }
+@media (max-width: 700px) { .sum-card { grid-template-columns: minmax(0, 1fr); } .sum-card b { font-size: 20px; } }
+.back-link { justify-self: start; }

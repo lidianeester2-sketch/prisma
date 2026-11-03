@@ -7,7 +7,7 @@
 (function () {
   const KEY = 'prisma2:db';
   const DIRTY_KEY = 'prisma2:dirty';
-  const COLS = ['items', 'tasks', 'notes', 'events', 'habits', 'meta', 'fin_conta', 'fin_cat', 'fin_lanc', 'fin_rec', 'fin_ciclo', 'fin_conc', 'fin_hist'];
+  const COLS = ['items', 'tasks', 'notes', 'events', 'habits', 'meta', 'fin_conta', 'fin_cat', 'fin_lanc', 'fin_rec', 'fin_ciclo', 'fin_conc', 'fin_hist', 'fin_parc'];
   let db = {};
   let dirty = new Set();
   const listeners = new Set();

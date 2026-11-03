@@ -153,7 +153,8 @@
     while (y < ty || (y === ty && m <= tm)) {
       const ym = `${y}-${pad(m)}`;
       const date = toISO(y, m, Math.min(rec.day || 1, daysInMonth(y, m)));
-      const inRange = date >= from && date <= to && (!rec.start || ym >= rec.start) && (!rec.end || ym <= rec.end);
+      const paused = rec.pausedUntil && ym < rec.pausedUntil && (!rec.pausedFrom || ym >= rec.pausedFrom);
+      const inRange = !paused && date >= from && date <= to && (!rec.start || ym >= rec.start) && (!rec.end || ym <= rec.end);
       if (inRange) out.push({
         id: `rec-${rec.id}-${ym}`, kind: rec.kind || 'despesa', desc: rec.desc, amount: rec.amount, date,
         status: 'previsto', certainty: rec.certainty || 'confirmado', method: rec.method || 'boleto',
@@ -184,6 +185,63 @@
     return (account.opening || 0) + txs.reduce((s, t) => s + effectOn(account.id, t), 0);
   }
 
+  /* ---------------- compromisso "teto" (envelope) ---------------- */
+  // Ex.: "Compras de casa R$ 250". Não se paga de uma vez: cada compra realizada na mesma
+  // categoria, dentro do período do envelope, abate o que falta. Assim nada conta duas vezes.
+  const envUsed = (t, txs) => txs.filter(x => done(x) && x.kind === 'despesa' && x.method !== 'credito' && x.id !== t.id && x.categoryId === t.categoryId && x.date >= t.envStart && x.date <= t.envEnd).reduce((s, x) => s + x.amount, 0);
+  function pendingAmount(t, txs, today) {
+    if (!t.envelope) return t.amount;
+    if (today && t.envEnd && today > t.envEnd) return 0;     // período acabou: o teto não segue para o próximo ciclo
+    return Math.max(0, t.amount - envUsed(t, txs));
+  }
+
+  /* ---------------- parcelamentos ---------------- */
+  const addMonths = (ym, n) => { let [y, m] = ym.split('-').map(Number); m += n; while (m > 12) { m -= 12; y++; } while (m < 1) { m += 12; y--; } return `${y}-${pad(m)}`; };
+  // parc: { id, type: 'carne' (paga mês a mês pela conta) | 'cartao' (entra na fatura de cada mês),
+  //         total, n, firstMonth 'AAAA-MM', paidBefore (parcelas já pagas antes do app) }
+  function installments(parc, txs = []) {
+    if (!parc || parc.deleted || !parc.n) return [];
+    const amounts = allocate(parc.total, Array(parc.n).fill(1));
+    const linked = txs.filter(t => live(t) && t.parcId === parc.id);
+    return amounts.map((amount, i) => {
+      const n = i + 1, t = linked.find(x => x.parcNum === n), before = n <= (parc.paidBefore || 0);
+      const paid = before || (!!t && t.status === 'realizado');
+      return { n, month: addMonths(parc.firstMonth, i), amount: t ? t.amount : amount, paid, before, txId: t ? t.id : null };
+    });
+  }
+  function parcProgress(parc, txs) {
+    const list = installments(parc, txs), paid = list.filter(i => i.paid), open = list.filter(i => !i.paid);
+    return { list, paidCount: paid.length, left: open.length, paidAmount: paid.reduce((s, i) => s + i.amount, 0), leftAmount: open.reduce((s, i) => s + i.amount, 0), next: open[0] || null };
+  }
+
+  /* ---------------- resumo de um ciclo (pago × pendente × futuro) ---------------- */
+  // range: { start, end } de um ciclo. Não depende de saldo de banco: é a conta do planejamento.
+  function cycleSummary(state, range, today) {
+    const { txs = [], parcs = [] } = state;
+    const inR = t => live(t) && t.date >= range.start && t.date <= range.end;
+    const exp = txs.filter(t => inR(t) && t.kind === 'despesa' && t.method !== 'credito');
+    const paid = exp.filter(done).sort((a, b) => a.date.localeCompare(b.date));
+    const pending = exp.filter(planned).map(t => ({ ...t, remaining: pendingAmount(t, txs, today) })).sort((a, b) => a.date.localeCompare(b.date));
+    const inc = txs.filter(t => inR(t) && t.kind === 'receita');
+    const sum = (l, k = 'amount') => l.reduce((s, t) => s + t[k], 0);
+    const paidTotal = sum(paid), pendingTotal = sum(pending, 'remaining');
+    const incomeDone = sum(inc.filter(done)), incomePlanned = sum(inc.filter(planned));
+    const committed = paidTotal + pendingTotal, income = incomeDone + incomePlanned;
+    const ym = range.start.slice(0, 7);
+    const card = parcs.filter(p => !p.deleted && p.type === 'cartao').flatMap(p => installments(p, txs).map(i => ({ ...i, parcId: p.id, desc: p.desc, total: p.total, of: p.n })));
+    const cardThis = card.filter(i => i.month === ym), cardFuture = card.filter(i => i.month > ym).sort((a, b) => a.month.localeCompare(b.month) || a.desc.localeCompare(b.desc));
+    return {
+      range, paid, pending, overdue: pending.filter(t => t.date < today && !t.envelope),
+      paidTotal, pendingTotal, committed, income, incomeDone, incomePlanned, projected: income - committed,
+      cardThis, cardThisTotal: sum(cardThis), cardFuture, cardFutureTotal: sum(cardFuture),
+      premissas: [
+        'Saldo projetado = receitas do ciclo (recebidas + previstas) − despesas do ciclo (pagas + pendentes).',
+        'Compras de casa funcionam como teto: cada compra nessa categoria abate o que falta; se passar, o excesso entra no total.',
+        'Parcelas no cartão não são despesa do ciclo: elas já estão dentro da fatura do mês, e só a fatura é paga.'
+      ]
+    };
+  }
+
   /* ---------------- o painel inteiro ---------------- */
   // state: { accounts, txs, categories, cycles, profile }
   function snapshot(state, today) {
@@ -199,8 +257,9 @@
     // Comprometido: despesas previstas (inclusive atrasadas) até a véspera do próximo salário,
     // pagas por conta do disponível ou ainda sem conta definida. Cartão de crédito entra na v7.
     const committedItems = txs.filter(t => planned(t) && t.kind === 'despesa' && t.method !== 'credito' && t.date < cycle.nextPay && (!t.accountId || availIds.has(t.accountId)))
+      .map(t => ({ ...t, remaining: pendingAmount(t, txs, today) })).filter(t => t.remaining > 0)
       .sort((a, b) => a.date.localeCompare(b.date));
-    const committed = committedItems.reduce((s, t) => s + t.amount, 0);
+    const committed = committedItems.reduce((s, t) => s + t.remaining, 0);
 
     const toReceiveItems = txs.filter(t => planned(t) && t.kind === 'receita' && t.date < cycle.nextPay);
     const toReceive = toReceiveItems.reduce((s, t) => s + t.amount, 0);
@@ -237,8 +296,9 @@
     const availIds = new Set(accounts.filter(a => !a.deleted && !a.archived && a.inAvailable !== false).map(a => a.id));
     const available = accounts.filter(a => availIds.has(a.id)).reduce((s, a) => s + balance(a, txs), 0);
     const commitments = txs.filter(t => planned(t) && t.kind === 'despesa' && t.method !== 'credito' && t.date <= end && (!t.accountId || availIds.has(t.accountId)))
+      .map(t => ({ ...t, remaining: pendingAmount(t, txs, start) })).filter(t => t.remaining > 0)
       .sort((a, b) => a.date.localeCompare(b.date));
-    const committed = commitments.reduce((s, t) => s + t.amount, 0);
+    const committed = commitments.reduce((s, t) => s + t.remaining, 0);
     const reserve = Math.max(0, reserveCents ?? profile.reserve ?? 0);
     const base = available - committed - reserve;
     return { start, end, nextPay: next, available, commitments, committed, reserve, base, weeks: splitWeeks(start, end, base) };
@@ -324,7 +384,7 @@
     if (!out.desc) out.missing.push('descricao');
     if (out.kind !== 'transferencia' && !out.categoryKey) out.missing.push('categoria');
     if (!out.method && out.kind === 'despesa') out.missing.push('forma');
-    if (out.method === 'credito') out.notes.push('Compras no cartão de crédito chegam na v7.');
+    if (out.method === 'credito') out.notes.push('Compras no cartão de crédito chegam numa próxima versão.');
     return out;
   }
 
@@ -345,7 +405,8 @@
     parseMoney, formatMoney, allocate,
     addDays, diffDays, weekday, easter, bankHolidays, isBusinessDay, shiftBusiness,
     paydayIn, nextPayday, prevPayday, cycleFor, weekRanges, splitWeeks,
-    occurrences, effectOn, balance, snapshot, cyclePlan, parsePhrase, diff
+    occurrences, effectOn, balance, snapshot, cyclePlan, parsePhrase, diff,
+    addMonths, installments, parcProgress, pendingAmount, envUsed, cycleSummary
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) { root.P = root.P || {}; root.P.finCore = api; }

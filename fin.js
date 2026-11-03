@@ -25,14 +25,25 @@
 
   /* ---------------- leitura ---------------- */
   F.profile = () => ({ ...DEFAULT_PROFILE, ...(S.get('meta', 'finprofile') || {}) });
-  F.accounts = () => S.all('fin_conta').filter(a => !a.archived).sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name, 'pt'));
+  F.accounts = () => S.all('fin_conta').filter(a => !a.archived && a.type !== 'cartao').sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name, 'pt'));
   F.cats = kind => S.all('fin_cat').filter(c => !c.archived && (!kind || c.kind === kind)).sort((a, b) => a.name.localeCompare(b.name, 'pt'));
   F.cat = id => S.get('fin_cat', id);
   F.acc = id => S.get('fin_conta', id);
   F.txs = () => S.all('fin_lanc');
   F.recs = () => S.all('fin_rec');
   F.cycles = () => S.all('fin_ciclo');
-  F.state = () => ({ accounts: S.all('fin_conta'), txs: F.txs(), categories: S.all('fin_cat'), cycles: F.cycles(), profile: F.profile() });
+  // cartão de crédito: guardado como "conta" do tipo cartão, sempre FORA do disponível (limite não é dinheiro)
+  F.cards = () => S.all('fin_conta').filter(a => !a.archived && a.type === 'cartao');
+  F.parcs = () => S.all('fin_parc');
+  F.parc = id => S.get('fin_parc', id);
+  F.state = () => ({ accounts: S.all('fin_conta'), txs: F.txs(), categories: S.all('fin_cat'), cycles: F.cycles(), profile: F.profile(), parcs: F.parcs() });
+  // ciclo vizinho: 0 = atual, 1 = próximo, −1 = anterior
+  F.cycleAt = ofs => {
+    let c = F.snap().cycle; const cyc = F.cycles(), prof = F.profile();
+    for (let i = 0; i < Math.abs(ofs || 0); i++) c = C.cycleFor(ofs > 0 ? c.nextPay : C.addDays(c.start, -1), cyc, prof);
+    return c;
+  };
+  F.summary = range => C.cycleSummary(F.state(), range, P.today());
   F.snap = () => C.snapshot(F.state(), P.today());
 
   /* ---------------- gravação com histórico ---------------- */
@@ -57,15 +68,39 @@
   // Contas fixas viram lançamentos "previstos" do período. Id fixo: nunca duplica.
   F.ensureOccurrences = (from, to) => {
     const raw = S.raw().fin_lanc;
-    F.recs().forEach(r => C.occurrences(r, from, to).forEach(o => { if (!raw[o.id]) S.seed('fin_lanc', o); }));
+    const pauses = F.profile().pauses || [];
+    const norm = x => String(x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    F.recs().forEach(r => {
+      // regra de pausa do perfil (ex.: academia só volta em jan/2027) vale mesmo para conta fixa criada depois
+      const z = pauses.find(x => norm(r.desc).includes(x.match));
+      const eff = z && (!r.pausedUntil || r.pausedUntil < z.until) ? { ...r, pausedUntil: z.until } : r;
+      C.occurrences(eff, from, to).forEach(o => { if (!raw[o.id]) S.seed('fin_lanc', o); });
+    });
+    F.ensureParcOccurrences(from, to);
+  };
+  // Carnês (ex.: multa paga todo mês): cada parcela vira um compromisso no ciclo que começa naquele mês.
+  // Id fixo parc-<id>-<n>: nunca duplica. Compras no CARTÃO não viram lançamento: estão na fatura.
+  F.ensureParcOccurrences = (from, to) => {
+    const raw = S.raw().fin_lanc, prof = F.profile();
+    F.parcs().filter(p => p.type === 'carne' && !p.deleted).forEach(p => C.installments(p, F.txs()).forEach(i => {
+      if (i.before) return;
+      const [y, m] = i.month.split('-').map(Number);
+      const start = C.paydayIn(y, m, prof), end = C.addDays(C.nextPayday(start, prof), -1);
+      if (end < from || start > to) return;
+      const id = `parc-${p.id}-${i.n}`;
+      if (raw[id]) return;
+      S.seed('fin_lanc', { id, kind: 'despesa', desc: `${p.desc} — parcela ${i.n}/${p.n}`, amount: i.amount, date: p.day ? `${i.month}-${String(p.day).padStart(2, '0')}` : end, noDue: !p.day,
+        status: 'previsto', certainty: 'confirmado', method: p.method || 'pix', accountId: p.accountId || null, categoryId: p.categoryId || null, parcId: p.id, parcNum: i.n, origin: 'parcelamento' });
+    }));
   };
 
   /* ---------------- formatação ---------------- */
   F.hidden = () => P.ls.get('prisma2:finHide', false);
   F.money = (c, opts) => (F.hidden() ? 'R$ ••••' : C.formatMoney(c, opts));
   F.date = iso => { if (!iso) return ''; const [y, m, d] = iso.split('-'); return `${d}/${m}${y !== String(new Date().getFullYear()) ? '/' + y.slice(2) : ''}`; };
-  F.status = t => (t.status === 'previsto' && t.date < P.today() ? 'pendente' : t.status);
-  F.STATUS_LABEL = { previsto: 'previsto', pendente: 'pendente', realizado: 'realizado', cancelado: 'cancelado' };
+  F.status = t => (t.status === 'previsto' && t.date < P.today() && !(t.envelope && t.envEnd >= P.today()) ? 'pendente' : t.status);
+  // "previsto" = ainda não pago (aparece como pendente); "pendente" interno = já passou da data (vencida)
+  F.STATUS_LABEL = { previsto: 'pendente', pendente: 'vencida', realizado: 'realizado', cancelado: 'cancelado' };
 
   /* ---------------- PIN ---------------- */
   const PIN_KEY = 'prisma2:finpin';
@@ -88,7 +123,7 @@
   // Para ver os dados de novo é preciso entrar com a senha da conta (Ajustes → Sincronização).
   F.forgotPin = async () => {
     P.ls.del(PIN_KEY); unlocked = false;
-    S.purgeLocal(['fin_conta', 'fin_cat', 'fin_lanc', 'fin_rec', 'fin_ciclo', 'fin_conc', 'fin_hist']);
+    S.purgeLocal(['fin_conta', 'fin_cat', 'fin_lanc', 'fin_rec', 'fin_ciclo', 'fin_conc', 'fin_hist', 'fin_parc']);
     try { Object.keys(localStorage).filter(k => k.startsWith('prisma2:lastPull')).forEach(k => localStorage.removeItem(k)); } catch (e) {}
     if (P.sync?.user()) await P.sync.signOut();
   };

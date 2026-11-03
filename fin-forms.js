@@ -105,6 +105,10 @@
           if (rec.kind === 'transferencia') { delete rec.categoryId; rec.method = 'transferencia'; } else delete rec.toAccountId;
           if (rec.kind === 'receita') rec.method = 'transferencia';
           if (rec.status === 'realizado' && !rec.paidDate) rec.paidDate = rec.date;
+          if (!existing && rec.kind === 'receita' && rec.categoryId === 'cat-salario' && rec.status === 'realizado') {
+            const planned = F.txs().find(t => t.kind === 'receita' && t.categoryId === 'cat-salario' && t.status === 'previsto' && Math.abs(C.diffDays(t.date, rec.date)) <= 12);
+            if (planned) { rec.id = planned.id; rec.createdAt = planned.createdAt; }
+          }
           const saved = F.save('fin_lanc', rec, existing ? `Editou “${rec.desc}”` : `Lançou “${rec.desc}” (${C.formatMoney(rec.amount)})`);
           api.close();
           P.toast(existing ? 'Lançamento salvo.' : impactToast());
@@ -135,9 +139,12 @@
         const hist = S.all('fin_hist').filter(h => h.recId === id).sort((a, b) => b.at - a.at);
         const acc = F.acc(t.accountId), to = F.acc(t.toAccountId), cat = F.cat(t.categoryId);
         return `<div class="fin-detail-amount ${t.kind}">${F.money(t.kind === 'despesa' ? -t.amount : t.amount)}</div>
-          <div class="detail-meta"><span class="pill st-${st}">${F.STATUS_LABEL[st]}</span><span class="pill cert-${t.certainty || 'confirmado'}">${t.certainty === 'estimado' ? 'valor estimado' : 'valor confirmado'}</span>${t.origin === 'recorrencia' ? '<span class="pill">conta fixa</span>' : ''}</div>
+          <div class="detail-meta"><span class="pill st-${st}">${F.STATUS_LABEL[st]}</span><span class="pill cert-${t.certainty || 'confirmado'}">${t.certainty === 'estimado' ? 'valor estimado' : 'valor confirmado'}</span>${t.origin === 'recorrencia' ? '<span class="pill">conta fixa</span>' : ''}${t.parcId ? '<span class="pill">parcelamento</span>' : ''}${t.envelope ? '<span class="pill">teto</span>' : ''}</div>
+          ${t.envelope && t.status === 'previsto' ? '<p class="hint">Não precisa pagar este item. Cada compra que você lançar na categoria dele, dentro do ciclo, desconta daqui. Se passar do teto, o excesso aparece no total do ciclo.</p>' : ''}
           <dl class="info">
-            <div><dt>${t.status === 'previsto' ? 'Vencimento' : 'Data'}</dt><dd>${F.date(t.date)}</dd></div>
+            <div><dt>${t.status === 'previsto' ? 'Vencimento' : 'Data'}</dt><dd>${t.noDue && t.status === 'previsto' ? 'sem data definida (até ' + F.date(t.date) + ')' : F.date(t.date)}</dd></div>
+            ${t.envelope ? `<div><dt>Teto do ciclo</dt><dd>usado ${F.money(C.envUsed(t, F.txs()))} de ${F.money(t.amount)}</dd></div>` : ''}
+            ${parcInfo(t)}
             ${t.paidDate && t.paidDate !== t.date ? `<div><dt>Pago em</dt><dd>${F.date(t.paidDate)}</dd></div>` : ''}
             ${cat ? `<div><dt>Categoria</dt><dd>${esc(cat.name)}</dd></div>` : ''}
             ${acc ? `<div><dt>${t.kind === 'transferencia' ? 'De' : 'Conta'}</dt><dd>${esc(acc.name)}</dd></div>` : ''}
@@ -150,7 +157,7 @@
             ${t.status !== 'cancelado' ? '<button class="btn ghost danger-t" type="button" data-cancel>Cancelar lançamento</button>' : '<button class="btn ghost" type="button" data-restore>Reativar</button>'}
             <span class="grow"></span>
             ${t.status !== 'cancelado' ? '<button class="btn ghost" type="button" data-edit>Editar</button>' : ''}
-            ${t.status === 'previsto' ? `<button class="btn primary" type="button" data-pay>${t.kind === 'receita' ? 'Recebi' : 'Marcar como pago'}</button>` : ''}
+            ${t.status === 'previsto' && !t.envelope ? `<button class="btn primary" type="button" data-pay>${t.kind === 'receita' ? 'Recebi' : 'Marcar como pago'}</button>` : ''}
           </div>`;
       },
       mount: api => {
@@ -171,6 +178,17 @@
   const histRow = h => `<div class="hist-row"><span class="mono faint">${new Date(h.at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
     <span>${esc(h.summary)}${h.action === 'alterou' ? `<small>${Object.entries(h.changes).filter(([k]) => FIELD_NAMES[k]).map(([k, [a, b]]) => `${FIELD_NAMES[k]}: ${esc(fmtVal(k, a))} → ${esc(fmtVal(k, b))}`).join(' · ')}</small>` : ''}</span></div>`;
 
+  // linha "parcela 3 de 12 · faltam 9 (R$ 432,00)" no detalhe de uma parcela
+  const parcInfo = t => {
+    const p = t.parcId && F.parc(t.parcId); if (!p) return '';
+    const pr = C.parcProgress(p, F.txs());
+    return `<div><dt>Parcelamento</dt><dd>parcela ${t.parcNum} de ${p.n} · pagas ${pr.paidCount} · faltam ${pr.left} (${F.money(pr.leftAmount)})</dd></div>`;
+  };
+  F.parcToast = t => {
+    const p = t.parcId && F.parc(t.parcId); if (!p) return null;
+    const pr = C.parcProgress(p, F.txs());
+    return pr.left ? `${p.desc}: ${pr.paidCount} de ${p.n} pagas. Faltam ${pr.left} (${C.formatMoney(pr.leftAmount)}).` : `${p.desc}: última parcela paga. Quitado!`;
+  };
   F.pay = id => {
     const t = S.get('fin_lanc', id) || S.raw().fin_lanc[id]; if (!t) return;
     P.sheet({
@@ -189,7 +207,7 @@
           if (!Number.isInteger(amount) || amount <= 0) { const p = api.body.querySelector('.form-error'); p.textContent = 'Informe o valor pago.'; p.hidden = false; return; }
           F.save('fin_lanc', { ...t, amount, paidDate: f.date.value, status: 'realizado', certainty: 'confirmado', accountId: f.accountId.value, method: f.method ? f.method.value : t.method },
             `${t.kind === 'receita' ? 'Recebeu' : 'Pagou'} “${t.desc}” (${C.formatMoney(amount)})`);
-          api.close(); P.toast(impactToast());
+          api.close(); P.toast(F.parcToast({ ...t }) || impactToast());
         };
       }
     });
@@ -215,7 +233,7 @@
             <div class="calc-input"><span>− Reserva de segurança do ciclo</span><input id="plan-reserve" inputmode="decimal" value="${inMoney(p.reserve)}" class="money-input"></div>
             <div class="calc-total ${p.base < 0 ? 'bad' : ''}"><span>= Livre para o dia a dia</span><b>${F.money(p.base)}</b></div>
           </div>
-          ${p.commitments.length ? `<details class="done-today"><summary>${p.commitments.length === 1 ? 'Ver o compromisso' : `Ver os ${p.commitments.length} compromissos`}</summary><div class="list">${p.commitments.map(t => `<div class="row fin-row"><span class="row-main as-text"><span class="row-title">${esc(t.desc)}</span><span class="row-meta">${F.date(t.date)}${t.certainty === 'estimado' ? ' · estimado' : ''}</span></span><span class="fin-amt">${F.money(t.amount)}</span></div>`).join('')}</div></details>` : '<p class="faint small">Nenhuma conta prevista no período. Cadastre suas contas fixas em Mais → Contas fixas.</p>'}
+          ${p.commitments.length ? `<details class="done-today"><summary>${p.commitments.length === 1 ? 'Ver o compromisso' : `Ver os ${p.commitments.length} compromissos`}</summary><div class="list">${p.commitments.map(t => `<div class="row fin-row"><span class="row-main as-text"><span class="row-title">${esc(t.desc)}</span><span class="row-meta">${F.date(t.date)}${t.certainty === 'estimado' ? ' · estimado' : ''}</span></span><span class="fin-amt">${F.money(t.remaining ?? t.amount)}</span></div>`).join('')}</div></details>` : '<p class="faint small">Nenhuma conta prevista no período. Cadastre suas contas fixas em Mais → Contas fixas.</p>'}
           <div class="block-head sub"><h3>Sugestão para as semanas</h3><span class="faint small">proporcional aos dias</span></div>
           <div class="weeks-preview">${p.weeks.map(w => `<div><span>${w.label}</span><small>${F.date(w.start)}–${F.date(w.end)} · ${w.days} dia${w.days > 1 ? 's' : ''}</small><b>${F.money(w.limit)}</b></div>`).join('')}</div>
           <p class="hint">Na próxima versão você poderá editar e travar o limite de cada semana.</p>
