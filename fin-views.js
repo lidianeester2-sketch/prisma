@@ -231,7 +231,7 @@
       </aside>
     </div>
 
-    ${ofs === 0 ? (c.projected ? `<section class="block"><div class="notice">Este ciclo ainda é uma projeção pelas regras do seu perfil (salário dia ${F.profile().payday}, adiando em fim de semana e feriado). Quando o salário cair, lance e confirme o plano.</div>
+    ${ofs === 0 ? (c.projected ? `<section class="block"><div class="notice">Este ciclo ainda é uma projeção pelas regras do seu perfil (${F.paydayTxt()}). Quando o salário cair, lance e confirme o plano.</div>
       <div class="form-actions split"><button class="btn primary" type="button" data-act="finSalary">Lançar o salário</button><button class="btn ghost" type="button" data-act="finPlanNow">Montar plano com o saldo de hoje</button><span class="grow"></span></div></section>`
     : `<section class="block"><div class="block-head"><h2>Plano confirmado em ${F.date(c.plannedAt || c.start)}</h2><button class="link" type="button" data-act="finReplan">Refazer plano</button></div>
       <div class="calc-table">

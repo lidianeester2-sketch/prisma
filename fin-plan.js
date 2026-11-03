@@ -25,7 +25,10 @@
   function build(plan) {
     if (!plan || plan.tipo !== 'prisma-financeiro-plano') throw new Error('Esse arquivo não é um planejamento do Prisma.');
     F.ensureSeeds();
-    const prof = F.profile();
+    const cur = F.profile();
+    // o arquivo pode trazer a regra do salário (ex.: 5º dia útil): o ciclo já é calculado com ela
+    const perfil = plan.perfil || {};
+    const prof = { ...cur, ...(perfil.diaSalario ? { payday: perfil.diaSalario } : {}), ...(perfil.regraSalario ? { paydayRule: perfil.regraSalario } : {}) };
     const cycle = C.cycleFor(plan.ciclo.inicio, F.cycles(), prof);
     F.ensureOccurrences(cycle.start, cycle.end);
     const ym = cycle.start.slice(0, 7);
@@ -34,7 +37,7 @@
     const inCycle = t => t.date >= cycle.start && t.date <= cycle.end && t.status === 'previsto';
     const mainAcc = F.accounts()[0];
 
-    if (plan.ciclo.fim && plan.ciclo.fim !== cycle.end) notes.push(`Você indicou o ciclo até ${F.date(plan.ciclo.fim)}. Pela regra do seu perfil (salário no dia ${prof.payday}, adiado quando cai em fim de semana ou feriado), o próximo salário cai em ${F.date(cycle.nextPay)}, então o ciclo vai até ${F.date(cycle.end)}. Os valores não mudam.`);
+    if ((plan.ciclo.fim && plan.ciclo.fim !== cycle.end) || plan.ciclo.inicio !== cycle.start) notes.push(`O arquivo indica o ciclo de ${F.date(plan.ciclo.inicio)} a ${F.date(plan.ciclo.fim)}. Pela regra do perfil (${F.paydayTxt(prof)}), o ciclo fica de ${F.date(cycle.start)} a ${F.date(cycle.end)}. Os valores não mudam.`);
 
     // categorias
     const catId = (name, kind = 'despesa') => {
@@ -46,6 +49,7 @@
     };
 
     // perfil
+    if (prof.payday !== cur.payday || prof.paydayRule !== cur.paydayRule) actions.push({ col: 'meta', rec: { ...cur, payday: prof.payday, paydayRule: prof.paydayRule, id: 'finprofile' }, what: 'perfil', label: `Dia do salário: ${F.paydayTxt(cur)} → ${F.paydayTxt(prof)} (salário em ${F.date(cycle.start)}, próximo em ${F.date(cycle.nextPay)})` });
     if (plan.salario && money(plan.salario) !== prof.income) actions.push({ col: 'meta', rec: { ...prof, income: money(plan.salario), incomeCertainty: 'confirmado', id: 'finprofile' }, what: 'perfil', label: `Renda líquida: ${F.money(prof.income)} → ${F.money(money(plan.salario))}` });
 
     // cartões

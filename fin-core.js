@@ -96,6 +96,11 @@
 
   /* ---------------- ciclo salarial ---------------- */
   function paydayIn(y, m, profile) {
+    if (profile.paydayRule === 'util') {           // "5º dia útil": conta só dias com banco aberto
+      let d = toISO(y, m, 1), n = 0;
+      for (let i = 0; i < 31; i++) { if (isBusinessDay(d) && ++n >= (profile.payday || 5)) return d; d = addDays(d, 1); }
+      return d;
+    }
     const day = Math.min(profile.payday || 6, daysInMonth(y, m));
     return shiftBusiness(toISO(y, m, day), profile.paydayRule || 'adia');
   }

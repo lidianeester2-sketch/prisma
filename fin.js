@@ -57,6 +57,7 @@
     }
     return saved;
   };
+  F.paydayTxt = (p = F.profile()) => p.paydayRule === 'util' ? `salário no ${p.payday}º dia útil do mês` : `salário no dia ${p.payday}${p.paydayRule === 'adia' ? ', adiado quando cai em fim de semana ou feriado' : p.paydayRule === 'antecipa' ? ', antecipado quando cai em fim de semana ou feriado' : ''}`;
   F.setProfile = changes => F.save('meta', { ...F.profile(), ...changes, id: 'finprofile' }, 'Alterou o perfil financeiro');
 
   /* ---------------- dados de partida ---------------- */

@@ -412,15 +412,15 @@
       title: 'Perfil financeiro',
       render: () => `<form class="form">
         <div class="row-fields">${field('Renda líquida habitual', `<input name="income" inputmode="decimal" value="${inMoney(p.income)}" class="money-input">`, 'Usada só como referência e estimativa.')}
-        ${field('Dia do salário', `<input name="payday" type="number" min="1" max="31" value="${p.payday}">`)}</div>
-        ${field('Se cair em fim de semana ou feriado', `<select name="paydayRule"><option value="adia" ${p.paydayRule === 'adia' ? 'selected' : ''}>Adia para o próximo dia útil</option><option value="antecipa" ${p.paydayRule === 'antecipa' ? 'selected' : ''}>Antecipa para o dia útil anterior</option><option value="mantem" ${p.paydayRule === 'mantem' ? 'selected' : ''}>Fica na mesma data</option></select>`, 'Feriados nacionais, Carnaval e Corpus Christi contam como dias sem banco.')}
+        ${field('Dia do salário', `<input name="payday" type="number" min="1" max="31" value="${p.payday}">`, 'Número do dia, ou qual dia útil (ex.: 5 = 5º dia útil).')}</div>
+        ${field('Como o dia é contado', `<select name="paydayRule"><option value="util" ${p.paydayRule === 'util' ? 'selected' : ''}>É o Nº dia útil do mês (ex.: 5º dia útil)</option><option value="adia" ${p.paydayRule === 'adia' ? 'selected' : ''}>Dia fixo; adia se cair em fim de semana ou feriado</option><option value="antecipa" ${p.paydayRule === 'antecipa' ? 'selected' : ''}>Dia fixo; antecipa se cair em fim de semana ou feriado</option><option value="mantem" ${p.paydayRule === 'mantem' ? 'selected' : ''}>Dia fixo, sempre na mesma data</option></select>`, 'Feriados nacionais, Carnaval e Corpus Christi contam como dias sem banco.')}
         ${field('Reserva de segurança por ciclo', `<input name="reserve" inputmode="decimal" value="${inMoney(p.reserve)}" class="money-input">`, 'Valor que fica guardado e não entra no “posso gastar”. Pode ser 0.')}
         <div class="form-actions"><button class="btn primary" type="submit">Salvar</button></div></form>`,
       mount: api => {
         api.body.querySelector('form').onsubmit = e => {
           e.preventDefault(); const f = e.target;
           const income = C.parseMoney(f.income.value), reserve = C.parseMoney(f.reserve.value || '0'), payday = parseInt(f.payday.value, 10);
-          if (income === null || reserve === null || !(payday >= 1 && payday <= 31)) { P.toast('Confira os valores.'); return; }
+          if (income === null || reserve === null || !(payday >= 1 && payday <= (f.paydayRule.value === 'util' ? 22 : 31))) { P.toast('Confira os valores.'); return; }
           F.setProfile({ income, reserve, payday, paydayRule: f.paydayRule.value });
           api.close(); P.toast('Perfil salvo.');
         };
