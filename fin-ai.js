@@ -56,6 +56,12 @@
     const c = s.cycle, sum = F.summary({ start: c.start, end: c.end });
     const money = () => { const m = String(text).match(/(\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?|\d+(?:[.,]\d{1,2})?)/); return m ? C.parseMoney(m[1]) : null; };
 
+    // cumprimentos e agradecimentos: resposta na hora, sem gastar a IA
+    if (/^(oi+|ola|ole|opa|eai|e ai|hey|bom dia|boa tarde|boa noite|tudo bem\??|oi tudo bem\??)[!.?\s]*$/.test(t)) {
+      const h = new Date().getHours(), nm = S.settings().name;
+      return { text: `${h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite'}${nm ? ', ' + nm : ''}! Hoje você pode gastar ${M(s.canSpend)} até ${F.date(c.end)}. Pode me perguntar coisas como “posso gastar 100?”, “quanto falta pagar?” ou pedir “gastei 25 de uber no pix”.` };
+    }
+    if (/^(obrigad[ao]|valeu|brigad[ao]|thanks)[!.\s]*$/.test(t)) return { text: 'De nada! Qualquer coisa, é só perguntar.' };
     // "paguei o aluguel" → marcar a conta pendente como paga
     if (/^(ja )?(paguei|quitei)\b/.test(t)) {
       const pend = sum.pending.filter(p => !p.envelope);
@@ -153,7 +159,11 @@
     busy = true; P.render(); scrollEnd();
     try {
       const history = chat().slice(-7, -1).map(m => ({ role: m.role, text: m.text }));
-      const r = await P.sync.execute(cfg().fn, { question: text, context: F.aiContext(), history });
+      // se a função não responder em 40 s, avisa em vez de ficar carregando para sempre
+      const r = await Promise.race([
+        P.sync.execute(cfg().fn, { question: text, context: F.aiContext(), history }),
+        new Promise(res => setTimeout(() => res({ ok: false, erro: 'A IA não respondeu a tempo. Confira no Appwrite: prisma-assistente → Settings → Timeout = 30 e se o deploy está Ready. Depois tente de novo.' }), 40000))
+      ]);
       if (r.ok) push({ role: 'assistant', text: r.resposta, action: r.acao || null, source: 'ia' });
       else push({ role: 'assistant', text: r.erro || 'A IA não respondeu.', source: 'erro', userId: r.userId || null });
     } catch (e) {
@@ -162,6 +172,8 @@
     }
     busy = false; P.render(); scrollEnd();
   };
+  // se a tela ficou presa em "carregando" (ex.: app fechado no meio), libera ao reabrir
+  window.addEventListener('pageshow', () => { busy = false; });
   const scrollEnd = () => setTimeout(() => { const l = P.$('.ai-log'); if (l) l.scrollTop = l.scrollHeight; window.scrollTo(0, document.body.scrollHeight); }, 30);
 
   const SUGGEST = ['Posso gastar R$ 100 hoje?', 'Quanto falta pagar?', 'Com o que eu mais gastei?', 'Quanto ainda tenho na semana?', 'Gastei 25 de uber no pix'];
