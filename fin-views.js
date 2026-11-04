@@ -157,6 +157,7 @@
             <span class="eyebrow">${fresh && r.count ? 'O relatório do ciclo que fechou está pronto' : 'Relatório do ciclo'}</span>
             <b>${r.count ? `Você gastou ${F.money(r.total)}` : 'Ainda sem gastos pagos'}</b>
             <small>${r.top ? `Onde mais foi: ${esc(r.top.name)} (${F.money(r.top.total)})` : 'Veja onde o dinheiro vai'} →</small></button></section>`; })()}
+        <section class="block"><form class="ai-quick" data-ai-quick><input name="q" autocomplete="off" placeholder="Pergunte ao assistente… ex.: posso gastar 100?" aria-label="Pergunte ao assistente"><button class="btn primary small" type="submit">Perguntar</button></form></section>
         ${alerts.length ? `<section class="block"><div class="block-head"><h2>Avisos</h2></div><div class="alerts">${alerts.slice(0, 2).map(([k, m]) => `<div class="alert a-${k}">${esc(m)}${k === 'warn' && /passou/.test(m) && s.week ? ` <button class="link" type="button" data-act="finOver" data-i="${s.weeks.indexOf(s.week)}">Decidir agora →</button>` : ''}</div>`).join('')}</div></section>` : ''}
         <section class="block"><div class="block-head"><h2>Contas</h2><button class="link" type="button" data-act="finConcile">Conferir saldo</button></div>
           <div class="list">${s.balances.filter(b => b.account.type !== 'cartao').map(b => `<button type="button" class="row as-btn fin-row" data-act="finAccount" data-id="${b.account.id}"><span class="row-main as-text"><span class="row-title">${esc(b.account.name)}</span><span class="row-meta">${F.ACC_TYPES[b.account.type] || ''}${b.account.inAvailable === false ? ' · fora do disponível' : ''}${b.account.openingSet === false ? ' · <b class="st-pendente">falta o saldo inicial</b>' : ''}</span></span><span class="fin-amt ${b.balance < 0 ? 'neg' : ''}">${F.money(b.balance)}</span></button>`).join('')}</div>
@@ -303,8 +304,9 @@
         ${item('finCardsCfg', 'Cartões', 'Fechamento e vencimento: a fatura vira conta a pagar no ciclo certo')}
         ${item('finImport', 'Importar planejamento', 'Cadastra de uma vez as contas de um mês a partir de um arquivo .json')}
       </div></section>
-      <section class="block set"><h2>Relatórios</h2><div class="data-actions">
+      <section class="block set"><h2>Relatórios e assistente</h2><div class="data-actions">
         ${item('finReport', 'Relatório do ciclo', 'Onde você mais gastou, onde gastou menos e a comparação com o ciclo anterior')}
+        ${item('finAi', 'Assistente', 'Pergunte “posso gastar 200?” ou peça para lançar um gasto. Ele sugere, você confirma')}
       </div></section>
       <section class="block set"><h2>Preferências</h2><div class="data-actions">
         ${item('finProfile', 'Perfil financeiro', 'Renda, dia do salário, regra de feriado, reserva')}
@@ -312,7 +314,7 @@
         ${item('finHistory', 'Histórico de alterações', 'Tudo que foi criado ou mudado, com antes e depois')}
       </div></section>
       <section class="block set"><h2>Chegando</h2><div class="data-actions">
-        ${soon('Dívidas e metas', 'em breve')}${soon('Renda extra e metas de economia', 'em breve')}${soon('Assistente com IA', 'em breve')}
+        ${soon('Dívidas e metas', 'em breve')}${soon('Renda extra e metas de economia', 'em breve')}
       </div></section>
     </div>`;
   };

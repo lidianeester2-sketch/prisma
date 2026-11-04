@@ -191,6 +191,17 @@
     },
     async signOut() { try { await account?.deleteSession('current'); } catch (e) {} user = null; setStatus('idle'); },
     user: () => user,
+    // chama uma função do Appwrite como o usuário logado (usado pelo assistente)
+    async execute(functionId, payload) {
+      if (!client) await init();
+      if (!client) throw new Error('Conecte o Appwrite em Ajustes → Sincronização.');
+      if (!user) throw new Error('Entre na sua conta em Ajustes → Sincronização para usar a IA.');
+      const fn = new A.Functions(client);
+      const ex = await fn.createExecution(functionId, JSON.stringify(payload), false, '/', 'POST', { 'content-type': 'application/json' });
+      let out = {}; try { out = JSON.parse(ex.responseBody || '{}'); } catch (e) { out = { ok: false, erro: 'Resposta estranha da função.' }; }
+      if (ex.status === 'failed' && !out.erro) out = { ok: false, erro: 'A função falhou. Veja em Appwrite → Functions → prisma-assistente → Executions.' };
+      return out;
+    },
     savePush
   };
 
