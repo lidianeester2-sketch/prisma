@@ -118,8 +118,10 @@
           // salário caiu e o ciclo ainda é só projetado → oferece montar o plano
           const snap = F.snap();
           if (!existing && saved.kind === 'receita' && saved.categoryId === 'cat-salario' && saved.status === 'realizado') {
-            const has = F.cycles().some(c => c.start <= saved.date && saved.date <= c.end);
-            if (!has) setTimeout(() => F.plan(saved.date, saved.id), 350);
+            const early = C.earlyCycle(saved.date, F.cycles(), F.profile());
+            const has = F.cycles().some(c => c.start <= saved.date && saved.date <= c.end && c.plannedAt);
+            if (early) setTimeout(() => F.earlyCycle({ txId: saved.id }), 350);
+            else if (!has) setTimeout(() => F.plan(saved.date, saved.id), 350);
           }
           return snap;
         };
@@ -221,16 +223,16 @@
   /* ============================================================
      PLANO DO CICLO
   ============================================================ */
-  F.plan = (start, salaryTxId = null) => {
+  F.plan = (start, salaryTxId = null, nextPayOverride = null) => {
     let reserve = F.profile().reserve || 0;
     const prev = F.cycles().find(c => c.start === start);
     if (prev) reserve = prev.reserve || 0;
     P.sheet({
       title: 'Plano do ciclo', kicker: 'nada muda até você confirmar', wide: true,
       render: () => {
-        const nextPay = C.nextPayday(start, F.profile());
+        const nextPay = nextPayOverride || C.nextPayday(start, F.profile());
         F.ensureOccurrences(start, C.addDays(nextPay, -1));
-        const p = C.cyclePlan(F.state(), start, reserve);
+        const p = C.cyclePlan(F.state(), start, reserve, nextPay);
         return `<p class="lede small">Ciclo de <b>${F.date(p.start)}</b> a <b>${F.date(p.end)}</b>. Próximo salário previsto: ${F.date(p.nextPay)}.</p>
           <div class="calc-table">
             <div><span>Saldo hoje nas contas do disponível</span><b>${F.money(p.available)}</b></div>
@@ -241,9 +243,9 @@
           ${p.commitments.length ? `<details class="done-today"><summary>${p.commitments.length === 1 ? 'Ver o compromisso' : `Ver os ${p.commitments.length} compromissos`}</summary><div class="list">${p.commitments.map(t => `<div class="row fin-row"><span class="row-main as-text"><span class="row-title">${esc(t.desc)}</span><span class="row-meta">${F.date(t.date)}${t.certainty === 'estimado' ? ' · estimado' : ''}</span></span><span class="fin-amt">${F.money(t.remaining ?? t.amount)}</span></div>`).join('')}</div></details>` : '<p class="faint small">Nenhuma conta prevista no período. Cadastre suas contas fixas em Mais → Contas fixas.</p>'}
           <div class="block-head sub"><h3>Sugestão para as semanas</h3><span class="faint small">proporcional aos dias</span></div>
           <div class="weeks-preview">${p.weeks.map(w => `<div><span>${w.label}</span><small>${F.date(w.start)}–${F.date(w.end)} · ${w.days} dia${w.days > 1 ? 's' : ''}</small><b>${F.money(w.limit)}</b></div>`).join('')}</div>
-          <p class="hint">Na próxima versão você poderá editar e travar o limite de cada semana.</p>
+          <p class="hint">Depois você pode mudar e travar o limite de cada semana em Orçamento → Editar semanas.</p>
           ${p.base < 0 ? `<div class="notice">O dinheiro de agora não cobre as contas até o próximo salário. Faltam ${F.money(-p.base)}. Dá para começar mesmo assim e acompanhar pelo painel.</div>` : ''}
-          <div class="form-actions"><button class="btn ghost" type="button" data-cancel>Agora não</button><button class="btn primary" type="button" data-go>${prev ? 'Refazer o plano' : 'Começar o ciclo'}</button></div>`;
+          <div class="form-actions"><button class="btn ghost" type="button" data-cancel>Agora não</button><button class="btn primary" type="button" data-go>${prev?.plannedAt ? 'Refazer o plano' : 'Começar o ciclo'}</button></div>`;
       },
       mount: api => {
         const b = api.body;
@@ -252,9 +254,9 @@
         b.querySelector('[data-cancel]').onclick = () => api.close();
         b.querySelector('[data-go]').onclick = () => {
           const v = C.parseMoney(r.value); if (v !== null && v >= 0) reserve = v;
-          const p = C.cyclePlan(F.state(), start, reserve);
-          F.save('fin_ciclo', { id: 'ciclo-' + start, start: p.start, end: p.end, salaryTxId, available: p.available, committed: p.committed, reserve: p.reserve, base: p.base, weeks: p.weeks.map(w => ({ start: w.start, end: w.end, days: w.days, label: w.label, limit: w.limit, locked: false })), plannedAt: P.today() },
-            `${prev ? 'Refez' : 'Começou'} o ciclo ${F.date(p.start)}–${F.date(p.end)}`);
+          const p = C.cyclePlan(F.state(), start, reserve, nextPayOverride || undefined);
+          F.save('fin_ciclo', { ...(prev || {}), id: 'ciclo-' + start, start: p.start, end: p.end, salaryTxId, available: p.available, committed: p.committed, reserve: p.reserve, base: p.base, weeks: p.weeks.map(w => ({ start: w.start, end: w.end, days: w.days, label: w.label, limit: w.limit, locked: false })), plannedAt: P.today() },
+            `${prev?.plannedAt ? 'Refez o plano do' : 'Começou o'} ciclo ${F.date(p.start)}–${F.date(p.end)}`);
           api.close(); P.toast('Ciclo começou. Bom mês! ✦');
           P.go('fin-orcamento');
         };
@@ -670,6 +672,65 @@
         F.save('fin_ciclo', { ...r.cycle, weeks: r.cycle.weeks.map(({ spent: _s, ...k }) => k) }, `${w.label} passou ${C.formatMoney(over)}: ${TXT[x.dataset.o][0].toLowerCase()}`);
         api.close(); P.toast('Plano do ciclo atualizado.');
       })
+    });
+  };
+  /* ============================================================
+     SALÁRIO ADIANTADO → iniciar o ciclo novo antes da data
+  ============================================================ */
+  F.earlyCycle = (opts = {}) => {
+    const prof = F.profile(), today = P.today();
+    const planned = F.txs().find(t => t.kind === 'receita' && t.categoryId === 'cat-salario' && t.status === 'previsto' && Math.abs(C.diffDays(t.date, today)) <= 15);
+    const given = opts.txId ? S.get('fin_lanc', opts.txId) : null;
+    let st = { date: given?.paidDate || given?.date || today, amount: given?.amount ?? planned?.amount ?? prof.income, accountId: given?.accountId || F.accounts()[0]?.id || '' };
+    P.sheet({
+      title: 'Recebi o salário antes', kicker: 'iniciar novo ciclo', live: false,
+      render: () => {
+        const e = C.earlyCycle(st.date, F.cycles(), prof);
+        return `<form class="form" data-early>
+          ${given ? `<p class="lede">Salário de ${F.money(given.amount)} lançado em ${F.date(st.date)}.</p>` : `<div class="row-fields">
+            ${field('Dia em que caiu', `<input type="date" name="date" value="${st.date}" max="${today}">`)}
+            ${field('Valor que entrou', `<input name="amount" inputmode="decimal" class="money-input" value="${inMoney(st.amount)}">`, planned ? `O salário previsto (${F.money(planned.amount)} em ${F.date(planned.date)}) vira este, sem duplicar.` : '')}</div>
+            ${field('Conta', `<select name="accountId">${accOptions(st.accountId)}</select>`)}`}
+          ${e ? `<div class="calc-table">
+              <div><span>Ciclo atual (${F.date(e.current.start)} a ${F.date(e.current.end)})</span><b>fecha em ${F.date(e.closeOn)}</b></div>
+              <div class="calc-total"><span>Ciclo novo</span><b>${F.date(e.start)} a ${F.date(e.end)}</b></div>
+            </div>
+            <p class="hint">O salário era esperado em ${F.date(e.scheduled)} e chegou ${e.daysEarly} dia${e.daysEarly === 1 ? '' : 's'} antes. O fim do ciclo novo continua sendo a véspera do próximo salário (${F.date(e.nextPay)}). As contas que vencem de ${F.date(e.start)} em diante passam a contar no ciclo novo. Depois você confirma o plano das semanas.</p>`
+          : `<div class="notice">Essa data não é um adiantamento: ${F.date(st.date)} ${C.cycleFor(st.date, F.cycles(), prof).start === st.date ? 'já é o início de um ciclo' : 'está longe do próximo salário previsto'}. Use Lançar normalmente.</div>`}
+          <p class="form-error" hidden></p>
+          <div class="form-actions"><button class="btn ghost" type="button" data-no>Agora não</button><button class="btn primary" type="submit" ${e ? '' : 'disabled'}>Iniciar novo ciclo</button></div>
+        </form>`;
+      },
+      mount: api => {
+        const f = api.body.querySelector('form');
+        const keep = () => { if (f.date) st = { date: f.date.value || st.date, amount: C.parseMoney(f.amount.value) ?? st.amount, accountId: f.accountId.value }; };
+        if (f.date) f.date.onchange = () => { keep(); setTimeout(() => api.refresh(), 0); };
+        api.body.querySelector('[data-no]').onclick = () => api.close();
+        f.onsubmit = e => {
+          e.preventDefault(); keep();
+          const err = m => { const p = api.body.querySelector('.form-error'); p.textContent = m; p.hidden = false; };
+          const ec = C.earlyCycle(st.date, F.cycles(), prof); if (!ec) return err('Essa data não é um adiantamento.');
+          if (!given && (!Number.isInteger(st.amount) || st.amount <= 0)) return err('Informe o valor que entrou.');
+          // 1) salário: confirma o previsto (sem duplicar) ou lança um novo
+          let txId = given?.id;
+          if (!given) {
+            const base = planned || { kind: 'receita', desc: 'Salário', categoryId: 'cat-salario', method: 'transferencia', origin: 'manual' };
+            txId = F.save('fin_lanc', { ...base, amount: st.amount, date: st.date, paidDate: st.date, status: 'realizado', certainty: 'confirmado', accountId: st.accountId }, `Salário adiantado: recebeu ${C.formatMoney(st.amount)} em ${F.date(st.date)}`).id;
+          }
+          // 2) fecha o ciclo atual na véspera
+          const cur = ec.current;
+          const oldRec = cur.id ? S.get('fin_ciclo', cur.id) : null;
+          F.save('fin_ciclo', { ...(oldRec || { id: 'ciclo-' + cur.start, start: cur.start, weeks: [], reserve: 0 }), end: ec.closeOn, weeks: (oldRec?.weeks || []).filter(w => w.start <= ec.closeOn).map(w => (w.end > ec.closeOn ? { ...w, end: ec.closeOn, days: C.diffDays(w.start, ec.closeOn) + 1 } : w)), closedEarly: true },
+            `Fechou o ciclo ${F.date(cur.start)}–${F.date(ec.closeOn)} (salário chegou antes)`);
+          // 3) abre o ciclo novo já com as datas certas; o plano das semanas vem em seguida
+          const p0 = C.cyclePlan(F.state(), ec.start, prof.reserve || 0, ec.nextPay);
+          F.save('fin_ciclo', { id: 'ciclo-' + ec.start, start: ec.start, end: ec.end, salaryTxId: txId, available: p0.available, committed: p0.committed, reserve: p0.reserve, base: p0.base, weeks: [], startedEarly: true },
+            `Iniciou o ciclo ${F.date(ec.start)}–${F.date(ec.end)} (salário ${ec.daysEarly} dia${ec.daysEarly === 1 ? '' : 's'} antes)`);
+          api.close();
+          P.ui.finCycleOfs = 0;
+          setTimeout(() => F.plan(ec.start, txId, ec.nextPay), 250);
+        };
+      }
     });
   };
 })();

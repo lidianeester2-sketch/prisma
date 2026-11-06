@@ -131,6 +131,17 @@
     return { id: null, start, end: addDays(next, -1), nextPay: next, projected: true, weeks: [] };
   }
 
+  // Salário caiu ANTES do dia previsto: o ciclo atual fecha na véspera e o novo começa no dia
+  // em que o dinheiro entrou. O fim do novo ciclo continua sendo a véspera do salário SEGUINTE.
+  function earlyCycle(salaryIso, cycles, profile) {
+    const cur = cycleFor(salaryIso, cycles, profile);
+    if (!cur || salaryIso <= cur.start) return null;                 // caiu no dia certo (ou é o início do ciclo)
+    const ahead = diffDays(salaryIso, cur.nextPay);
+    if (ahead <= 0 || ahead > 15) return null;                       // muito longe do próximo salário: não é adiantamento
+    const after = nextPayday(cur.nextPay, profile);
+    return { current: cur, closeOn: addDays(salaryIso, -1), start: salaryIso, scheduled: cur.nextPay, nextPay: after, end: addDays(after, -1), daysEarly: ahead };
+  }
+
   // Semanas do ciclo: blocos de 7 dias a partir do início; o resto vira "dias finais".
   function weekRanges(start, end) {
     const out = []; let s = start;
@@ -392,9 +403,9 @@
   }
 
   // Plano do ciclo ao registrar o salário (mostrado para confirmar antes de salvar).
-  function cyclePlan(state, start, reserveCents) {
+  function cyclePlan(state, start, reserveCents, nextPayOverride) {
     const { accounts = [], txs = [], profile = {} } = state;
-    const next = nextPayday(start, profile), end = addDays(next, -1);
+    const next = nextPayOverride || nextPayday(start, profile), end = addDays(next, -1);
     const availIds = new Set(accounts.filter(a => !a.deleted && !a.archived && a.inAvailable !== false).map(a => a.id));
     const available = accounts.filter(a => availIds.has(a.id)).reduce((s, a) => s + balance(a, txs), 0);
     const commitments = txs.filter(t => planned(t) && t.kind === 'despesa' && t.method !== 'credito' && t.date <= end && (!t.accountId || availIds.has(t.accountId)))
@@ -506,7 +517,7 @@
   const api = {
     parseMoney, formatMoney, allocate,
     addDays, diffDays, weekday, easter, bankHolidays, isBusinessDay, shiftBusiness,
-    paydayIn, nextPayday, prevPayday, cycleFor, weekRanges, splitWeeks,
+    paydayIn, nextPayday, prevPayday, cycleFor, earlyCycle, weekRanges, splitWeeks,
     occurrences, effectOn, balance, snapshot, cyclePlan, parsePhrase, diff,
     addMonths, installments, parcProgress, pendingAmount, envUsed, cycleSummary, cycleReport, invoiceMonth, invoiceDue, invoiceParts, rebalanceWeeks, coverOverspend
   };

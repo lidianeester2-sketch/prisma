@@ -18,6 +18,7 @@
   let busy = false;
 
   /* ---------------- resumo para a IA ---------------- */
+  // Resumo enxuto (menos texto = IA mais rápida). Valores em reais com 2 casas.
   F.aiContext = () => {
     const withDesc = cfg().descriptions;
     let s = F.snap(); F.ensureOccurrences(s.cycle.start, s.cycle.end); s = F.snap();
@@ -25,26 +26,28 @@
     const pc = F.cycleAt(-1);
     const sum = F.summary({ start: c.start, end: c.end }), sumNext = F.summary({ start: nx.start, end: nx.end });
     const rep = C.cycleReport(F.state(), { start: c.start, end: c.end }, { start: pc.start, end: pc.end }, today);
+    const R = v => Math.round(v) / 100;
     const cat = id => F.cat(id)?.name || 'Sem categoria';
     const d = t => (withDesc ? t.desc : cat(t.categoryId));
-    const tx = t => ({ id: t.id, desc: d(t), cat: cat(t.categoryId), valor: t.remaining ?? t.amount, data: t.date, pagoEm: t.paidDate || null, forma: t.method, tipo: t.kind, certeza: t.certainty || 'confirmado', ...(t.envelope ? { teto: true } : {}), ...(t.noDue ? { semVencimento: true } : {}) });
-    const from = pc.start;
+    // pendente: "id|vencimento|descrição|categoria|valor|obs"
+    const pend = t => [t.id, t.noDue ? 'sem data' : t.date, d(t), cat(t.categoryId), R(t.remaining ?? t.amount), [t.envelope ? 'teto' : '', t.certainty === 'estimado' ? 'estimado' : ''].filter(Boolean).join(' ')].join('|');
+    // gasto: "data|descrição|categoria|forma|valor"
+    const gasto = t => [t.paidDate || t.date, d(t), cat(t.categoryId), t.method || '', R(t.amount)].join('|');
+    const cur = F.txs().filter(t => !t.deleted && t.status === 'realizado' && (t.paidDate || t.date) >= c.start && (t.paidDate || t.date) <= c.end).sort((a, b) => (b.paidDate || b.date).localeCompare(a.paidDate || a.date));
     return JSON.stringify({
-      hoje: today, moeda: 'centavos',
-      perfil: { regraSalario: F.paydayTxt(), rendaLiquida: F.profile().income, reservaPadrao: F.profile().reserve },
-      cicloAtual: { inicio: c.start, fim: c.end, proximoSalario: c.nextPay, projetado: !!c.projected, diasRestantes: s.daysLeft },
-      painel: { saldoReal_confirmado: s.real, reservado: s.reserved, comprometidoAteSalario: s.committed, possoGastar: s.canSpend, porDia: s.perDay, aReceber_naoIncluido: s.toReceive },
-      semanaAtual: s.week ? { nome: s.week.label, inicio: s.week.start, fim: s.week.end, limite: s.week.limit, gasto: s.week.spent, restante: s.week.limit - s.week.spent } : null,
-      semanas: s.weeks.map(w => ({ nome: w.label, inicio: w.start, fim: w.end, limite: w.limit, gasto: w.spent })),
-      contas: s.balances.filter(b => b.account.type !== 'cartao').map(b => ({ nome: b.account.name, saldo: b.balance })),
-      cartoes: F.cards().map(k => ({ nome: k.name, fechamento: k.closingDay || null, vencimento: k.dueDay || null })),
-      resumoCicloAtual: { receitas: sum.income, comprometido: sum.committed, pago: sum.paidTotal, faltaPagar: sum.pendingTotal, saldoProjetado: sum.projected },
-      pendentesCicloAtual: sum.pending.map(tx),
-      proximoCiclo: { inicio: nx.start, fim: nx.end, receitas: sumNext.income, comprometido: sumNext.committed, saldoProjetado: sumNext.projected, pendentes: sumNext.pending.map(tx) },
-      gastosPorCategoriaCicloAtual: rep.cats.map(k => ({ categoria: k.name, total: k.total, cicloAnterior: k.prev ?? null })),
-      lancamentos: F.txs().filter(t => !t.deleted && t.date >= from && t.status === 'realizado').sort((a, b) => b.date.localeCompare(a.date)).slice(0, 150).map(tx),
-      parcelamentos: F.parcs().filter(p => !p.deleted && !p.canceled).map(p => { const pr = C.parcProgress(p, F.txs()); return { desc: withDesc ? p.desc : cat(p.categoryId), tipo: p.type, total: p.total, parcelas: p.n, pagas: p.type === 'carne' ? pr.paidCount : null, restante: p.type === 'carne' ? pr.leftAmount : null, faturas: p.type === 'cartao' ? C.installments(p).map(i => ({ mes: i.month, valor: i.amount })) : null }; }),
-      categorias: F.cats().map(k => ({ nome: k.name, tipo: k.kind }))
+      hoje: today, valores: 'reais',
+      ciclo: `${c.start} a ${c.end}${c.projected ? ' (projetado)' : ''}; próximo salário ${c.nextPay}; ${F.paydayTxt()}`,
+      painel: { saldoReal: R(s.real), reservado: R(s.reserved), contasAteSalario: R(s.committed), possoGastar: R(s.canSpend), porDia: R(s.perDay), diasRestantes: s.daysLeft },
+      semana: s.week ? `${s.week.label} ${s.week.start} a ${s.week.end}: limite ${R(s.week.limit)}, gasto ${R(s.week.spent)}` : 'sem plano semanal',
+      contas: s.balances.filter(b => b.account.type !== 'cartao').map(b => `${b.account.name}: ${R(b.balance)}`),
+      ciclo_resumo: { receitas: R(sum.income), comprometido: R(sum.committed), pago: R(sum.paidTotal), faltaPagar: R(sum.pendingTotal), saldoProjetado: R(sum.projected) },
+      pendentes: { formato: 'id|vencimento|descrição|categoria|valor|obs', itens: sum.pending.map(pend) },
+      proximo_ciclo: { periodo: `${nx.start} a ${nx.end}`, comprometido: R(sumNext.committed), saldoProjetado: R(sumNext.projected), pendentes: sumNext.pending.slice(0, 15).map(pend) },
+      gastos_por_categoria: rep.cats.map(k => `${k.name}: ${R(k.total)}${k.prev !== undefined ? ` (ciclo anterior ${R(k.prev)})` : ''}`),
+      gastos_do_ciclo: { formato: 'data|descrição|categoria|forma|valor', itens: cur.slice(0, 60).map(gasto), total: cur.length },
+      cartao_parcelas_futuras: sum.cardFuture.slice(0, 12).map(i => `${i.month} ${withDesc ? i.desc : 'compra'} ${i.n}/${i.of}: ${R(i.amount)}`),
+      carnes: F.parcs().filter(p => !p.deleted && !p.canceled && p.type === 'carne').map(p => { const pr = C.parcProgress(p, F.txs()); return `${withDesc ? p.desc : cat(p.categoryId)}: ${pr.paidCount}/${p.n} pagas, falta ${R(pr.leftAmount)}`; }),
+      categorias: F.cats().map(k => k.name)
     });
   };
 
@@ -157,6 +160,7 @@
     const local = F.aiLocal(text);
     if (local) { push({ role: 'assistant', text: local.text, action: local.action || null, source: 'app' }); P.render(); scrollEnd(); return; }
     busy = true; P.render(); scrollEnd();
+    const t0 = Date.now(), tick = setInterval(() => { const el = P.$('[data-secs]'); if (el) el.textContent = `pensando… ${Math.round((Date.now() - t0) / 1000)} s`; }, 1000);
     try {
       const history = chat().slice(-7, -1).map(m => ({ role: m.role, text: m.text }));
       // se a função não responder em 40 s, avisa em vez de ficar carregando para sempre
@@ -170,7 +174,7 @@
       const m = e?.code === 404 ? `Não achei a função “${cfg().fn}” no Appwrite. Confira o passo 2 do guia (o ID da função).` : e?.code === 401 ? 'Para usar a IA, entre na sua conta em Ajustes → Sincronização. As perguntas comuns funcionam sem isso.' : e?.message || 'Sem conexão com a IA agora.';
       push({ role: 'assistant', text: m, source: 'erro' });
     }
-    busy = false; P.render(); scrollEnd();
+    clearInterval(tick); busy = false; P.render(); scrollEnd();
   };
   // se a tela ficou presa em "carregando" (ex.: app fechado no meio), libera ao reabrir
   window.addEventListener('pageshow', () => { busy = false; });
@@ -190,7 +194,7 @@
           ${m.action ? actionCard(m.action, i) : ''}
           ${m.role === 'assistant' ? `<span class="ai-src">${m.source === 'app' ? 'calculado pelo app' : m.source === 'ia' ? 'IA · confira os números' : ''}</span>` : ''}
         </div>`).join('') : `<div class="ai-empty"><b>Oi${S.settings().name ? ', ' + esc(S.settings().name) : ''}!</b><span>Experimente uma destas:</span></div>`}
-      ${busy ? '<div class="ai-msg assistant"><div class="ai-bubble ai-typing"><i></i><i></i><i></i></div></div>' : ''}
+      ${busy ? '<div class="ai-msg assistant"><div class="ai-bubble ai-typing"><i></i><i></i><i></i><span class="ai-secs" data-secs>pensando…</span></div></div>' : ''}
     </div>
     <div class="chips ai-suggest">${SUGGEST.map(q => `<button type="button" class="chip" data-act="aiAsk" data-q="${esc(q)}">${esc(q)}</button>`).join('')}</div>
     <form class="ai-form" data-form="aiAsk"><input id="ai-q" name="q" autocomplete="off" maxlength="600" placeholder="Escreva sua pergunta…" ${busy ? 'disabled' : ''} aria-label="Pergunta"><button class="btn primary" type="submit" ${busy ? 'disabled' : ''}>Enviar</button></form>`;

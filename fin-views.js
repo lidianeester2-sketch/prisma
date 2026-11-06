@@ -93,6 +93,7 @@
     if (s.canSpend < 0) alerts.push(['bad', `O dinheiro disponível não cobre as contas até ${endTxt}. Faltam ${F.money(-s.canSpend)}. Vale olhar as contas previstas e ver o que pode esperar.`]);
     if (overdue.length) alerts.push(['warn', `${overdue.length} conta${overdue.length > 1 ? 's' : ''} já venceu e continua como prevista. Se já pagou, é só marcar como paga.`]);
     if (s.week && s.week.spent > s.week.limit && !(s.week.ackOver >= s.week.spent)) alerts.push(['warn', `A ${s.week.label.toLowerCase()} passou ${F.money(s.week.spent - s.week.limit)} do previsto. Ainda dá para reorganizar o restante do ciclo.`]);
+    if (s.daysLeft > 0 && s.daysLeft <= 7) alerts.push(['info', `Faltam ${s.daysLeft} dia${s.daysLeft === 1 ? '' : 's'} para o salário (${F.date(s.cycle.nextPay)}). Se ele cair antes, dá para iniciar o ciclo novo no mesmo dia.`]);
     if (s.cycle.projected && s.cycle.start <= today && !F.txs().some(t => t.categoryId === 'cat-salario' && t.status === 'realizado' && t.date >= s.cycle.start)) alerts.push(['info', `O salário estava previsto para ${F.date(s.cycle.start)}. Quando cair, registre para montar o plano do ciclo.`]);
     const lastConc = S.all('fin_conc').sort((a, b) => b.date.localeCompare(a.date))[0];
     if (F.txs().length > 5 && (!lastConc || C.diffDays(lastConc.date, today) > 7)) alerts.push(['info', 'Faz mais de uma semana que você não confere o saldo com o banco. Leva 30 segundos.']);
@@ -158,7 +159,7 @@
             <b>${r.count ? `Você gastou ${F.money(r.total)}` : 'Ainda sem gastos pagos'}</b>
             <small>${r.top ? `Onde mais foi: ${esc(r.top.name)} (${F.money(r.top.total)})` : 'Veja onde o dinheiro vai'} →</small></button></section>`; })()}
         <section class="block"><form class="ai-quick" data-ai-quick><input name="q" autocomplete="off" placeholder="Pergunte ao assistente… ex.: posso gastar 100?" aria-label="Pergunte ao assistente"><button class="btn primary small" type="submit">Perguntar</button></form></section>
-        ${alerts.length ? `<section class="block"><div class="block-head"><h2>Avisos</h2></div><div class="alerts">${alerts.slice(0, 2).map(([k, m]) => `<div class="alert a-${k}">${esc(m)}${k === 'warn' && /passou/.test(m) && s.week ? ` <button class="link" type="button" data-act="finOver" data-i="${s.weeks.indexOf(s.week)}">Decidir agora →</button>` : ''}</div>`).join('')}</div></section>` : ''}
+        ${alerts.length ? `<section class="block"><div class="block-head"><h2>Avisos</h2></div><div class="alerts">${alerts.slice(0, 2).map(([k, m]) => `<div class="alert a-${k}">${esc(m)}${k === 'warn' && /passou/.test(m) && s.week ? ` <button class="link" type="button" data-act="finOver" data-i="${s.weeks.indexOf(s.week)}">Decidir agora →</button>` : ''}${/cair antes/.test(m) ? ' <button class="link" type="button" data-act="finEarly">Recebi o salário antes →</button>' : ''}</div>`).join('')}</div></section>` : ''}
         <section class="block"><div class="block-head"><h2>Contas</h2><button class="link" type="button" data-act="finConcile">Conferir saldo</button></div>
           <div class="list">${s.balances.filter(b => b.account.type !== 'cartao').map(b => `<button type="button" class="row as-btn fin-row" data-act="finAccount" data-id="${b.account.id}"><span class="row-main as-text"><span class="row-title">${esc(b.account.name)}</span><span class="row-meta">${F.ACC_TYPES[b.account.type] || ''}${b.account.inAvailable === false ? ' · fora do disponível' : ''}${b.account.openingSet === false ? ' · <b class="st-pendente">falta o saldo inicial</b>' : ''}</span></span><span class="fin-amt ${b.balance < 0 ? 'neg' : ''}">${F.money(b.balance)}</span></button>`).join('')}</div>
         </section>
@@ -197,7 +198,7 @@
         <div><b>${label}</b><span>${F.date(c.start)} a ${F.date(c.end)} · salário ${F.date(c.start)} ${c.projected ? cert('projetado') : cert('confirmado')}</span></div>
         <button class="icon-btn" type="button" data-act="finCycle" data-d="1" aria-label="Próximo ciclo">›</button>
       </div>
-      <div class="head-links">${ofs ? '<button class="link" type="button" data-act="finCycle" data-d="0">← Voltar para o ciclo atual</button>' : ''}<button class="link" type="button" data-act="finReport">Ver relatório do ciclo →</button></div></header>
+      <div class="head-links">${ofs === 0 && C.diffDays(today, c.nextPay) <= 15 && C.diffDays(today, c.nextPay) > 0 ? '<button class="link" type="button" data-act="finEarly">Recebi o salário antes → iniciar novo ciclo</button>' : ''}${ofs ? '<button class="link" type="button" data-act="finCycle" data-d="0">← Voltar para o ciclo atual</button>' : ''}<button class="link" type="button" data-act="finReport">Ver relatório do ciclo →</button></div></header>
 
     <section class="block">
       <div class="block-head"><h2>Resumo do ciclo</h2></div>
@@ -238,8 +239,8 @@
       </aside>
     </div>
 
-    ${ofs === 0 ? (c.projected ? `<section class="block"><div class="notice">Este ciclo ainda é uma projeção pelas regras do seu perfil (${F.paydayTxt()}). Quando o salário cair, lance e confirme o plano.</div>
-      <div class="form-actions split"><button class="btn primary" type="button" data-act="finSalary">Lançar o salário</button><button class="btn ghost" type="button" data-act="finPlanNow">Montar plano com o saldo de hoje</button><span class="grow"></span></div></section>`
+    ${ofs === 0 ? (c.projected || !c.plannedAt ? `<section class="block"><div class="notice">${c.projected ? `Este ciclo ainda é uma projeção pelas regras do seu perfil (${F.paydayTxt()}). Quando o salário cair, lance e confirme o plano.` : `O ciclo ${F.date(c.start)}–${F.date(c.end)} já começou, mas o plano das semanas ainda não foi montado.`}</div>
+      <div class="form-actions split">${c.projected ? '<button class="btn primary" type="button" data-act="finSalary">Lançar o salário</button>' : ''}<button class="btn ${c.projected ? 'ghost' : 'primary'}" type="button" data-act="finPlanNow">Montar plano${c.projected ? ' com o saldo de hoje' : ''}</button><span class="grow"></span></div></section>`
     : `<section class="block"><div class="block-head"><h2>Plano confirmado em ${F.date(c.plannedAt || c.start)}</h2><button class="link" type="button" data-act="finReplan">Refazer plano</button></div>
       <div class="calc-table">
         <div><span>Saldo no início do plano</span><b>${F.money(c.available)}</b></div>
@@ -298,6 +299,7 @@
         ${item('finAccounts', 'Contas', 'Nubank e outras contas, com saldo inicial')}
         ${item('finRecs', 'Contas fixas', 'Aluguel, luz, academia, assinaturas: viram compromissos em cada ciclo')}
         ${item('finCats', 'Categorias', 'Padrão + as suas; quais entram no limite semanal')}
+        ${item('finEarly', 'Recebi o salário antes', 'Fecha o ciclo atual e inicia o novo a partir do dia em que o dinheiro entrou')}
         ${item('finConcile', 'Conferir saldo', 'Compare com o saldo do banco e ajuste a diferença')}
         ${item('finCardNew', 'Gasto no cartão (parcelado)', 'Compra no crédito em 1× ou parcelada: as parcelas vão para as faturas, sem contar como gasto do ciclo')}
         ${item('finCards', 'Compras no cartão', 'Ver, editar ou cancelar as compras parceladas')}
@@ -333,8 +335,9 @@
     finPay: el => F.pay(el.dataset.id),
     finLancar: () => F.lancar(),
     finSalary: () => F.lancar({ kind: 'receita', categoryId: 'cat-salario', desc: 'Salário', amount: F.profile().income, certainty: 'confirmado' }),
-    finPlanNow: () => F.plan(F.snap().cycle.start),
-    finReplan: () => F.plan(F.snap().cycle.start),
+    finPlanNow: () => { const c = F.snap().cycle; F.plan(c.start, null, c.projected ? null : c.nextPay); },
+    finReplan: () => { const c = F.snap().cycle; F.plan(c.start, null, c.nextPay); },
+    finEarly: () => F.earlyCycle(),
     finAccount: el => F.accountForm(F.acc(el.dataset.id)),
     finAccounts: () => P.sheet({
       title: 'Contas', live: true,

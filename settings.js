@@ -110,7 +110,7 @@
         </div>
       </section>
 
-      <p class="credits">Prisma · versão 15 · Desenvolvido por Lidiane Tavares</p>
+      <p class="credits">Prisma · versão 18 · Desenvolvido por Lidiane Tavares<br><button class="link" type="button" data-act="repair">Atualizar o app (baixa a versão mais nova; seus dados ficam)</button></p>
     </div>`;
   };
 

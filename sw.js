@@ -3,10 +3,11 @@
    - Guarda os arquivos do app para abrir sem internet.
    - HTML: tenta a rede primeiro (pega atualização na hora);
      se não tiver internet, usa o que está guardado.
-   - CSS/JS/ícones: usa o guardado e atualiza em segundo plano.
+   - CSS/JS: também tenta a rede primeiro (assim a versão nova chega
+     na hora); sem internet, usa o guardado. Ícones: usa o guardado.
    - Ao publicar uma versão nova, mude o número em VERSION.
 ============================================================ */
-const VERSION = 'prisma-v15';
+const VERSION = 'prisma-v18';
 const SHELL = [
   './', './index.html', './manifest.json', './app.css',
   './config.js', './util.js', './store.js', './views.js', './forms.js',
@@ -16,7 +17,9 @@ const SHELL = [
 ];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(VERSION).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  // cache: 'reload' → baixa do servidor de verdade, nunca uma cópia velha do navegador.
+  // Um arquivo que falhar não impede a atualização dos outros.
+  e.waitUntil(caches.open(VERSION).then(c => Promise.all(SHELL.map(u => fetch(new Request(u, { cache: 'reload' })).then(r => (r.ok ? c.put(u, r) : null)).catch(() => null)))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', e => {
@@ -31,6 +34,11 @@ self.addEventListener('fetch', e => {
   if (req.mode === 'navigate') {
     e.respondWith(fetch(req).then(res => { const copy = res.clone(); caches.open(VERSION).then(c => c.put('./index.html', copy)); return res; })
       .catch(() => caches.match('./index.html')));
+    return;
+  }
+  if (/\.(js|css|json)$/.test(url.pathname)) {
+    e.respondWith(fetch(req, { cache: 'no-cache' }).then(res => { if (res.ok) { const copy = res.clone(); caches.open(VERSION).then(c => c.put(req, copy)); } return res; })
+      .catch(() => caches.match(req)));
     return;
   }
   e.respondWith(caches.match(req).then(cached => {
@@ -60,3 +68,6 @@ self.addEventListener('notificationclick', e => {
     return self.clients.openWindow(target);
   }));
 });
+
+// o app pode pedir para trocar de versão na hora (botão "Atualizar o app" nos Ajustes)
+self.addEventListener('message', e => { if (e.data === 'skipWaiting') self.skipWaiting(); });
