@@ -69,7 +69,9 @@
     document.body.dataset.space = P.space();
     document.body.classList.toggle('onboarding', to === 'boasvindas' || to === 'entrar');
     P.applyFocus();
-    P.ui[P.space() === 'fin' ? 'lastFin' : 'lastPrisma'] = to; P.saveUI();
+    // lembra a última tela de cada espaço (Ajustes não conta: ele não é de nenhum dos dois)
+    if (to.startsWith('fin')) P.ui.lastFin = to; else if (PRISMA_ROUTES.includes(to)) P.ui.lastPrisma = to;
+    P.saveUI();
     [...P.openSheets].forEach(sh => sh.close());
     P.$$('[data-nav]').forEach(b => { const on = b.dataset.nav === to; b.classList.toggle('on', on); on ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current'); });
     P.$('#mobile-title').textContent = ROUTES[to];
@@ -116,7 +118,12 @@
       if (P.space() === 'fin') { if (!P.fin.locked()) P.fin.lancar(); else P.render(); return; }
       P.capture(el.dataset.type || 'tarefa', { due: el.dataset.due, area: el.dataset.area });
     },
-    switchSpace: () => !(P.hasFin() && P.hasPrisma()) ? P.go(P.home()) : P.go(P.space() === 'fin' ? (P.ui.lastPrisma || 'hoje') : (P.ui.lastFin || 'fin')),
+    switchSpace: () => {
+      if (!(P.hasFin() && P.hasPrisma())) return P.go(P.home());
+      const lastFin = String(P.ui.lastFin || '').startsWith('fin') ? P.ui.lastFin : 'fin';
+      const lastPrisma = PRISMA_ROUTES.includes(P.ui.lastPrisma) ? P.ui.lastPrisma : 'hoje';
+      P.go(P.space() === 'fin' ? lastPrisma : lastFin);
+    },
     openTask: el => P.openTask(el.dataset.id),
     openItem: el => P.openItem(el.dataset.id),
     openNote: el => P.openNote(el.dataset.id),
