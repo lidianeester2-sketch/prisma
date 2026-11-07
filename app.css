@@ -1249,3 +1249,21 @@ body.one-space #mobile-title { display: block; }
 .ai-fab svg { width: 24px; height: 24px; }
 body.on-ai .ai-fab, body.onboarding .ai-fab, body.has-sheet .ai-fab { display: none !important; }
 @media (max-width: 700px) { .ai-fab { bottom: calc(102px + env(safe-area-inset-bottom, 0px)); right: 16px; width: 48px; height: 48px; } }
+
+/* ---------- v28: formulários (etapa 3 de UX) ---------- */
+form.autosave .form-actions { display: none; }
+.more-opts { border-radius: var(--r-md); background: var(--surface-2); padding: 0 14px; }
+.more-opts > summary { cursor: pointer; list-style: none; padding: 12px 0; font-weight: 700; font-size: 14px; }
+.more-opts > summary::-webkit-details-marker { display: none; }
+.more-opts > summary::before { content: "›"; display: inline-block; margin-right: 8px; transition: transform .15s; }
+.more-opts[open] > summary::before { transform: rotate(90deg); }
+.more-opts[open] { padding-bottom: 14px; display: grid; gap: 12px; }
+.credit-link { justify-self: start; text-align: left; }
+.pend-group { margin-bottom: 14px; }
+.pend-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin: 0 2px 8px; font-size: 13px; font-weight: 700; color: var(--muted); }
+.pend-head b { color: var(--text); font-variant-numeric: tabular-nums; }
+.fin-row.compact { padding-block: 9px; }
+.fin-row.compact .row-title { font-size: 14px; }
+.toast { cursor: pointer; }
+.empty .btn { justify-self: start; }
+.sum-card + details, details.calc { margin-bottom: 14px; }

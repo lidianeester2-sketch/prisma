@@ -390,7 +390,7 @@
       <div class="block-head"><h2>Grade de aulas</h2><button class="link" type="button" data-act="go" data-to="areas">Editar matérias →</button></div>
       ${week.length || online.length ? `<div class="week">${week.map(w => `<div class="week-day"><div class="eyebrow">${P.DOW_LONG[w.dow]}</div>${w.list.map(({ it, s }) => `<button type="button" class="week-class" data-act="openItem" data-id="${it.id}" style="--c:${P.color(it.color)}"><span class="mono">${esc(s.start)}–${esc(s.end)}</span><strong>${esc(it.title)}</strong></button>`).join('')}</div>`).join('')}
         ${online.length ? `<div class="week-day"><div class="eyebrow">on-line</div>${online.map(it => `<button type="button" class="week-class" data-act="openItem" data-id="${it.id}" style="--c:${P.color(it.color)}"><span class="mono">no seu ritmo</span><strong>${esc(it.title)}</strong></button>`).join('')}</div>` : ''}</div>`
-        : empty('Sem horários cadastrados.', 'Abra uma matéria e adicione o dia e horário da aula.')}
+        : empty('Sem horários cadastrados.', 'Abra uma matéria e adicione o dia e horário da aula.', 'data-act="go" data-to="areas"', 'Abrir as pastas')}
     </section>`;
   };
 

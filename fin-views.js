@@ -187,9 +187,18 @@
     const cardParcs = F.parcs().filter(p => !p.deleted && !p.canceled && p.type === 'cartao' && C.installments(p).some(i => i.month >= c.start.slice(0, 7)));
     const futureByMonth = {}; sum.cardFuture.forEach(i => (futureByMonth[i.month] = futureByMonth[i.month] || []).push(i));
 
-    const pendRow = t => `<div class="row fin-row ${t.date < today && !t.envelope && !t.noDue ? 'late' : ''}">
-        <button type="button" class="row-main" data-act="finTx" data-id="${t.id}"><span class="row-title">${esc(t.desc)}</span><span class="row-meta">${esc(F.cat(t.categoryId)?.name || '')} · ${dueTxt(t, today)}${t.certainty === 'estimado' ? ' · estimado' : ''}</span></button>
+    // linha compacta: o grupo já diz quando vence, então a linha só mostra o essencial
+    const pendRow = t => `<div class="row fin-row compact ${t.date < today && !t.envelope && !t.noDue ? 'late' : ''}">
+        <button type="button" class="row-main" data-act="finTx" data-id="${t.id}"><span class="row-title">${esc(t.desc)}</span><span class="row-meta">${esc(F.cat(t.categoryId)?.name || '')}${t.envelope ? ' · ' + dueTxt(t, today) : t.noDue ? '' : ' · ' + F.date(t.date)}${t.certainty === 'estimado' ? ' · estimado' : ''}</span></button>
         <span class="fin-amt">${F.money(t.remaining)}</span>${t.envelope ? '' : `<button class="btn ghost small" type="button" data-act="finPay" data-id="${t.id}">Pagar</button>`}</div>`;
+    const in7 = C.addDays(today, 7);
+    const groups = [
+      ['Vencidas', sum.pending.filter(t => !t.envelope && !t.noDue && t.date < today)],
+      ['Vencem nos próximos 7 dias', sum.pending.filter(t => !t.envelope && !t.noDue && t.date >= today && t.date <= in7)],
+      ['Depois', sum.pending.filter(t => !t.envelope && !t.noDue && t.date > in7)],
+      [`Sem data definida · até ${F.date(c.end)}`, sum.pending.filter(t => !t.envelope && t.noDue)],
+      ['Tetos do ciclo', sum.pending.filter(t => t.envelope)]
+    ].filter(([, l]) => l.length);
 
     return `
     <header class="page-head"><h1>Orçamento</h1>
@@ -213,7 +222,8 @@
     <div class="cols">
       <section class="block main-col">
         <div class="block-head"><h2>Pendentes</h2><span class="count">${sum.pending.length}</span><span class="faint small">${F.money(sum.pendingTotal)}</span></div>
-        <div class="list">${sum.pending.length ? sum.pending.map(pendRow).join('') : '<div class="empty"><strong>Nada pendente neste ciclo.</strong></div>'}</div>
+        ${sum.pending.length ? groups.map(([t, l]) => `<div class="pend-group"><div class="pend-head"><span>${t}</span><b>${F.money(l.reduce((a, x) => a + x.remaining, 0))}</b></div><div class="list">${l.map(pendRow).join('')}</div></div>`).join('')
+          : `<div class="empty"><strong>Nada pendente neste ciclo.</strong><span>Contas a pagar aparecem aqui. Cadastre as fixas uma vez e elas entram sozinhas em todo ciclo.</span><button class="btn small" type="button" data-act="finRecs">Cadastrar contas fixas</button></div>`}
 
         <details class="more" ${sum.paid.length ? 'open' : ''}><summary>Pagas <span class="count">${sum.paid.length}</span> <span class="faint small">${F.money(sum.paidTotal)}</span></summary>
           <div class="list">${sum.paid.length ? sum.paid.map(txRow).join('') : '<div class="empty"><span>Nenhuma despesa paga ainda neste ciclo.</span></div>'}</div></details>
@@ -283,7 +293,7 @@
       <div class="chips">${chips('finStatus', [['all', 'Qualquer situação'], ['realizado', 'Realizados'], ['previsto', 'Pendentes'], ['pendente', 'Vencidas'], ['cancelado', 'Cancelados']])}</div>
     </div>
     ${list.length ? Object.entries(groups).map(([d, items]) => `<div class="day-group"><div class="day-label">${P.relDay(d) === 'hoje' ? 'Hoje' : P.relDay(d) === 'ontem' ? 'Ontem' : F.date(d)}</div><div class="list">${items.map(txRow).join('')}</div></div>`).join('')
-      : '<div class="empty"><strong>Nada por aqui.</strong><span>Toque em + Lançar e escreva do seu jeito, por exemplo “gastei 23,90 de uber no pix”.</span></div>'}`;
+      : '<div class="empty"><strong>Nada por aqui.</strong><span>Escreva do seu jeito, por exemplo “gastei 23,90 de uber no pix”.</span><button class="btn primary small" type="button" data-act="finLancar">Lançar agora</button></div>'}`;
   };
 
   /* ============================================================

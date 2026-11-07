@@ -26,6 +26,31 @@
     <div class="settings">
 
       <section class="block set">
+        <h2>${sync.builtIn ? 'Sua conta' : 'Sincronização'}</h2>
+        <p class="lede small">${sync.builtIn ? 'Seus dados ficam guardados na sua conta e aparecem em qualquer aparelho em que você entrar.' : 'Para ver os mesmos dados no computador e no celular. Sem isso, tudo fica salvo só neste aparelho.'}</p>
+        ${!sync.configured ? `
+          <div class="notice">Ainda não conectado. Siga o guia <b>APPWRITE.md</b> que veio junto com o projeto (leva uns 15 minutos) e cole aqui os dois códigos.</div>
+          <form class="form" data-form="appw">
+            <label class="field"><span class="field-label">API Endpoint</span><input id="aw-endpoint" name="url" placeholder="https://nyc.cloud.appwrite.io/v1" autocomplete="off"></label>
+            <label class="field"><span class="field-label">Project ID</span><input id="aw-project" name="key" placeholder="ex.: 6720f1a2003b4c5d6e7f" autocomplete="off"></label>
+            <div class="form-actions"><button class="btn primary small" type="submit">Conectar</button></div>
+          </form>` : !sync.user ? `
+          <form class="form" data-form="login">
+            <label class="field"><span class="field-label">E-mail</span><input id="login-email" name="email" type="email" autocomplete="email" required></label>
+            <label class="field"><span class="field-label">Senha</span><input id="login-pw" name="pw" type="password" autocomplete="current-password" required minlength="8"></label>
+            <div class="form-actions split"><button class="btn ghost small" type="button" data-act="supaReset">Trocar projeto</button><span class="grow"></span>
+              <button class="btn ghost small" type="submit" name="mode" value="signup">Criar conta</button><button class="btn primary small" type="submit" name="mode" value="login">Entrar</button></div>
+          </form>` : `
+          <div class="sync-box">
+            <div><span class="status-dot ${sync.status}"></span><strong>${esc(sync.user.email)}</strong><small>${P.sync.label()}</small></div>
+            <div class="form-actions split"><button class="btn ghost small" type="button" data-act="signOut">Sair</button><span class="grow"></span><button class="btn primary small" type="button" data-act="syncNow">Sincronizar agora</button></div>
+          </div>
+          <div class="data-actions">
+            <button type="button" class="data-btn" data-act="invite"><strong>Convidar alguém</strong><small>Gera um link para outra pessoa usar o Prisma com a conta dela. Cada conta só vê os próprios dados.</small></button>
+          </div>`}
+      </section>
+
+      <section class="block set">
         <h2>Seu foco</h2>
         <p class="hint">O Prisma mostra só o que você marcar. Dá para mudar quando quiser; nada é apagado.</p>
         <div class="ob-focus compact">${Object.entries(P.FOCUS).map(([k, f]) => `<button type="button" class="ob-opt ${P.focus().includes(k) ? 'on' : ''}" data-act="toggleFocus" data-k="${k}" aria-pressed="${P.focus().includes(k)}"><span class="ob-ico f-${k}">${f.icon}</span><span><b>${f.label}</b><small>${f.desc}</small></span><span class="ob-check" aria-hidden="true">✓</span></button>`).join('')}</div>
@@ -64,30 +89,7 @@
         <div class="themes">${THEMES.map(([k, l, d]) => `<button type="button" class="theme ${({ claro: 'prisma', grafite: 'escuro', ambar: 'sol' }[st.theme] || st.theme) === k ? 'on' : ''}" data-act="setTheme" data-t="${k}" aria-pressed="${st.theme === k}"><span class="theme-sw sw-${k}"></span><strong>${l}</strong><small>${d}</small></button>`).join('')}</div>
       </section>
 
-      <section class="block set">
-        <h2>${sync.builtIn ? 'Sua conta' : 'Sincronização'}</h2>
-        <p class="lede small">${sync.builtIn ? 'Seus dados ficam guardados na sua conta e aparecem em qualquer aparelho em que você entrar.' : 'Para ver os mesmos dados no computador e no celular. Sem isso, tudo fica salvo só neste aparelho.'}</p>
-        ${!sync.configured ? `
-          <div class="notice">Ainda não conectado. Siga o guia <b>APPWRITE.md</b> que veio junto com o projeto (leva uns 15 minutos) e cole aqui os dois códigos.</div>
-          <form class="form" data-form="appw">
-            <label class="field"><span class="field-label">API Endpoint</span><input id="aw-endpoint" name="url" placeholder="https://nyc.cloud.appwrite.io/v1" autocomplete="off"></label>
-            <label class="field"><span class="field-label">Project ID</span><input id="aw-project" name="key" placeholder="ex.: 6720f1a2003b4c5d6e7f" autocomplete="off"></label>
-            <div class="form-actions"><button class="btn primary small" type="submit">Conectar</button></div>
-          </form>` : !sync.user ? `
-          <form class="form" data-form="login">
-            <label class="field"><span class="field-label">E-mail</span><input id="login-email" name="email" type="email" autocomplete="email" required></label>
-            <label class="field"><span class="field-label">Senha</span><input id="login-pw" name="pw" type="password" autocomplete="current-password" required minlength="8"></label>
-            <div class="form-actions split"><button class="btn ghost small" type="button" data-act="supaReset">Trocar projeto</button><span class="grow"></span>
-              <button class="btn ghost small" type="submit" name="mode" value="signup">Criar conta</button><button class="btn primary small" type="submit" name="mode" value="login">Entrar</button></div>
-          </form>` : `
-          <div class="sync-box">
-            <div><span class="status-dot ${sync.status}"></span><strong>${esc(sync.user.email)}</strong><small>${P.sync.label()}</small></div>
-            <div class="form-actions split"><button class="btn ghost small" type="button" data-act="signOut">Sair</button><span class="grow"></span><button class="btn primary small" type="button" data-act="syncNow">Sincronizar agora</button></div>
-          </div>
-          <div class="data-actions">
-            <button type="button" class="data-btn" data-act="invite"><strong>Convidar alguém</strong><small>Gera um link para outra pessoa usar o Prisma com a conta dela. Cada conta só vê os próprios dados.</small></button>
-          </div>`}
-      </section>
+
 
       <section class="block set">
         <h2>Notificações</h2>
@@ -126,17 +128,17 @@
         </div>
       </section>
 
-      <p class="credits">Prisma · versão 27 · Desenvolvido por Lidiane Tavares<br><button class="link" type="button" data-act="repair">Atualizar o app (baixa a versão mais nova; seus dados ficam)</button></p>
+      <p class="credits">Prisma · versão 28 · Desenvolvido por Lidiane Tavares<br><button class="link" type="button" data-act="repair">Atualizar o app (baixa a versão mais nova; seus dados ficam)</button></p>
     </div>`;
   };
 
   P.mounts.ajustes = root => {
     const f = sel => root.querySelector(`[data-form="${sel}"]`);
-    f('profile') && (f('profile').onsubmit = e => { e.preventDefault(); S.setSettings({ name: e.target.name.value.trim(), ...(e.target.semesterEnd ? { semesterEnd: e.target.semesterEnd.value || null } : {}) }); P.toast('Salvo.'); });
+    f('profile') && (f('profile').onsubmit = e => { e.preventDefault(); S.setSettings({ name: e.target.name.value.trim(), ...(e.target.semesterEnd ? { semesterEnd: e.target.semesterEnd.value || null } : {}) }); P.toast('Salvo ✓'); });
     f('reading') && (f('reading').onsubmit = e => {
       e.preventDefault();
       const n = v => { const x = parseInt(String(v).trim(), 10); return Number.isFinite(x) && x > 0 ? x : null; };
-      S.setSettings({ reading: { daily: n(e.target.daily.value), yearly: n(e.target.yearly.value) } }); P.toast('Metas salvas.');
+      S.setSettings({ reading: { daily: n(e.target.daily.value), yearly: n(e.target.yearly.value) } }); P.toast('Metas salvas ✓');
     });
     f('playlist') && (f('playlist').onsubmit = e => {
       e.preventDefault(); const v = e.target.pl.value.trim();
@@ -144,6 +146,8 @@
       if (v && !m) { P.toast('Não encontrei o código da playlist nesse link. Ele precisa ter “list=”.'); return; }
       S.setSettings({ playlist: m ? m[1] : '' }); P.toast(m ? 'Playlist salva.' : 'Playlist removida.');
     });
+    // salvar sozinho: ao sair de um campo, já grava (sem botão "Salvar")
+    ['profile', 'reading', 'playlist'].forEach(k => { const fm = f(k); if (!fm) return; fm.classList.add('autosave'); P.$$('input', fm).forEach(inp => inp.addEventListener('change', () => fm.requestSubmit())); });
     f('appw') && (f('appw').onsubmit = async e => { e.preventDefault(); await P.sync.configure(e.target.url.value.trim(), e.target.key.value.trim()); P.render(); });
     f('login') && (f('login').onsubmit = async e => {
       e.preventDefault(); const mode = e.submitter?.value || 'login';

@@ -126,12 +126,15 @@ P.toast = (msg, opts = {}) => {
   const el = document.createElement('div');
   el.className = 'toast';
   el.innerHTML = `<span>${P.esc(msg)}</span>${opts.undo ? '<button type="button">Desfazer</button>' : ''}`;
+  // no máximo 2 mensagens ao mesmo tempo; tocar fecha
+  [...host.children].slice(0, -1).forEach(old => old.remove());
   host.appendChild(el);
+  el.onclick = e => { if (e.target.tagName !== 'BUTTON') close(); };
   requestAnimationFrame(() => el.classList.add('show'));
   let timer;
   const close = () => { clearTimeout(timer); el.classList.remove('show'); setTimeout(() => el.remove(), 250); };
   if (opts.undo) el.querySelector('button').onclick = () => { opts.undo(); close(); };
-  timer = setTimeout(close, opts.undo ? 5000 : 2800);
+  timer = setTimeout(close, opts.undo ? 5000 : Math.min(4200, 1800 + String(msg).length * 22));
 };
 
 /* ---------- Sheet (janela) ---------- */

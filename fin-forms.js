@@ -39,17 +39,19 @@
           ${tx.kind === 'transferencia' ? `<div class="row-fields">
               ${field('De', `<select name="accountId">${accOptions(tx.accountId)}</select>`)}
               ${field('Para', `<select name="toAccountId"><option value="">Escolha…</option>${accOptions(tx.toAccountId)}</select>`)}
-            </div>` : `<div class="row-fields">
-              ${field('Categoria', `<select name="categoryId">${catOptions(tx.kind, tx.categoryId)}</select>`)}
-              ${field(tx.kind === 'receita' ? 'Entrou na conta' : 'Conta', `<select name="accountId">${accOptions(tx.accountId)}</select>`)}
-            </div>`}
-          ${tx.kind === 'despesa' ? field('Forma de pagamento', `<div class="chips compact" data-method>${['debito', 'pix', 'dinheiro', 'boleto', 'credito'].map(m => `<button type="button" class="chip ${tx.method === m ? 'on' : ''}" data-m="${m}" ${m === 'credito' && existing ? 'disabled' : ''}>${F.METHODS[m]}${m === 'credito' ? ' (parcelar)' : ''}</button>`).join('')}</div>`) : ''}
+            </div>` : field('Categoria', `<select name="categoryId">${catOptions(tx.kind, tx.categoryId)}</select>`)}
           <div class="field"><span class="field-label">Situação</span><div class="chips compact" data-status>
             <button type="button" class="chip ${tx.status === 'realizado' ? 'on' : ''}" data-s="realizado">${tx.kind === 'receita' ? 'Já recebi' : tx.kind === 'transferencia' ? 'Já fiz' : 'Já paguei'}</button>
             <button type="button" class="chip ${tx.status === 'previsto' ? 'on' : ''}" data-s="previsto">${tx.kind === 'receita' ? 'Vou receber' : 'Vou pagar'}</button>
           </div></div>
-          <label class="check-line"><input type="checkbox" name="estimado" ${tx.certainty === 'estimado' ? 'checked' : ''}> Valor estimado (ainda não sei o valor exato)</label>
-          ${field('Observações', `<input name="notes" value="${esc(tx.notes || '')}" placeholder="opcional">`)}
+          ${tx.kind === 'despesa' && !existing ? '<button type="button" class="link credit-link" data-m="credito">Comprei no cartão de crédito (à vista ou parcelado) →</button>' : ''}
+          <details class="more-opts" ${tx.notes || tx.certainty === 'estimado' ? 'open' : ''}>
+            <summary>Mais opções <span class="faint">· ${tx.kind === 'transferencia' ? 'observações' : `${esc(F.acc(tx.accountId)?.name || 'conta')}${tx.kind === 'despesa' ? ' · ' + (F.METHODS[tx.method] || '') : ''}`}</span></summary>
+            ${tx.kind === 'transferencia' ? '' : field(tx.kind === 'receita' ? 'Entrou na conta' : 'Conta', `<select name="accountId">${accOptions(tx.accountId)}</select>`)}
+            ${tx.kind === 'despesa' ? field('Forma de pagamento', `<div class="chips compact" data-method>${['debito', 'pix', 'dinheiro', 'boleto'].map(m => `<button type="button" class="chip ${tx.method === m ? 'on' : ''}" data-m="${m}">${F.METHODS[m]}</button>`).join('')}</div>`) : ''}
+            <label class="check-line"><input type="checkbox" name="estimado" ${tx.certainty === 'estimado' ? 'checked' : ''}> Valor estimado (ainda não sei o valor exato)</label>
+            ${field('Observações', `<input name="notes" value="${esc(tx.notes || '')}" placeholder="opcional">`)}
+          </details>
           <p class="form-error" hidden></p>
           <div class="form-actions"><button class="btn primary" type="submit">${existing ? 'Salvar' : 'Lançar'}</button></div>
         </form>`,
@@ -59,7 +61,7 @@
         const redraw = () => { const v = b.querySelector('#fin-frase')?.value; api.refresh(); const fr = b.querySelector('#fin-frase'); if (fr && v) { fr.value = v; showParsed(); } };
         P.$$('[data-kind]', b).forEach(x => x.onclick = () => { keep(); tx.kind = x.dataset.kind; tx.categoryId = ''; redraw(); });
         const toCard = () => { keep(); api.close(); setTimeout(() => F.cardForm({ desc: tx.desc, total: tx.amount, n: parsed?.installments, categoryId: tx.categoryId, date: tx.date }), 220); };
-        P.$$('[data-m]', b).forEach(x => x.onclick = () => { if (x.disabled) return; if (x.dataset.m === 'credito') return toCard(); tx.method = x.dataset.m; P.$$('[data-m]', b).forEach(y => y.classList.toggle('on', y === x)); });
+        P.$$('[data-m]', b).forEach(x => x.onclick = () => { if (x.disabled) return; if (x.dataset.m === 'credito') return toCard(); tx.method = x.dataset.m; P.$$('[data-method] [data-m]', b).forEach(y => y.classList.toggle('on', y === x)); });
         P.$$('[data-s]', b).forEach(x => x.onclick = () => { keep(); tx.status = x.dataset.s; redraw(); });
         f.date.onchange = () => { keep(); if (!existing && tx.date > today && tx.status === 'realizado') { tx.status = 'previsto'; redraw(); } };
 

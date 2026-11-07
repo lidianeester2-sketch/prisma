@@ -187,7 +187,7 @@
     return `
     <header class="page-head row-head"><div><h1>Assistente</h1><p class="lede">Pergunte sobre o seu dinheiro. Ele só sugere: nada é gravado sem você confirmar.</p></div>
       <button class="icon-btn" type="button" data-act="aiCfg" aria-label="Ajustes do assistente"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg></button></header>
-    ${on ? '' : '<div class="notice">As perguntas comuns já funcionam. Para perguntas livres com IA, entre na sua conta em Ajustes → Sincronização e configure a função (guia do assistente).</div>'}
+    ${on ? '' : '<div class="notice">Para perguntas livres com IA, entre na sua conta em Ajustes.</div>'}
     <div class="ai-log" aria-live="polite">
       ${list.length ? list.map((m, i) => `<div class="ai-msg ${m.role} src-${m.source || 'none'}">
           <div class="ai-bubble">${esc(m.text).replace(/\n/g, '<br>')}</div>
