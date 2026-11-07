@@ -87,6 +87,9 @@
       <section class="block set">
         <h2>Aparência</h2>
         <div class="themes">${THEMES.map(([k, l, d]) => `<button type="button" class="theme ${({ claro: 'prisma', grafite: 'escuro', ambar: 'sol' }[st.theme] || st.theme) === k ? 'on' : ''}" data-act="setTheme" data-t="${k}" aria-pressed="${st.theme === k}"><span class="theme-sw sw-${k}"></span><strong>${l}</strong><small>${d}</small></button>`).join('')}</div>
+        <div class="field-label" id="ts-label">Tamanho do texto</div>
+        <div class="chips text-size" role="group" aria-labelledby="ts-label">${[['normal', 'Normal'], ['grande', 'Grande'], ['maior', 'Maior']].map(([k, l]) => `<button type="button" class="chip ${(st.textSize || 'normal') === k ? 'on' : ''}" data-act="setTextSize" data-z="${k}" aria-pressed="${(st.textSize || 'normal') === k}">${l}</button>`).join('')}</div>
+        <p class="hint">Aumenta letras e botões no app inteiro.</p>
       </section>
 
 
@@ -128,7 +131,7 @@
         </div>
       </section>
 
-      <p class="credits">Prisma · versão 28 · Desenvolvido por Lidiane Tavares<br><button class="link" type="button" data-act="repair">Atualizar o app (baixa a versão mais nova; seus dados ficam)</button></p>
+      <p class="credits">Prisma · versão 30 · Desenvolvido por Lidiane Tavares<br><button class="link" type="button" data-act="repair">Atualizar o app (baixa a versão mais nova; seus dados ficam)</button></p>
     </div>`;
   };
 
@@ -170,6 +173,7 @@
 
   /* ---------- ações dos ajustes ---------- */
   Object.assign(P.actions, {
+    setTextSize: el => { S.setSettings({ textSize: el.dataset.z }); P.applyTheme(); P.render(); },
     setTheme: el => { S.setSettings({ theme: el.dataset.t }); P.applyTheme(); },
     notifDay: el => { const d = +el.dataset.d; const n = S.settings().notify; const days = n.daysBefore.includes(d) ? n.daysBefore.filter(x => x !== d) : [...n.daysBefore, d].sort((a, b) => a - b); S.setSettings({ notify: { ...n, daysBefore: days } }); },
     notifClass: el => S.setSettings({ notify: { ...S.settings().notify, classReminder: el.checked } }),

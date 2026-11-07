@@ -1267,3 +1267,82 @@ form.autosave .form-actions { display: none; }
 .toast { cursor: pointer; }
 .empty .btn { justify-self: start; }
 .sum-card + details, details.calc { margin-bottom: 14px; }
+
+/* ============================================================
+   v29 — Acessibilidade (design universal), etapa 1
+   Contraste mínimo de 4,5:1 (WCAG AA) nos textos, cores de
+   pastas legíveis como texto, tamanho do texto ajustável e
+   áreas de toque maiores.
+============================================================ */
+:root:not([data-theme]), [data-theme="prisma"] {
+  --muted: #636378; --faint: #6b6b7a;
+  --ok: #1d7b54; --warn: #975d1c; --bad: #c03d47;
+  --t1-ink: #664ad8; --t2-ink: #9d5434; --t3-ink: #206d9d; --t4-ink: #207954;
+}
+[data-theme="menta"] {
+  --muted: #516c62; --faint: #596f66; --accent: #267854; --accent-2: #267854; --hero-bg: #267854;
+  --ok: #1b784f; --warn: #91611b; --bad: #bb3f46;
+  --t1-ink: #1f7550; --t2-ink: #94611f; --t3-ink: #1e708b; --t4-ink: #6653ca;
+}
+[data-theme="malva"] {
+  --muted: #715a6c; --faint: #72606d; --accent: #7e5a77; --accent-2: #7e5a77; --hero-bg: #7e5a77;
+  --ok: #2a7255; --warn: #8e5829; --bad: #b23d49;
+  --t1-ink: #795773; --t2-ink: #915644; --t3-ink: #4f6787; --t4-ink: #4a6f51;
+}
+[data-theme="sol"] {
+  --muted: #6b5f73; --faint: #736879; --hero-bg: #c44c47;
+  --ok: #227856; --warn: #965d22; --bad: #bc3e49;
+  --t1-ink: #86611a; --t2-ink: #9d4b4c; --t4-ink: #2e7657;
+}
+[data-theme="escuro"] { --faint: #8e8e98; }
+
+body[data-space="fin"] .fin-hero { --hero-bg: var(--ok); }
+[data-theme="sol"] body[data-space="fin"] .fin-hero { --hero-bg: #c44c47; }
+[data-theme="escuro"] body[data-space="fin"] .fin-hero { --hero-bg: #1d6e4b; }
+.fin-hero.tone-warn { background: var(--warn); }
+.fin-hero .eyebrow, .fin-hero .fin-sub { color: rgba(255, 255, 255, .92); }
+.hero-chip { background: rgba(0, 0, 0, .16); }
+
+/* cor da pasta usada como texto: misturada com a cor do texto para ficar legível */
+.row-title .kind, .time, .mini-area, .week-class .mono, .note-src,
+.now-card .eyebrow, .now-open .eyebrow { color: color-mix(in srgb, var(--c) 45%, var(--text)); }
+
+/* tamanho do texto */
+html[data-text="grande"] body { zoom: 1.12; }
+html[data-text="maior"] body { zoom: 1.25; }
+.text-size { margin: 8px 0 4px; }
+
+/* áreas de toque: no mínimo 44 px nos botões só de ícone */
+.icon-btn, .mobile-top .icon-btn { width: 44px; height: 44px; }
+.icon-btn.small { width: 36px; height: 36px; }
+.mobile-top .space-btn { padding: 8px; margin: -8px; }
+.mobile-top .sync-badge { padding: 12px; margin: -6px; }
+.check { position: relative; }
+.check::after { content: ""; position: absolute; inset: -10px; }
+.row-main { min-height: 44px; }
+.link { padding-block: 10px; }
+.chip, .btn.small, .hero-chip { min-height: 40px; }
+.more-opts > summary, details > summary { min-height: 44px; display: flex; align-items: center; }
+.fin-row .btn.small { min-width: 64px; }
+.fin-list .fin-row + .fin-row, .pend-group .fin-row + .fin-row { margin-top: 8px; }
+
+/* letras pequenas demais */
+@media (max-width: 700px) { .tabbar a span { font-size: 11.5px; } }
+.pill, .tagpill, .mini-area, .note-src, .cal-dow, .item-sub { font-size: max(12px, 1em); }
+
+/* foco visível ao navegar pelo teclado */
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.fin-hero .eyebrow, .fin-hero .fin-sub { opacity: 1; }
+.cert { font-size: 11px; color: var(--text); }
+.space-switch button { min-height: 40px; }
+@media (max-width: 700px) { .tabbar a { min-height: 48px; } }
+.cert[class*="cert-"] { color: var(--text); }
+details > summary { gap: 6px; }
+
+/* ---------- v30: tolerância ao erro ---------- */
+.money-preview { display: block; margin-top: 6px; font-size: 13px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
+.money-preview.bad { color: var(--bad); }
+.draft-note { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-bottom: 12px; }
+.form-actions.choose { flex-direction: column-reverse; align-items: stretch; }
+.form-actions.choose .btn { width: 100%; }
+.toast button { min-height: 40px; padding-inline: 12px; }

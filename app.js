@@ -25,6 +25,10 @@
     const resolved = t === 'auto' ? (mq.matches ? 'prisma' : 'escuro') : t;
     document.documentElement.setAttribute('data-theme', resolved);
     try { localStorage.setItem('prisma2:theme', resolved); } catch (e) {}
+    // tamanho do texto (Ajustes → Aparência)
+    const ts = S.settings().textSize || 'normal';
+    document.documentElement.setAttribute('data-text', ts);
+    try { localStorage.setItem('prisma2:text', ts); } catch (e) {}
     const meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.content = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#eef0fa';
   };

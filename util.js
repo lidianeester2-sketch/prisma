@@ -134,7 +134,7 @@ P.toast = (msg, opts = {}) => {
   let timer;
   const close = () => { clearTimeout(timer); el.classList.remove('show'); setTimeout(() => el.remove(), 250); };
   if (opts.undo) el.querySelector('button').onclick = () => { opts.undo(); close(); };
-  timer = setTimeout(close, opts.undo ? 5000 : Math.min(4200, 1800 + String(msg).length * 22));
+  timer = setTimeout(close, opts.undo ? Math.max(6500, 2500 + String(msg).length * 40) : Math.min(4200, 1800 + String(msg).length * 22));
 };
 
 /* ---------- Sheet (janela) ---------- */
@@ -146,14 +146,14 @@ P.sheet = ({ title, kicker = '', render, mount, wide = false, onClose, live = fa
   wrap.innerHTML = `
     <div class="sheet-backdrop"></div>
     <section class="sheet ${wide ? 'wide' : ''}" role="dialog" aria-modal="true" aria-label="${P.esc(title)}">
-      <header class="sheet-head">
+      <div class="sheet-head">
         <div class="sheet-grab" aria-hidden="true"></div>
         <div class="sheet-titles">
           ${kicker ? `<div class="eyebrow">${kicker}</div>` : ''}
           <h2>${P.esc(title)}</h2>
         </div>
         <button class="icon-btn" type="button" data-close aria-label="Fechar">✕</button>
-      </header>
+      </div>
       <div class="sheet-body"></div>
     </section>`;
   host.appendChild(wrap);
@@ -199,6 +199,18 @@ P.ask = (message, okLabel = 'Confirmar', danger = true) => new Promise(resolve =
     onClose: () => { if (!answered) resolve(false); }
   });
   return s;
+});
+
+/* Pergunta com mais de duas saídas: resolve com o value escolhido, ou null se fechar */
+P.choose = (message, options, title = 'Antes de continuar') => new Promise(resolve => {
+  let done = false;
+  P.sheet({
+    title,
+    render: () => `<p class="ask-msg">${P.esc(message)}</p>
+      <div class="form-actions choose">${options.map((o, i) => `<button class="btn ${o.primary ? 'primary' : 'ghost'}" type="button" data-i="${i}">${P.esc(o.label)}</button>`).join('')}</div>`,
+    mount: api => P.$$('[data-i]', api.body).forEach(b => b.onclick = () => { done = true; resolve(options[+b.dataset.i].value); api.close(); }),
+    onClose: () => { if (!done) resolve(null); }
+  });
 });
 
 P.debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };

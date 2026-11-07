@@ -18,7 +18,7 @@
   const PULL_KEY = 'prisma2:lastPull';
   const OWNER_KEY = 'prisma2:owner';   // de quem são os dados guardados neste aparelho
   // o que é pessoal e fica só no aparelho (PIN, conversa do assistente etc.): sai junto na troca de conta
-  const PERSONAL = ['prisma2:finpin', 'prisma2:aiChat', 'prisma2:aiCfg', 'prisma2:finHide', 'prisma2:open7', 'prisma2:pushSaved', 'prisma2:ui'];
+  const PERSONAL = ['prisma2:finpin', 'prisma2:aiChat', 'prisma2:aiCfg', 'prisma2:finHide', 'prisma2:open7', 'prisma2:pushSaved', 'prisma2:ui', 'prisma2:lancDraft'];
   function clearPersonal() {
     try { Object.keys(localStorage).filter(k => k.startsWith(PULL_KEY) || PERSONAL.includes(k)).forEach(k => localStorage.removeItem(k)); } catch (e) {}
     P.fin?.lock?.();

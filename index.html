@@ -6,7 +6,7 @@
 <title>Prisma</title>
 <script>
   // aplica o tema salvo antes de desenhar a página (evita piscar)
-  try { var t = localStorage.getItem('prisma2:theme'); if (t) document.documentElement.setAttribute('data-theme', t); } catch (e) {}
+  try { var t = localStorage.getItem('prisma2:theme'); if (t) document.documentElement.setAttribute('data-theme', t); var z = localStorage.getItem('prisma2:text'); if (z) document.documentElement.setAttribute('data-text', z); } catch (e) {}
 </script>
 <meta name="theme-color" content="#eef0fa">
 <meta name="description" content="Faculdade, projetos e leituras num lugar só.">

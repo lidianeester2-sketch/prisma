@@ -16,6 +16,25 @@
     return parts.join(' · ');
   };
 
+  /* ---------- campo de dinheiro: mostra como o valor foi entendido ---------- */
+  if (!F._moneyPreview) {
+    F._moneyPreview = true;
+    const preview = inp => {
+      let out = inp.parentElement.querySelector('.money-preview');
+      const v = inp.value.trim();
+      if (!v) { out?.remove(); inp.removeAttribute('aria-describedby'); return; }
+      if (!out) { out = document.createElement('span'); out.className = 'money-preview'; out.id = 'mp-' + Math.random().toString(36).slice(2, 8); out.setAttribute('aria-live', 'polite'); inp.after(out); inp.setAttribute('aria-describedby', out.id); }
+      const c = C.parseMoney(v);
+      out.classList.toggle('bad', c === null);
+      out.textContent = c === null ? 'Não entendi o valor. Use, por exemplo, 50,48.' : `Vai ficar ${C.formatMoney(c)}`;
+    };
+    document.addEventListener('input', e => { if (e.target.matches?.('.money-input')) preview(e.target); });
+    document.addEventListener('change', e => {
+      const inp = e.target; if (!inp.matches?.('.money-input')) return;
+      const c = C.parseMoney(inp.value); if (c !== null && c >= 0) inp.value = inMoney(c);
+    });
+  }
+
   /* ============================================================
      LANÇAR (frase + formulário)
   ============================================================ */
@@ -23,9 +42,19 @@
     const today = P.today();
     let tx = existing ? { ...existing } : { kind: 'despesa', date: today, status: 'realizado', certainty: 'confirmado', method: 'debito', accountId: F.accounts()[0]?.id || '', ...preset };
     let parsed = null;
+    // rascunho: se a janela fechou sem querer, o que você digitou volta (vale por 12 horas, só para lançamento novo)
+    const DRAFT = 'prisma2:lancDraft';
+    const useDraft = !existing && !Object.keys(preset).length;
+    const draft = useDraft ? P.ls.get(DRAFT) : null;
+    let restored = false;
+    if (draft && Date.now() - draft.at < 12 * 3600e3 && (draft.tx.amount || draft.tx.desc)) { tx = { ...tx, ...draft.tx }; restored = true; }
+    else if (draft) P.ls.del(DRAFT);
+    const saveDraft = () => { if (useDraft && (tx.amount || tx.desc)) P.ls.set(DRAFT, { at: Date.now(), tx: { kind: tx.kind, amount: tx.amount, date: tx.date, desc: tx.desc, categoryId: tx.categoryId, toAccountId: tx.toAccountId, accountId: tx.accountId, status: tx.status, method: tx.method, notes: tx.notes, certainty: tx.certainty } }); };
+    const dropDraft = () => P.ls.del(DRAFT);
     const sheet = P.sheet({
       title: existing ? 'Editar lançamento' : 'Lançar', kicker: 'Financeiro+',
       render: () => `
+        ${restored ? '<div class="notice draft-note">Recuperei o que você estava lançando. <button type="button" class="link" data-discard>Começar do zero</button></div>' : ''}
         ${existing ? '' : `<label class="field fin-phrase"><span class="field-label">Escreva do seu jeito</span>
           <input id="fin-frase" autocomplete="off" placeholder="ex.: gastei 50,48 com hambúrguer no débito" autofocus>
           <span class="hint" id="fin-frase-out">Ou preencha os campos abaixo.</span></label>`}
@@ -60,10 +89,13 @@
         const keep = () => { const fd = new FormData(f); tx = { ...tx, amount: C.parseMoney(fd.get('amount')) ?? tx.amount, date: fd.get('date'), desc: fd.get('desc'), accountId: fd.get('accountId') || tx.accountId, toAccountId: fd.get('toAccountId') ?? tx.toAccountId, categoryId: fd.get('categoryId') ?? tx.categoryId, notes: fd.get('notes'), certainty: fd.get('estimado') ? 'estimado' : 'confirmado' }; };
         const redraw = () => { const v = b.querySelector('#fin-frase')?.value; api.refresh(); const fr = b.querySelector('#fin-frase'); if (fr && v) { fr.value = v; showParsed(); } };
         P.$$('[data-kind]', b).forEach(x => x.onclick = () => { keep(); tx.kind = x.dataset.kind; tx.categoryId = ''; redraw(); });
-        const toCard = () => { keep(); api.close(); setTimeout(() => F.cardForm({ desc: tx.desc, total: tx.amount, n: parsed?.installments, categoryId: tx.categoryId, date: tx.date }), 220); };
+        const toCard = () => { keep(); dropDraft(); api.close(); setTimeout(() => F.cardForm({ desc: tx.desc, total: tx.amount, n: parsed?.installments, categoryId: tx.categoryId, date: tx.date }), 220); };
         P.$$('[data-m]', b).forEach(x => x.onclick = () => { if (x.disabled) return; if (x.dataset.m === 'credito') return toCard(); tx.method = x.dataset.m; P.$$('[data-method] [data-m]', b).forEach(y => y.classList.toggle('on', y === x)); });
         P.$$('[data-s]', b).forEach(x => x.onclick = () => { keep(); tx.status = x.dataset.s; redraw(); });
         f.date.onchange = () => { keep(); if (!existing && tx.date > today && tx.status === 'realizado') { tx.status = 'previsto'; redraw(); } };
+        const ds = b.querySelector('[data-discard]');
+        if (ds) ds.onclick = () => { dropDraft(); restored = false; tx = { kind: 'despesa', date: today, status: 'realizado', certainty: 'confirmado', method: 'debito', accountId: F.accounts()[0]?.id || '' }; parsed = null; api.refresh(); };
+        if (useDraft) { const sd = P.debounce(() => { if (!b.isConnected) return; keep(); saveDraft(); }, 400); b.addEventListener('input', sd); b.addEventListener('click', sd); }
 
         const out = b.querySelector('#fin-frase-out');
         const showParsed = () => {
@@ -93,7 +125,7 @@
           const fr2 = b.querySelector('#fin-frase'); fr2.focus(); fr2.setSelectionRange(fr2.value.length, fr2.value.length);
         }, 350);
 
-        f.onsubmit = e => {
+        f.onsubmit = async e => {
           e.preventDefault(); keep();
           const err = msg => { const p = b.querySelector('.form-error'); p.textContent = msg; p.hidden = false; };
           if (parsed?.method === 'credito' && !existing) return toCard();
@@ -114,9 +146,34 @@
             const planned = F.txs().find(t => t.kind === 'receita' && t.categoryId === 'cat-salario' && t.status === 'previsto' && Math.abs(C.diffDays(t.date, rec.date)) <= 12);
             if (planned) { rec.id = planned.id; rec.createdAt = planned.createdAt; }
           }
+          if (!existing && !rec.id) {
+            const norm = s => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+            const same = t => t.kind === rec.kind && t.amount === rec.amount && t.status !== 'cancelado' && (norm(t.desc) === norm(rec.desc) || (rec.categoryId && t.categoryId === rec.categoryId));
+            // já existe uma conta pendente igual? em vez de lançar outra, marca ela como paga
+            const pend = rec.kind === 'despesa' && rec.status === 'realizado' && F.txs().find(t => same(t) && t.status === 'previsto' && !t.envelope && Math.abs(C.diffDays(t.date, rec.date)) <= 31);
+            if (pend) {
+              const ch = await P.choose(`Você tem “${pend.desc}” de ${C.formatMoney(pend.amount)} pendente${pend.noDue ? '' : ` para ${F.date(pend.date)}`}. É esse pagamento?`, [
+                { label: 'Sim, marcar como paga', value: 'pay', primary: true }, { label: 'Não, é outro gasto', value: 'new' }]);
+              if (!ch) return;
+              if (ch === 'pay') {
+                const before = { ...pend };
+                F.save('fin_lanc', { ...pend, amount: rec.amount, paidDate: rec.date, status: 'realizado', certainty: 'confirmado', accountId: rec.accountId, method: rec.method }, `Pagou “${pend.desc}” (${C.formatMoney(rec.amount)})`);
+                dropDraft(); api.close();
+                P.toast(F.parcToast(pend) || `“${pend.desc}” marcada como paga.`, { undo: () => F.save('fin_lanc', before, `Desfez o pagamento de “${pend.desc}”`) });
+                return;
+              }
+            }
+            // mesmo valor, mesmo gasto, em até 1 dia: pode ser repetido
+            const dup = F.txs().find(t => same(t) && t.status === rec.status && Math.abs(C.diffDays(t.date, rec.date)) <= 1);
+            if (dup && !(await P.ask(`Já tem “${dup.desc}” de ${C.formatMoney(dup.amount)} em ${F.date(dup.date)}. Lançar outro igual?`, 'Lançar mesmo assim', false))) return;
+          }
+          const before = rec.id ? { ...(S.raw().fin_lanc[rec.id] || {}) } : null;
           const saved = F.save('fin_lanc', rec, existing ? `Editou “${rec.desc}”` : `Lançou “${rec.desc}” (${C.formatMoney(rec.amount)})`);
-          api.close();
-          P.toast(existing ? 'Lançamento salvo.' : impactToast());
+          dropDraft(); api.close();
+          const undo = before && before.id
+            ? () => F.save('fin_lanc', before, `Desfez a alteração em “${before.desc}”`)
+            : () => { F.save('fin_lanc', { ...saved, status: 'cancelado' }, `Desfez o lançamento “${saved.desc}”`); S.remove('fin_lanc', saved.id); };
+          P.toast(existing ? 'Lançamento salvo.' : impactToast(), { undo });
           // salário caiu e o ciclo ainda é só projetado → oferece montar o plano
           const snap = F.snap();
           if (!existing && saved.kind === 'receita' && saved.categoryId === 'cat-salario' && saved.status === 'realizado') {
@@ -174,9 +231,10 @@
         const on = (sel, fn) => { const el = b.querySelector(sel); if (el) el.onclick = fn; };
         on('[data-pay]', () => { api.close(); F.pay(id); });
         on('[data-edit]', () => { api.close(); F.lancar({}, t); });
-        on('[data-cancel]', async () => {
-          if (!(await P.ask(`Cancelar “${t.desc}”? Ele deixa de contar no saldo e nos compromissos, mas continua no histórico.`, 'Cancelar lançamento'))) return;
-          F.save('fin_lanc', { ...t, status: 'cancelado' }, `Cancelou “${t.desc}”`); P.toast('Lançamento cancelado.');
+        on('[data-cancel]', () => {
+          const before = { ...t };
+          F.save('fin_lanc', { ...t, status: 'cancelado' }, `Cancelou “${t.desc}”`); api.close();
+          P.toast('Lançamento cancelado.', { undo: () => F.save('fin_lanc', before, `Desfez o cancelamento de “${t.desc}”`) });
         });
         on('[data-restore]', () => { F.save('fin_lanc', { ...t, status: t.paidDate ? 'realizado' : 'previsto' }, `Reativou “${t.desc}”`); });
       }
@@ -216,7 +274,8 @@
           if (!Number.isInteger(amount) || amount <= 0) { const p = api.body.querySelector('.form-error'); p.textContent = 'Informe o valor pago.'; p.hidden = false; return; }
           F.save('fin_lanc', { ...t, amount, paidDate: f.date.value, status: 'realizado', certainty: 'confirmado', accountId: f.accountId.value, method: f.method ? f.method.value : t.method },
             `${t.kind === 'receita' ? 'Recebeu' : 'Pagou'} “${t.desc}” (${C.formatMoney(amount)})`);
-          api.close(); P.toast(F.parcToast({ ...t }) || impactToast());
+          const before = { ...t };
+          api.close(); P.toast(F.parcToast({ ...t }) || impactToast(), { undo: () => F.save('fin_lanc', before, `Desfez o pagamento de “${t.desc}”`) });
         };
       }
     });
