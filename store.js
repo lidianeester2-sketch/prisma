@@ -17,7 +17,7 @@
     name: '',
     theme: 'prisma',
     playlist: '',
-    semesterEnd: '2026-12-08',
+    semesterEnd: '',
     notify: { enabled: false, daysBefore: [0, 1, 3], classReminder: true, digestHour: '08:00' },
     tags: ['Conceito', 'Para a prova', 'Ideia', 'Referência', 'Citação', 'Decisão'],
     reading: { daily: null, yearly: null }
@@ -133,6 +133,14 @@
       persist();
       return db[col][rec.id];
     },
+    /* Troca de conta no mesmo aparelho: tira TUDO da pessoa anterior deste aparelho
+       (na nuvem fica tudo guardado na conta dela) e começa limpo para a nova conta. */
+    resetDevice() {
+      db = blank(); dirty = new Set(); seed(); dirty.clear();
+      try { localStorage.setItem(KEY, JSON.stringify(db)); localStorage.setItem(DIRTY_KEY, '[]'); } catch (e) {}
+      emit({ col: '*', remote: true });
+    },
+    pendingCount: () => dirty.size,
     /* Remove registros SÓ deste aparelho (não apaga na nuvem). Usado no "Esqueci o PIN". */
     purgeLocal(cols) {
       cols.forEach(c => { db[c] = {}; [...dirty].forEach(k => { if (k.startsWith(c + ':')) dirty.delete(k); }); });
@@ -144,39 +152,9 @@
 
   /* ---------- primeiros dados ---------- */
   function seed() {
+    // Aparelho novo começa limpo: cada pessoa cadastra as próprias matérias, projetos e hábitos.
     db.meta.settings = { ...DEFAULT_SETTINGS };
     dirty.add('meta:settings');
-    // Semestre 2026.2 — mesmas matérias e calendário que estavam fixos no código antigo.
-    // Agora são dados normais: dá pra editar, arquivar e trocar no próximo semestre.
-    const subjects = [
-      ['VIV0106', 'Inovação e Empreendedorismo', 5, '20:50', '22:30', 3, '💡'],
-      ['VIV0481', 'Profissões em Comunicação', 2, '19:00', '20:40', 4, '🎙️'],
-      ['VIV0727', 'História da Mídia', 3, '19:00', '20:40', 1, '📺'],
-      ['VIV0750', 'Computação Gráfica e Editoração', 4, '20:50', '22:30', 6, '🖥️'],
-      ['ARA6403', 'LABVIDA Publicidade e Propaganda 1', null, '', '', 0, '🎨'],
-      ['ARA1739', 'Língua Portuguesa', null, '', '', 2, '📖']
-    ];
-    // ids fixos: assim dois aparelhos novos não duplicam as mesmas matérias ao sincronizar
-    subjects.forEach(([code, title, dow, start, end, color, emoji]) => {
-      const id = 'seed-' + code;
-      db.items[id] = {
-        id, area: 'faculdade', title, code, sub: '', color, emoji, status: 'cursando', seed: true,
-        online: dow === null, schedule: dow === null ? [] : [{ dow, start, end }],
-        counters: [{ key: 'aulas', label: 'aulas', done: 0, total: null }, { key: 'ativ', label: 'atividades', done: 0, total: null }],
-        start: '2026-08-04', end: '2026-12-08', createdAt: Date.now(), updatedAt: Date.now()
-      };
-      dirty.add('items:' + id);
-    });
-    ['Fui à aula', 'Estudei um pouco', 'Revisei anotações', 'Bebi água'].forEach((name, i) => {
-      const id = 'seed-habit-' + i;
-      db.habits[id] = { id, name, order: i, checks: {}, seed: true, createdAt: Date.now(), updatedAt: Date.now() };
-      dirty.add('habits:' + id);
-    });
-    P.ACADEMIC_2026_2.forEach(([date, cat, title]) => {
-      const id = 'ev-' + date + '-' + title.slice(0, 18).normalize('NFD').replace(/[^\w]/g, '').toLowerCase();
-      db.events[id] = { id, date, cat, title, source: 'calendario-2026.2', createdAt: Date.now(), updatedAt: Date.now() };
-      dirty.add('events:' + id);
-    });
   }
 
   P.ACADEMIC_2026_2 = [

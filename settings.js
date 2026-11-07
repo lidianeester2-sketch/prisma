@@ -26,15 +26,21 @@
     <div class="settings">
 
       <section class="block set">
+        <h2>Seu foco</h2>
+        <p class="hint">O Prisma mostra só o que você marcar. Dá para mudar quando quiser; nada é apagado.</p>
+        <div class="ob-focus compact">${Object.entries(P.FOCUS).map(([k, f]) => `<button type="button" class="ob-opt ${P.focus().includes(k) ? 'on' : ''}" data-act="toggleFocus" data-k="${k}" aria-pressed="${P.focus().includes(k)}"><span class="ob-ico f-${k}">${f.icon}</span><span><b>${f.label}</b><small>${f.desc}</small></span><span class="ob-check" aria-hidden="true">✓</span></button>`).join('')}</div>
+      </section>
+
+      <section class="block set">
         <h2>Você</h2>
         <form class="form" data-form="profile">
           <label class="field"><span class="field-label">Como o Prisma te chama</span><input id="set-name" name="name" value="${esc(st.name)}" placeholder="Seu nome"></label>
-          <label class="field"><span class="field-label">Fim do semestre</span><input id="set-sem" type="date" name="semesterEnd" value="${st.semesterEnd || ''}"></label>
+          ${P.focus().includes('faculdade') ? `<label class="field"><span class="field-label">Fim do semestre</span><input id="set-sem" type="date" name="semesterEnd" value="${st.semesterEnd || ''}"></label>` : ''}
           <div class="form-actions"><button class="btn primary small" type="submit">Salvar</button></div>
         </form>
       </section>
 
-      <section class="block set">
+      <section class="block set ${P.focus().includes('leituras') ? '' : 'is-hidden'}">
         <h2>Metas de leitura</h2>
         <form class="form" data-form="reading">
           <div class="row-fields">
@@ -70,6 +76,9 @@
           <div class="sync-box">
             <div><span class="status-dot ${sync.status}"></span><strong>${esc(sync.user.email)}</strong><small>${P.sync.label()}</small></div>
             <div class="form-actions split"><button class="btn ghost small" type="button" data-act="signOut">Sair</button><span class="grow"></span><button class="btn primary small" type="button" data-act="syncNow">Sincronizar agora</button></div>
+          </div>
+          <div class="data-actions">
+            <button type="button" class="data-btn" data-act="invite"><strong>Convidar alguém</strong><small>Gera um link para outra pessoa usar o Prisma com a conta dela. Cada conta só vê os próprios dados.</small></button>
           </div>`}
       </section>
 
@@ -92,7 +101,7 @@
         <div class="form-actions split"><button class="btn ghost small" type="button" data-act="manageEvents">Ver e editar datas</button><span class="grow"></span><button class="btn ghost small" type="button" data-act="capture" data-type="evento">+ Data</button></div>
       </section>
 
-      <section class="block set">
+      <section class="block set ${P.hasPrisma() ? '' : 'is-hidden'}">
         <h2>Trilha de estudo</h2>
         <form class="form" data-form="playlist">
           <label class="field"><span class="field-label">Link de uma playlist pública do YouTube</span><input id="set-pl" name="pl" value="${st.playlist ? 'https://www.youtube.com/playlist?list=' + esc(st.playlist) : ''}" placeholder="https://www.youtube.com/playlist?list=…"></label>
@@ -110,13 +119,13 @@
         </div>
       </section>
 
-      <p class="credits">Prisma · versão 18 · Desenvolvido por Lidiane Tavares<br><button class="link" type="button" data-act="repair">Atualizar o app (baixa a versão mais nova; seus dados ficam)</button></p>
+      <p class="credits">Prisma · versão 20 · Desenvolvido por Lidiane Tavares<br><button class="link" type="button" data-act="repair">Atualizar o app (baixa a versão mais nova; seus dados ficam)</button></p>
     </div>`;
   };
 
   P.mounts.ajustes = root => {
     const f = sel => root.querySelector(`[data-form="${sel}"]`);
-    f('profile') && (f('profile').onsubmit = e => { e.preventDefault(); S.setSettings({ name: e.target.name.value.trim(), semesterEnd: e.target.semesterEnd.value || null }); P.toast('Salvo.'); });
+    f('profile') && (f('profile').onsubmit = e => { e.preventDefault(); S.setSettings({ name: e.target.name.value.trim(), ...(e.target.semesterEnd ? { semesterEnd: e.target.semesterEnd.value || null } : {}) }); P.toast('Salvo.'); });
     f('reading') && (f('reading').onsubmit = e => {
       e.preventDefault();
       const n = v => { const x = parseInt(String(v).trim(), 10); return Number.isFinite(x) && x > 0 ? x : null; };
@@ -157,7 +166,31 @@
     disableNotif: () => P.push.disable(),
     testNotif: () => P.push.test(),
     syncNow: () => P.sync.now(true),
-    signOut: async () => { if (await P.ask('Sair da conta? Os dados continuam neste aparelho.', 'Sair', false)) { await P.sync.signOut(); P.render(); } },
+    signOut: () => P.sheet({
+      title: 'Sair da conta', kicker: P.sync.state().user?.email || '',
+      render: () => `<p class="lede">Antes de sair, o Prisma manda para a nuvem o que ainda não subiu.</p>
+        <div class="data-actions">
+          <button type="button" class="data-btn" data-out="keep"><strong>Sair e manter os dados aqui</strong><small>Para quando o aparelho é só seu.</small></button>
+          <button type="button" class="data-btn" data-out="wipe"><strong>Sair e apagar deste aparelho</strong><small>Para aparelho emprestado ou de outra pessoa. Tudo continua guardado na sua conta; é só entrar de novo.</small></button>
+        </div>`,
+      mount: api => P.$$('[data-out]', api.body).forEach(b => b.onclick = async () => {
+        b.disabled = true;
+        const ok = await P.sync.signOut(b.dataset.out === 'wipe');
+        if (ok !== false) { api.close(); P.toast(b.dataset.out === 'wipe' ? 'Você saiu e os dados saíram deste aparelho.' : 'Você saiu da conta.'); P.render(); } else b.disabled = false;
+      })
+    }),
+    toggleFocus: el => {
+      const k = el.dataset.k, cur = P.focus();
+      const next = cur.includes(k) ? cur.filter(x => x !== k) : [...cur, k];
+      if (!next.length) { P.toast('Deixe pelo menos um foco marcado.'); return; }
+      S.setSettings({ focus: next }); P.applyFocus(); P.render();
+      P.toast(cur.includes(k) ? `${P.FOCUS[k].label} saiu do app (seus dados continuam guardados).` : `${P.FOCUS[k].label} voltou para o app.`);
+    },
+    invite: async () => {
+      const link = P.sync.inviteLink(); if (!link) return;
+      try { await navigator.clipboard.writeText(link); P.toast('Link copiado! Mande para a pessoa: ela abre, cria a conta dela e pronto.'); }
+      catch (e) { P.ask(`Copie e mande este link:\n${link}`, 'Ok', false); }
+    },
     supaReset: () => { P.sync.reset(); P.render(); },
     exportBackup: () => {
       const blob = new Blob([S.exportJSON()], { type: 'application/json' });

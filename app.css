@@ -20,7 +20,7 @@
   --t2: #fde7dc; --t2-ink: #e3743f;
   --t3: #dcefff; --t3-ink: #2593d3;
   --t4: #dcf4e7; --t4-ink: #24a46b;
-  --a-faculdade: #6d4fe8; --a-projetos: #2593d3; --a-leituras: #df9325;
+  --a-faculdade: #6d4fe8; --a-projetos: #2593d3; --a-leituras: #df9325; --a-pessoal: #e0457b;
   --ok: #1f9e66; --warn: #d9821a; --bad: #e0454f;
   --shadow: 0 16px 40px rgba(40, 40, 100, .14);
   --soft: 0 1px 2px rgba(30, 30, 80, .05), 0 4px 14px rgba(30, 30, 80, .04);
@@ -39,7 +39,7 @@
   --hero-bg: #2f9e6e; --hero-text: #ffffff;
   --side-bg: #2f9e6e; --side-text: #ffffff; --side-muted: rgba(255, 255, 255, .78); --side-on: rgba(255, 255, 255, .18);
   --t1: #d6efe3; --t1-ink: #22865b; --t2: #fdeedb; --t2-ink: #d17d1f; --t3: #d9eef5; --t3-ink: #2183a6; --t4: #e9e6f8; --t4-ink: #6a55d1;
-  --a-faculdade: #2f9e6e; --a-projetos: #2183a6; --a-leituras: #d17d1f;
+  --a-faculdade: #2f9e6e; --a-projetos: #2183a6; --a-leituras: #d17d1f; --a-pessoal: #c2577f;
 }
 [data-theme="malva"] {
   --bg: #efe5e1; --surface: #faf5f2; --surface-2: #f2e9e5; --surface-3: #e6d9d4;
@@ -50,7 +50,7 @@
   --hero-bg: #8c6585; --hero-text: #ffffff;
   --side-bg: #e6d9d4; --side-text: #3d2a39; --side-muted: #7d6577; --side-on: #faf5f2;
   --t1: #ecdbe7; --t1-ink: #8c6585; --t2: #f6e2d6; --t2-ink: #c06f4a; --t3: #dfe6ee; --t3-ink: #557aa0; --t4: #e1ece2; --t4-ink: #4f8a5b;
-  --a-faculdade: #8c6585; --a-projetos: #557aa0; --a-leituras: #c06f4a;
+  --a-faculdade: #8c6585; --a-projetos: #557aa0; --a-leituras: #c06f4a; --a-pessoal: #a85a7a;
 }
 [data-theme="sol"] {
   --bg: #f6efea; --surface: #ffffff; --surface-2: #faf5f1; --surface-3: #efe6df;
@@ -61,7 +61,7 @@
   --hero-bg: #f2807b; --hero-text: #ffffff;
   --side-bg: #4f3d5a; --side-text: #ffffff; --side-muted: rgba(255, 255, 255, .75); --side-on: rgba(255, 255, 255, .14);
   --t1: #fde9a8; --t1-ink: #b9850d; --t2: #fbdcda; --t2-ink: #d9605b; --t3: #e6e0f0; --t3-ink: #6e5a86; --t4: #dff1e8; --t4-ink: #2f9a68;
-  --a-faculdade: #6e5a86; --a-projetos: #d9605b; --a-leituras: #b9850d;
+  --a-faculdade: #6e5a86; --a-projetos: #d9605b; --a-leituras: #b9850d; --a-pessoal: #2f9a68;
 }
 [data-theme="escuro"] {
   color-scheme: dark;
@@ -73,7 +73,7 @@
   --hero-bg: #5b45c9; --hero-text: #ffffff;
   --side-bg: #18181e; --side-text: #ededf2; --side-muted: #a2a2b0; --side-on: #25252e;
   --t1: #2a2640; --t1-ink: #b3a5ff; --t2: #3a2a24; --t2-ink: #f2a07a; --t3: #1f3040; --t3-ink: #7cc3f0; --t4: #1f3529; --t4-ink: #74d3a2;
-  --a-faculdade: #a796ff; --a-projetos: #7cc3f0; --a-leituras: #e8b65c;
+  --a-faculdade: #a796ff; --a-projetos: #7cc3f0; --a-leituras: #e8b65c; --a-pessoal: #f08aae;
   --ok: #62c493; --warn: #dba154; --bad: #e2707f;
   --shadow: 0 16px 40px rgba(0, 0, 0, .45);
   --soft: none;
@@ -308,6 +308,7 @@ input[type=checkbox] { accent-color: var(--accent); width: 18px; height: 18px; }
 .seg-btn.a-faculdade.on span, .seg-btn.a-faculdade.on { color: var(--a-faculdade); }
 .seg-btn.a-projetos.on { color: var(--a-projetos); }
 .seg-btn.a-leituras.on { color: var(--a-leituras); }
+.seg-btn.a-pessoal.on { color: var(--a-pessoal); }
 .seg.small { margin-bottom: 4px; }
 .seg.small .seg-btn { padding: 7px 12px; font-size: 13px; }
 
@@ -1104,3 +1105,34 @@ input[type="month"], input[type="date"] { min-width: 0; max-width: 100%; }
 .ai-quick input { flex: 1; min-width: 0; border: 0 !important; background: transparent !important; font-size: 14px !important; }
 @media (max-width: 700px) { .ai-form { bottom: calc(92px + env(safe-area-inset-bottom, 0px)); } }
 .ai-secs { font-size: 12px; color: var(--muted); margin-left: 6px; }
+
+/* ---------- v20: boas-vindas e foco ---------- */
+body.onboarding .sidebar, body.onboarding .mobile-top, body.onboarding .tabbar { display: none !important; }
+body.onboarding main { margin: 0; max-width: none; padding: calc(28px + env(safe-area-inset-top, 0px)) 16px 40px; }
+.ob { min-height: calc(100vh - 80px); display: grid; align-content: center; justify-items: center; gap: 18px; }
+.ob-card { width: min(520px, 100%); display: grid; gap: 14px; padding: 30px 26px; border-radius: 28px; background: var(--surface); box-shadow: var(--shadow); }
+.ob-card h1 { font-size: clamp(26px, 5vw, 32px); }
+.ob-card .lede { margin: 0; }
+.ob-logo { border-radius: 20px; margin-bottom: 4px; }
+.ob-dots { display: flex; gap: 8px; }
+.ob-dots i { width: 28px; height: 6px; border-radius: 99px; background: var(--surface-3); }
+.ob-dots i.on { background: var(--accent); width: 44px; } .ob-dots i.done { background: color-mix(in srgb, var(--accent) 45%, var(--surface-3)); }
+.ob-form { display: flex; gap: 10px; flex-wrap: wrap; }
+.ob-form input { flex: 1 1 220px; font-size: 16px !important; padding: 14px 16px !important; }
+.ob-form.col { display: grid; }
+.ob-form .btn { padding: 13px 20px; }
+.ob-focus { display: grid; gap: 10px; }
+.ob-focus.compact { grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); }
+.ob-opt { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 14px 16px; border-radius: 18px; border: 2px solid transparent; background: var(--surface-2); text-align: left; color: var(--text); }
+.ob-opt b { display: block; font-size: 15.5px; } .ob-opt small { display: block; font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+.ob-opt.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
+.ob-ico { width: 42px; height: 42px; border-radius: 14px; display: grid; place-items: center; font-size: 18px; font-weight: 800; background: var(--t1); color: var(--t1-ink); }
+.ob-ico.f-financeiro { background: var(--t4); color: var(--t4-ink); } .ob-ico.f-projetos { background: var(--t3); color: var(--t3-ink); }
+.ob-ico.f-leituras { background: var(--t2); color: var(--t2-ink); } .ob-ico.f-pessoal { background: color-mix(in srgb, var(--a-pessoal) 18%, var(--surface)); color: var(--a-pessoal); }
+.ob-check { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 800; color: transparent; border: 2px solid var(--line-2); }
+.ob-opt.on .ob-check { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.ob-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; margin-top: 4px; }
+.ob .credits { margin: 0; }
+/* um espaço só: o logo não troca de espaço */
+body.one-space .brand-name small, body.one-space .space-tag { display: none; }
+body.no-prisma .brand-name .only-fin { display: inline !important; }

@@ -8,7 +8,7 @@
   /* ---------- peças de formulário ---------- */
   const itemOptions = (selected, area) => {
     const items = S.all('items').filter(it => !['arquivada'].includes(it.status));
-    const groups = Object.entries(P.AREAS).filter(([k]) => !area || area === k).map(([k, a]) => {
+    const groups = Object.entries(P.AREAS).filter(([k]) => (!area || area === k) && (area || P.areasOn().includes(k))).map(([k, a]) => {
       const list = items.filter(it => it.area === k).sort((x, y) => (P.isActive(y) - P.isActive(x)) || x.title.localeCompare(y.title, 'pt'));
       return list.length ? `<optgroup label="${a.label}">${list.map(it => `<option value="${it.id}" ${it.id === selected ? 'selected' : ''}>${esc(it.title)}</option>`).join('')}</optgroup>` : '';
     }).join('');
@@ -213,17 +213,17 @@
   const READ_UNITS = { livro: 'páginas', artigo: 'páginas', podcast: 'episódios', curso: 'aulas', video: 'minutos' };
 
   function itemForm(body, it, api, existing = false) {
-    let area = it.area || 'faculdade';
+    let area = it.area || P.areasOn()[0] || 'projetos';
     let color = it.color ?? Math.floor(Math.random() * 8);
     let schedule = (it.schedule || []).map(s => ({ ...s }));
     const draw = () => {
       const c = it.counters || [];
       const total = k => c.find(x => x.key === k)?.total ?? '';
       body.innerHTML = `<form class="form" data-f="item">
-        ${existing ? '' : `<div class="seg small">${Object.entries(P.AREAS).map(([k, a]) => `<button type="button" class="seg-btn ${k === area ? 'on' : ''} a-${k}" data-area="${k}">${a.icon} ${a.label}</button>`).join('')}</div>`}
+        ${existing ? '' : `<div class="seg small">${Object.entries(P.AREAS).filter(([k]) => P.areasOn().includes(k) || k === area).map(([k, a]) => `<button type="button" class="seg-btn ${k === area ? 'on' : ''} a-${k}" data-area="${k}">${a.icon} ${a.label}</button>`).join('')}</div>`}
         <div class="row-fields title-row">
           ${field('Ícone', `<input name="emoji" class="emoji-input" maxlength="4" value="${esc(it.emoji || '')}" placeholder="${P.AREAS[area].icon}">`)}
-          ${field(area === 'faculdade' ? 'Nome da matéria' : area === 'projetos' ? 'Nome do projeto' : 'Título', `<input name="title" required autofocus value="${esc(it.title || '')}" placeholder="${area === 'faculdade' ? 'Ex.: História da Mídia' : area === 'projetos' ? 'Ex.: Campanha tricampeonato' : 'Ex.: Mulheres que correm com os lobos'}">`)}
+          ${field(area === 'faculdade' ? 'Nome da matéria' : area === 'projetos' ? 'Nome do projeto' : area === 'pessoal' ? 'Meta ou objetivo' : 'Título', `<input name="title" required autofocus value="${esc(it.title || '')}" placeholder="${area === 'faculdade' ? 'Ex.: História da Mídia' : area === 'projetos' ? 'Ex.: Campanha de lançamento' : area === 'pessoal' ? 'Ex.: Correr 5 km, organizar a casa' : 'Ex.: Mulheres que correm com os lobos'}">`)}
         </div>
         <div class="field"><span class="field-label">Cor</span><div class="swatches">${P.COLORS.map((col, i) => `<button type="button" class="swatch ${i === color ? 'on' : ''}" style="--c:${col}" data-color="${i}" aria-label="Cor ${i + 1}"></button>`).join('')}</div></div>
         ${area === 'faculdade' ? `
@@ -239,6 +239,9 @@
         ${area === 'projetos' ? `
           <div class="row-fields">${field('Cliente ou contexto', `<input name="sub" value="${esc(it.sub || '')}" placeholder="Ex.: Mobili, faculdade, pessoal">`)}${field('Etapas planejadas', `<input name="t_etapas" inputmode="numeric" value="${total('etapas') || (existing ? '' : 10)}">`)}</div>
           ${field('Prazo final (opcional)', `<input type="date" name="end" value="${it.end || ''}">`)}` : ''}
+        ${area === 'pessoal' ? `
+          <div class="row-fields">${field('Por que importa (opcional)', `<input name="sub" value="${esc(it.sub || '')}" placeholder="Ex.: saúde, dinheiro, família">`)}${field('Passos planejados', `<input name="t_passos" inputmode="numeric" value="${total('passos') || (existing ? '' : 5)}">`)}</div>
+          ${field('Data para chegar lá (opcional)', `<input type="date" name="end" value="${it.end || ''}">`)}` : ''}
         ${area === 'leituras' ? `
           <div class="row-fields">${field('Autor ou fonte', `<input name="sub" value="${esc(it.sub || '')}">`)}${field('Tipo', `<select name="kind">${Object.keys(READ_UNITS).map(k => `<option value="${k}" ${(it.kind || 'livro') === k ? 'selected' : ''}>${k === 'video' ? 'Vídeo' : k[0].toUpperCase() + k.slice(1)}</option>`).join('')}</select>`)}</div>
           ${field('Total', `<input name="t_main" inputmode="numeric" value="${total('main') || (existing ? '' : 200)}">`, 'Páginas, episódios, aulas ou minutos, conforme o tipo.')}` : ''}
@@ -265,6 +268,7 @@
         let counters;
         if (area === 'faculdade') counters = [{ key: 'aulas', label: 'aulas', done: keepDone('aulas'), total: num(fd.get('t_aulas')) }, { key: 'ativ', label: 'atividades', done: keepDone('ativ'), total: num(fd.get('t_ativ')) }];
         if (area === 'projetos') counters = [{ key: 'etapas', label: 'etapas', done: keepDone('etapas'), total: num(fd.get('t_etapas')) }];
+        if (area === 'pessoal') counters = [{ key: 'passos', label: 'passos', done: keepDone('passos'), total: num(fd.get('t_passos')) }];
         if (area === 'leituras') counters = [{ key: 'main', label: READ_UNITS[fd.get('kind')] || 'páginas', done: keepDone('main'), total: num(fd.get('t_main')) }];
         const status = it.status || P.STATUS[area][area === 'leituras' ? 1 : 0][0];
         const rec = {
@@ -277,7 +281,7 @@
         Object.assign(rec, P.finishFields(it, status));
         delete rec.seed;
         const saved = S.put('items', rec);
-        P.toast(existing ? 'Salvo.' : `${title} criado${area === 'leituras' ? 'a' : ''}.`);
+        P.toast(existing ? 'Salvo.' : `${title} criad${area === 'leituras' || area === 'pessoal' ? 'a' : 'o'}.`);
         api.close();
         if (!existing) { P.ui.area = area; P.saveUI(); }
         return saved;
@@ -301,7 +305,7 @@
         const notes = S.all('notes').filter(n => n.itemId === id).sort((a, b) => b.createdAt - a.createdAt);
         const info = [];
         if (it.code) info.push(['Código', it.code]);
-        if (it.sub) info.push([it.area === 'faculdade' ? 'Professor(a)' : it.area === 'projetos' ? 'Cliente' : 'Autor', it.sub]);
+        if (it.sub) info.push([it.area === 'faculdade' ? 'Professor(a)' : it.area === 'projetos' ? 'Cliente' : it.area === 'pessoal' ? 'Por que importa' : 'Autor', it.sub]);
         if (it.area === 'faculdade') info.push(['Aulas', it.online ? 'on-line' : (it.schedule || []).map(s => `${P.DOW_LONG[s.dow]} ${s.start}–${s.end}`).join(', ') || 'sem horário']);
         if (it.start || it.end) info.push(['Período', [it.start && P.fmtDate(it.start), it.end && P.fmtDate(it.end)].filter(Boolean).join(' → ')]);
         if (it.area === 'leituras') info.push(['Nota', `<span class="rating" role="group" aria-label="Nota">${[1, 2, 3, 4, 5].map(n => `<button type="button" data-rate="${n}" class="${(it.rating || 0) >= n ? 'on' : ''}" aria-label="${n} estrela${n > 1 ? 's' : ''}">★</button>`).join('')}</span>`]);

@@ -16,6 +16,13 @@
   const S = P.store;
   const CFG_KEY = 'prisma2:appwrite';
   const PULL_KEY = 'prisma2:lastPull';
+  const OWNER_KEY = 'prisma2:owner';   // de quem são os dados guardados neste aparelho
+  // o que é pessoal e fica só no aparelho (PIN, conversa do assistente etc.): sai junto na troca de conta
+  const PERSONAL = ['prisma2:finpin', 'prisma2:aiChat', 'prisma2:aiCfg', 'prisma2:finHide', 'prisma2:open7', 'prisma2:pushSaved', 'prisma2:ui'];
+  function clearPersonal() {
+    try { Object.keys(localStorage).filter(k => k.startsWith(PULL_KEY) || PERSONAL.includes(k)).forEach(k => localStorage.removeItem(k)); } catch (e) {}
+    P.fin?.lock?.();
+  }
   const LIB = 'https://cdn.jsdelivr.net/npm/appwrite@16.1.0';
   const DB = 'prisma', TABLE = 'records';
   let A = null, client = null, account = null, db = null, user = null;
@@ -56,6 +63,7 @@
       account = new A.Account(client);
       db = new A.Databases(client);
       try { user = await account.get(); } catch (e) { user = null; }
+      if (user && !P.ls.get(OWNER_KEY)) P.ls.set(OWNER_KEY, user.$id);
       P.renderSyncBadge?.();
       if (user) now();
     } catch (e) { setStatus('offline', e.message); }
@@ -183,13 +191,32 @@
         P.toast(e.code === 401 ? 'E-mail ou senha incorretos.' : e.code === 409 ? 'Já existe uma conta com esse e-mail. Use “Entrar”.' : /password/i.test(m) ? 'A senha precisa ter pelo menos 8 caracteres.' : m || 'Erro ao entrar.');
         return false;
       }
-      // Primeiro login neste aparelho: prepara tudo que já existe aqui para subir
-      if (!P.ls.get(PULL_KEY + ':' + user.$id)) S.markAllDirty();
+      // Outra pessoa já usou este aparelho: os dados dela saem daqui (continuam na conta dela)
+      const owner = P.ls.get(OWNER_KEY);
+      if (owner && owner !== user.$id) {
+        S.resetDevice(); clearPersonal();
+        P.toast('Este aparelho estava com os dados de outra conta. Eles saíram daqui e continuam guardados na conta da outra pessoa.');
+      } else if (!P.ls.get(PULL_KEY + ':' + user.$id)) S.markAllDirty();   // primeiro login: sobe o que já existe aqui
+      P.ls.set(OWNER_KEY, user.$id);
       await now(true);
       P.push?.resubscribe?.();
       return true;
     },
-    async signOut() { try { await account?.deleteSession('current'); } catch (e) {} user = null; setStatus('idle'); },
+    // Sair: antes manda para a nuvem o que ainda não subiu. Com "apagar", tira tudo deste aparelho.
+    async signOut(wipeDevice = false) {
+      try { if (user) await now(true); } catch (e) {}
+      if (wipeDevice && S.pendingCount()) { P.toast('Ainda há alterações que não subiram para a nuvem. Conecte à internet e tente de novo.'); return false; }
+      try { await account?.deleteSession('current'); } catch (e) {}
+      user = null; setStatus('idle');
+      if (wipeDevice) { S.resetDevice(); clearPersonal(); P.ls.del(OWNER_KEY); }
+      return true;
+    },
+    pending: () => S.pendingCount(),
+    // link de convite: abre o Prisma já ligado ao mesmo Appwrite (endpoint e projeto não são segredo)
+    inviteLink() { const c = cfg(); if (!c) return null; return `${location.origin}${location.pathname}#convite=${btoa(c.endpoint + '|' + c.project)}`; },
+    acceptInvite(code) {
+      try { const [endpoint, project] = atob(code).split('|'); if (!/^https:\/\/.+\/v1$/.test(endpoint) || !project) return false; if (!cfg()?.project) P.ls.set(CFG_KEY, { endpoint, project }); return true; } catch (e) { return false; }
+    },
     user: () => user,
     // chama uma função do Appwrite como o usuário logado (usado pelo assistente)
     async execute(functionId, payload) {

@@ -78,13 +78,27 @@ P.color = i => P.COLORS[((i ?? 0) % P.COLORS.length + P.COLORS.length) % P.COLOR
 P.AREAS = {
   faculdade: { label: 'Faculdade', one: 'matéria', icon: '◆', unitMain: 'aulas' },
   projetos: { label: 'Projetos', one: 'projeto', icon: '▲', unitMain: 'etapas' },
-  leituras: { label: 'Leituras', one: 'leitura', icon: '●', unitMain: 'páginas' }
+  leituras: { label: 'Leituras', one: 'leitura', icon: '●', unitMain: 'páginas' },
+  pessoal: { label: 'Vida pessoal', one: 'meta', icon: '★', unitMain: 'passos' }
 };
 P.STATUS = {
   faculdade: [['cursando', 'Cursando'], ['concluida', 'Concluída'], ['arquivada', 'Arquivada']],
   projetos: [['ativo', 'Ativo'], ['pausado', 'Pausado'], ['concluido', 'Concluído']],
-  leituras: [['quero', 'Quero ler'], ['lendo', 'Lendo'], ['pausado', 'Pausado'], ['concluido', 'Concluída']]
+  leituras: [['quero', 'Quero ler'], ['lendo', 'Lendo'], ['pausado', 'Pausado'], ['concluido', 'Concluída']],
+  pessoal: [['ativo', 'Em andamento'], ['pausado', 'Pausada'], ['concluido', 'Concluída']]
 };
+/* Foco escolhido na primeira tela: monta o app com o que a pessoa usa. */
+P.FOCUS = {
+  faculdade: { label: 'Faculdade', icon: '◆', desc: 'Matérias, aulas, provas e prazos' },
+  financeiro: { label: 'Financeiro', icon: '$', desc: 'Quanto posso gastar, contas, cartão e relatórios' },
+  projetos: { label: 'Projetos', icon: '▲', desc: 'Trabalhos e ideias com etapas e prazos' },
+  leituras: { label: 'Leitura', icon: '●', desc: 'Livros, cursos e metas de páginas' },
+  pessoal: { label: 'Vida pessoal', icon: '★', desc: 'Metas, hábitos e rotina' }
+};
+P.focus = () => { const f = P.store?.settings?.().focus; return Array.isArray(f) && f.length ? f : Object.keys(P.FOCUS); };
+P.areasOn = () => Object.keys(P.AREAS).filter(a => P.focus().includes(a));
+P.hasFin = () => P.focus().includes('financeiro');
+P.hasPrisma = () => P.areasOn().length > 0;
 P.ACTIVE = ['cursando', 'ativo', 'lendo'];
 P.statusLabel = (area, s) => (P.STATUS[area] || []).find(x => x[0] === s)?.[1] || s;
 

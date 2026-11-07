@@ -165,7 +165,7 @@
       const history = chat().slice(-7, -1).map(m => ({ role: m.role, text: m.text }));
       // se a função não responder em 40 s, avisa em vez de ficar carregando para sempre
       const r = await Promise.race([
-        P.sync.execute(cfg().fn, { question: text, context: F.aiContext(), history }),
+        P.sync.execute(cfg().fn, { question: text, context: F.aiContext(), history, nome: S.settings().name || '' }),
         new Promise(res => setTimeout(() => res({ ok: false, erro: 'A IA não respondeu a tempo. Confira no Appwrite: prisma-assistente → Settings → Timeout = 30 e se o deploy está Ready. Depois tente de novo.' }), 40000))
       ]);
       if (r.ok) push({ role: 'assistant', text: r.resposta, action: r.acao || null, source: 'ia' });

@@ -334,7 +334,7 @@
     finTx: el => F.openTx(el.dataset.id),
     finPay: el => F.pay(el.dataset.id),
     finLancar: () => F.lancar(),
-    finSalary: () => F.lancar({ kind: 'receita', categoryId: 'cat-salario', desc: 'Salário', amount: F.profile().income, certainty: 'confirmado' }),
+    finSalary: () => F.lancar({ kind: 'receita', categoryId: 'cat-salario', desc: 'Salário', amount: F.profile().income || null, certainty: 'confirmado' }),
     finPlanNow: () => { const c = F.snap().cycle; F.plan(c.start, null, c.projected ? null : c.nextPay); },
     finReplan: () => { const c = F.snap().cycle; F.plan(c.start, null, c.nextPay); },
     finEarly: () => F.earlyCycle(),

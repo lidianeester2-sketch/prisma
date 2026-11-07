@@ -21,7 +21,7 @@
   F.KINDS = { despesa: 'Despesa', receita: 'Receita', transferencia: 'Transferência', ajuste: 'Ajuste' };
   F.ACC_TYPES = { corrente: 'Conta corrente', poupanca: 'Poupança', carteira: 'Carteira (dinheiro)', investimento: 'Investimento' };
 
-  const DEFAULT_PROFILE = { id: 'finprofile', income: 500000, incomeCertainty: 'estimado', payday: 6, paydayRule: 'adia', reserve: 0 };
+  const DEFAULT_PROFILE = { id: 'finprofile', income: 0, incomeCertainty: 'estimado', payday: 5, paydayRule: 'util', reserve: 0 };
 
   /* ---------------- leitura ---------------- */
   F.profile = () => ({ ...DEFAULT_PROFILE, ...(S.get('meta', 'finprofile') || {}) });
@@ -64,7 +64,7 @@
   // Categorias padrão e a conta Nubank ficam só neste aparelho até você mexer nelas.
   F.ensureSeeds = () => {
     F.DEFAULT_CATS.forEach(([key, name, kind, weekly]) => S.seed('fin_cat', { id: 'cat-' + key, name, kind, weekly, custom: false }));
-    if (!S.all('fin_conta').length) S.seed('fin_conta', { id: 'conta-nubank', name: 'Nubank', bank: 'Nubank', type: 'corrente', opening: 0, openingDate: P.today(), openingSet: false, inAvailable: true, order: 0 });
+    if (!S.all('fin_conta').length) S.seed('fin_conta', { id: 'conta-nubank', name: 'Conta principal', bank: '', type: 'corrente', opening: 0, openingDate: P.today(), openingSet: false, inAvailable: true, order: 0 });
   };
   // Contas fixas viram lançamentos "previstos" do período. Id fixo: nunca duplica.
   F.ensureOccurrences = (from, to) => {

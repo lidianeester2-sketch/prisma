@@ -3,9 +3,17 @@
 ============================================================ */
 (function () {
   const S = P.store;
-  const ROUTES = { hoje: 'Hoje', agenda: 'Agenda', areas: 'Áreas', notas: 'Notas', ajustes: 'Ajustes', fin: 'Financeiro+', 'fin-orcamento': 'Orçamento', 'fin-lanc': 'Lançamentos', 'fin-mais': 'Mais', 'fin-relatorio': 'Relatório', 'fin-assistente': 'Assistente' };
-  P.space = () => (route.startsWith('fin') ? 'fin' : 'prisma');
-  let route = 'hoje';
+  const ROUTES = { hoje: 'Hoje', agenda: 'Agenda', areas: 'Áreas', notas: 'Notas', ajustes: 'Ajustes', fin: 'Financeiro+', 'fin-orcamento': 'Orçamento', 'fin-lanc': 'Lançamentos', 'fin-mais': 'Mais', 'fin-relatorio': 'Relatório', 'fin-assistente': 'Assistente', boasvindas: 'Bem-vindo' };
+  const PRISMA_ROUTES = ['hoje', 'agenda', 'areas', 'notas'];
+  let route = 'hoje', spaceNow = 'prisma';
+  // Ajustes fica no espaço em que a pessoa estava (assim quem usa só o Financeiro+ também chega nele)
+  P.space = () => (route.startsWith('fin') ? 'fin' : route === 'ajustes' ? spaceNow : 'prisma');
+  P.home = () => (P.hasPrisma() ? 'hoje' : P.hasFin() ? 'fin' : 'ajustes');
+  P.applyFocus = () => {
+    document.body.classList.toggle('no-fin', !P.hasFin());
+    document.body.classList.toggle('no-prisma', !P.hasPrisma());
+    document.body.classList.toggle('one-space', !(P.hasFin() && P.hasPrisma()));
+  };
   let pendingRender = false;
 
   /* ---------- tema ---------- */
@@ -45,10 +53,19 @@
   };
 
   P.go = to => {
-    if (!ROUTES[to]) to = 'hoje';
+    if (!ROUTES[to]) to = P.home();
+    // primeira vez no app: fluxo de boas-vindas
+    if (!S.settings().onboarded && to !== 'boasvindas') to = 'boasvindas';
+    if (S.settings().onboarded && to === 'boasvindas') to = P.home();
+    // o app mostra só o que a pessoa escolheu usar
+    if (to.startsWith('fin') && !P.hasFin()) to = P.home();
+    if (PRISMA_ROUTES.includes(to) && !P.hasPrisma()) to = P.home();
     if (location.hash !== '#' + to) { location.hash = to; return; }
+    if (to.startsWith('fin')) spaceNow = 'fin'; else if (to !== 'ajustes') spaceNow = 'prisma';
     route = to;
     document.body.dataset.space = P.space();
+    document.body.classList.toggle('onboarding', to === 'boasvindas');
+    P.applyFocus();
     P.ui[P.space() === 'fin' ? 'lastFin' : 'lastPrisma'] = to; P.saveUI();
     [...P.openSheets].forEach(sh => sh.close());
     P.$$('[data-nav]').forEach(b => { const on = b.dataset.nav === to; b.classList.toggle('on', on); on ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current'); });
@@ -69,6 +86,10 @@
 
   /* ---------- quando os dados mudam ---------- */
   S.on(() => {
+    P.applyFocus();
+    // entrou numa conta que já existe durante as boas-vindas: usa o que já está na conta dela
+    if (route === 'boasvindas' && S.settings().onboarded) { P.go(P.home()); return; }
+    if (route === 'boasvindas') return;   // não redesenha no meio do formulário
     const act = document.activeElement;
     const typing = act && P.$('#view').contains(act) && /^(INPUT|TEXTAREA|SELECT)$/.test(act.tagName) && !act.dataset.input && act.type !== 'checkbox';
     if (typing) { pendingRender = true; return; }
@@ -92,7 +113,7 @@
       if (P.space() === 'fin') { if (!P.fin.locked()) P.fin.lancar(); else P.render(); return; }
       P.capture(el.dataset.type || 'tarefa', { due: el.dataset.due, area: el.dataset.area });
     },
-    switchSpace: () => P.go(P.space() === 'fin' ? (P.ui.lastPrisma || 'hoje') : (P.ui.lastFin || 'fin')),
+    switchSpace: () => !(P.hasFin() && P.hasPrisma()) ? P.go('ajustes') : P.go(P.space() === 'fin' ? (P.ui.lastPrisma || 'hoje') : (P.ui.lastFin || 'fin')),
     openTask: el => P.openTask(el.dataset.id),
     openItem: el => P.openItem(el.dataset.id),
     openNote: el => P.openNote(el.dataset.id),
@@ -186,9 +207,14 @@
   /* ---------- início ---------- */
   P.start = () => {
     S.load();
+    // quem já usava o Prisma antes do fluxo de boas-vindas não passa por ele de novo (e continua com tudo)
+    const st0 = S.settings();
+    if (!st0.onboarded && (st0.name || ['items', 'tasks', 'notes', 'fin_lanc', 'fin_conta'].some(c => S.all(c).some(r => r.updatedAt)) || P.ls.get('prisma2:owner'))) S.setSettings({ onboarded: true, focus: st0.focus || Object.keys(P.FOCUS) });
     if (!P.ui.agendaSel || P.ui.agendaSel < P.addDays(P.today(), -60)) { P.ui.agendaSel = null; P.ui.agendaMonth = null; }
     P.applyTheme();
-    P.go(location.hash.slice(1) || 'hoje');
+    const inv = location.hash.match(/^#convite=(.+)$/);
+    if (inv) { const ok = P.sync?.acceptInvite(decodeURIComponent(inv[1])); history.replaceState(null, '', location.pathname + '#ajustes'); if (ok) setTimeout(() => P.toast('Bem-vindo ao Prisma! Crie sua conta em Sincronização (e-mail e senha de 8+ letras).'), 600); }
+    P.go(location.hash.slice(1) || P.home());
     P.renderSyncBadge();
     P.push?.registration().then(() => P.push.check());
     // depois que a sincronização conecta, confirma o cadastro deste aparelho no robô

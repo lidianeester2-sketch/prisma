@@ -136,7 +136,7 @@
     const greet = h < 5 ? 'Boa madrugada' : h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
     // filtro de área (Tudo / Faculdade / Projetos / Leituras)
     const allItems = S.all('items');
-    const used = Object.keys(P.AREAS).filter(a => allItems.some(i => i.area === a && i.status !== 'arquivada'));
+    const used = P.areasOn().filter(a => allItems.some(i => i.area === a && i.status !== 'arquivada'));
     let af = P.ui.hojeArea || 'all';
     if (af !== 'all' && !used.includes(af)) af = 'all';
     const areaOf = t => t.area || (t.itemId && S.get('items', t.itemId)?.area) || null;
@@ -166,7 +166,7 @@
     const wsDay = P.weekStart(today);
     const todayCount = overdue.length + dueToday.length + steps.length;
     const semLeft = hasFac && showFac && st.semesterEnd ? P.daysUntil(st.semesterEnd) : null;
-    const showReading = (af === 'all' || af === 'leituras') && (allItems.some(i => i.area === 'leituras') || st.reading?.daily || st.reading?.yearly);
+    const showReading = P.areasOn().includes('leituras') && (af === 'all' || af === 'leituras') && (allItems.some(i => i.area === 'leituras') || st.reading?.daily || st.reading?.yearly);
 
     let ncHtml;
     if (nc) {
@@ -183,7 +183,7 @@
         const pct = P.pct(focus), c = focus.counters?.[0];
         ncHtml = `<div class="now-card focus" style="--c:${P.color(focus.color)}">
           <button class="now-open" type="button" data-act="openItem" data-id="${focus.id}">
-            <span class="eyebrow">Em foco · ${focus.area === 'leituras' ? 'leitura' : focus.area === 'projetos' ? 'projeto' : 'matéria'}</span>
+            <span class="eyebrow">Em foco · ${P.AREAS[focus.area]?.one || 'item'}</span>
             <span class="now-time">${pct === null ? '—' : pct + '<small>%</small>'}</span>
             <span class="now-title">${esc(focus.emoji || P.AREAS[focus.area].icon)} ${esc(focus.title)}</span>
             <span class="now-meta">${c ? `${c.done}${c.total ? ' de ' + c.total : ''} ${esc(c.label)}` : ''}${focus.sub ? ' · ' + esc(focus.sub) : ''}</span>
@@ -193,7 +193,7 @@
       } else if (af === 'faculdade') {
         ncHtml = `<div class="now-card quiet"><span class="eyebrow">Próxima aula</span><span class="now-title">Nenhuma aula nos próximos dias</span><span class="now-meta">Cadastre horários nas matérias em Áreas.</span></div>`;
       } else {
-        ncHtml = `<button class="now-card quiet" type="button" data-act="capture" data-type="item" data-area="${af === 'all' ? 'projetos' : af}"><span class="eyebrow">Em foco</span><span class="now-title">Nada em andamento ainda</span><span class="now-meta">Toque para criar uma matéria, um projeto ou uma leitura.</span></button>`;
+        ncHtml = `<button class="now-card quiet" type="button" data-act="capture" data-type="item" data-area="${af === 'all' ? (P.areasOn()[0] || 'projetos') : af}"><span class="eyebrow">Em foco</span><span class="now-title">Nada em andamento ainda</span><span class="now-meta">Toque para criar uma matéria, um projeto ou uma leitura.</span></button>`;
       }
     }
 
@@ -403,6 +403,7 @@
      ÁREAS (Faculdade · Projetos · Leituras)
   ============================================================ */
   P.views.areas = () => {
+    if (!P.areasOn().includes(P.ui.area)) P.ui.area = P.areasOn()[0] || 'projetos';
     const area = P.ui.area, filt = P.ui.areaFilter;
     const all = S.all('items').filter(it => it.area === area);
     const list = all.filter(it => filt === 'todos' ? it.status !== 'arquivada' : filt === 'arquivo' ? ['arquivada', 'concluida', 'concluido'].includes(it.status) : (P.isActive(it) || it.status === 'quero' || it.status === 'pausado'))
@@ -414,6 +415,7 @@
     let summary = '';
     if (area === 'faculdade') { const n = all.filter(i => i.status === 'cursando').length; const left = st.semesterEnd ? P.daysUntil(st.semesterEnd) : null; summary = `${n} matéria${n !== 1 ? 's' : ''} cursando${left !== null && left >= 0 ? ` · semestre termina em ${left} dias` : ''}`; }
     if (area === 'projetos') { const n = all.filter(i => i.status === 'ativo').length; summary = `${n} projeto${n !== 1 ? 's' : ''} ativo${n !== 1 ? 's' : ''}`; }
+    if (area === 'pessoal') { const n = all.filter(i => i.status === 'ativo').length; summary = `${n} meta${n !== 1 ? 's' : ''} em andamento`; }
     if (area === 'leituras') { const n = all.filter(i => i.status === 'lendo').length, q = all.filter(i => i.status === 'quero').length, c = P.finishedThisYear().length, g = st.reading?.yearly; summary = `${n} lendo · ${q} na fila · ${c}${g ? ' de ' + g : ''} concluída${c !== 1 || g ? 's' : ''} em ${new Date().getFullYear()}`; }
 
     const card = it => {
@@ -432,7 +434,7 @@
           ${it.counters?.[0] && P.isActive(it) ? `<button class="plus" type="button" data-act="inc" data-id="${it.id}" data-key="${it.counters[0].key}" aria-label="Mais 1 ${esc(it.counters[0].label)}">+1 ${esc(it.counters[0].label.replace(/s$/, ''))}</button>` : ''}
         </article>`;
     };
-    const addCard = `<button class="item-card add" type="button" data-act="capture" data-type="item" data-area="${area}"><span>+</span>${area === 'projetos' ? 'Novo projeto' : area === 'leituras' ? 'Nova leitura' : 'Nova matéria'}</button>`;
+    const addCard = `<button class="item-card add" type="button" data-act="capture" data-type="item" data-area="${area}"><span>+</span>${area === 'projetos' ? 'Novo projeto' : area === 'leituras' ? 'Nova leitura' : area === 'pessoal' ? 'Nova meta' : 'Nova matéria'}</button>`;
     let groupsHtml;
     if (area === 'leituras' && filt === 'ativos') {
       // leituras: separadas em Lendo agora / Na fila / Pausadas
@@ -445,7 +447,7 @@
     return `
     <header class="page-head"><h1>Áreas</h1><p class="lede">${summary}</p></header>
     <div class="seg" role="tablist" aria-label="Área">
-      ${Object.entries(P.AREAS).map(([k, a]) => `<button type="button" role="tab" aria-selected="${k === area}" class="seg-btn ${k === area ? 'on' : ''} a-${k}" data-act="setArea" data-a="${k}"><span aria-hidden="true">${a.icon}</span> ${a.label}</button>`).join('')}
+      ${Object.entries(P.AREAS).filter(([k]) => P.areasOn().includes(k)).map(([k, a]) => `<button type="button" role="tab" aria-selected="${k === area}" class="seg-btn ${k === area ? 'on' : ''} a-${k}" data-act="setArea" data-a="${k}"><span aria-hidden="true">${a.icon}</span> ${a.label}</button>`).join('')}
     </div>
     <div class="chips">
       ${[['ativos', 'Em andamento'], ['todos', 'Todos'], ['arquivo', 'Concluídos e arquivados']].map(([k, l]) => `<button type="button" class="chip ${filt === k ? 'on' : ''}" data-act="areaFilter" data-f="${k}">${l}</button>`).join('')}
@@ -473,7 +475,7 @@
     <div class="notes-tools">
       <label class="search"><span aria-hidden="true">⌕</span><input id="notes-q" type="search" placeholder="Buscar nas notas" value="${esc(u.notesQ || '')}" data-input="notesQ" aria-label="Buscar nas notas"></label>
       <div class="chips">
-        ${[['all', 'Todas'], ['faculdade', 'Faculdade'], ['projetos', 'Projetos'], ['leituras', 'Leituras'], ['geral', 'Soltas']].map(([k, l]) => `<button type="button" class="chip ${u.notesArea === k ? 'on' : ''}" data-act="notesArea" data-f="${k}">${l}</button>`).join('')}
+        ${[['all', 'Todas'], ...P.areasOn().map(a => [a, P.AREAS[a].label]), ['geral', 'Soltas']].map(([k, l]) => `<button type="button" class="chip ${u.notesArea === k ? 'on' : ''}" data-act="notesArea" data-f="${k}">${l}</button>`).join('')}
         <button type="button" class="chip ${u.notesFav ? 'on' : ''}" data-act="notesFav">★ Favoritas</button>
         <button type="button" class="chip" data-act="notesSort">${u.notesAsc ? 'Mais antigas ↑' : 'Mais recentes ↓'}</button>
       </div>
