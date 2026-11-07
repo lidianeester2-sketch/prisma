@@ -25,9 +25,9 @@
     const steps = t.steps?.length ? `${t.steps.filter(s => s.done).length}/${t.steps.length} etapas` : '';
     const meta = [item ? esc(item.title) : (t.area ? P.AREAS[t.area]?.label : ''), t.kind !== 'tarefa' ? kind.label : '', steps].filter(Boolean).join(' · ');
     return `<div class="row task ${t.done ? 'done' : ''} ${late ? 'late' : ''}" style="--c:${itemColor(t.itemId)}">
-      <button class="check" type="button" data-act="toggleTask" data-id="${t.id}" aria-label="${t.done ? 'Reabrir' : 'Concluir'} ${esc(t.title)}"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>
+      <button class="check" type="button" data-act="toggleTask" data-id="${t.id}" aria-label="${t.done ? 'Reabrir' : 'Concluir'} ${esc(t.title)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>
       <button class="row-main" type="button" data-act="openTask" data-id="${t.id}">
-        <span class="row-title">${t.kind !== 'tarefa' ? `<span class="kind">${kind.icon}</span>` : ''}${esc(t.title)}</span>
+        <span class="row-title">${t.kind !== 'tarefa' ? `<span class="kind" aria-hidden="true">${kind.icon}</span>` : ''}${esc(t.title)}</span>
         ${meta ? `<span class="row-meta"><i class="dot"></i>${meta}</span>` : ''}
       </button>
       ${opts.noDate ? '' : `<span class="when ${late ? 'bad' : (t.due === today ? 'hot' : '')}">${P.relDay(t.due)}</span>`}
@@ -35,7 +35,7 @@
   };
 
   P.stepRow = (t, s) => `<div class="row step ${s.date < P.today() ? 'late' : ''}" style="--c:${itemColor(t.itemId)}">
-      <button class="check small" type="button" data-act="toggleStep" data-id="${t.id}" data-step="${s.id}" aria-label="Concluir etapa ${esc(s.label)}"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>
+      <button class="check small" type="button" data-act="toggleStep" data-id="${t.id}" data-step="${s.id}" aria-label="Concluir etapa ${esc(s.label)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>
       <button class="row-main" type="button" data-act="openTask" data-id="${t.id}">
         <span class="row-title">${esc(s.label)}</span>
         <span class="row-meta"><i class="dot"></i>etapa de “${esc(t.title)}” · entrega ${P.relDay(t.due)}</span>
@@ -199,7 +199,7 @@
 
     const filterHtml = used.length > 1 ? `<div class="chips hoje-filter" role="group" aria-label="Mostrar">
       <button type="button" class="chip ${af === 'all' ? 'on' : ''}" data-act="hojeArea" data-f="all">Tudo</button>
-      ${used.map(a => `<button type="button" class="chip ${af === a ? 'on' : ''}" data-act="hojeArea" data-f="${a}">${P.AREAS[a].icon} ${P.AREAS[a].label}</button>`).join('')}
+      ${used.map(a => `<button type="button" class="chip ${af === a ? 'on' : ''}" data-act="hojeArea" data-f="${a}"><span aria-hidden="true">${P.AREAS[a].icon}</span> ${P.AREAS[a].label}</button>`).join('')}
     </div>` : '';
 
     return `
@@ -251,7 +251,7 @@
               const on = !!hb.checks?.[today];
               const dots = Array.from({ length: 7 }, (_, i) => { const d = P.addDays(wsDay, i); return `<i class="${hb.checks?.[d] ? 'on' : ''} ${d === today ? 'is-today' : ''} ${d > today ? 'future' : ''}"></i>`; }).join('');
               return `<button class="habit ${on ? 'on' : ''}" type="button" data-act="toggleHabit" data-id="${hb.id}" aria-pressed="${on}">
-                <span class="habit-check"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>
+                <span class="habit-check"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>
                 <span class="habit-name">${esc(hb.name)}</span><span class="habit-week" aria-hidden="true">${dots}</span></button>`;
             }).join('') : empty('Sem hábitos ainda.', 'Pequenas rotinas mudam o mês inteiro.', 'data-act="manageHabits"', 'Criar hábito')}
           </div>
@@ -293,7 +293,7 @@
     const main = it.counters?.[0];
     return `<div class="mini" style="--c:${P.color(it.color)}">
       <button class="mini-open" type="button" data-act="openItem" data-id="${it.id}">
-        <span class="mini-area">${P.AREAS[it.area].icon} ${P.AREAS[it.area].label}</span>
+        <span class="mini-area"><span aria-hidden="true">${P.AREAS[it.area].icon}</span> ${P.AREAS[it.area].label}</span>
         <span class="mini-title">${esc(it.emoji || '')} ${esc(it.title)}</span>
         <span class="mini-meta">${main ? `${main.done}${main.total ? '/' + main.total : ''} ${esc(main.label)}` : ''}${pct !== null ? ` · ${pct}%` : ''}</span>
         ${bar(pct)}
@@ -441,8 +441,8 @@
 
     return `
     <header class="page-head"><h1>${P.areasTitle()}</h1><p class="lede">${summary}</p></header>
-    <div class="seg" role="tablist" aria-label="Área">
-      ${Object.entries(P.AREAS).filter(([k]) => P.areasOn().includes(k)).map(([k, a]) => `<button type="button" role="tab" aria-selected="${k === area}" class="seg-btn ${k === area ? 'on' : ''} a-${k}" data-act="setArea" data-a="${k}"><span aria-hidden="true">${a.icon}</span> ${a.label}</button>`).join('')}
+    <div class="seg" role="group" aria-label="Área">
+      ${Object.entries(P.AREAS).filter(([k]) => P.areasOn().includes(k)).map(([k, a]) => `<button type="button" aria-pressed="${k === area}" class="seg-btn ${k === area ? 'on' : ''} a-${k}" data-act="setArea" data-a="${k}"><span aria-hidden="true">${a.icon}</span> ${a.label}</button>`).join('')}
     </div>
     <div class="chips">
       ${[['ativos', 'Em andamento'], ['todos', 'Todos'], ['arquivo', 'Concluídos e arquivados']].map(([k, l]) => `<button type="button" class="chip ${filt === k ? 'on' : ''}" data-act="areaFilter" data-f="${k}">${l}</button>`).join('')}

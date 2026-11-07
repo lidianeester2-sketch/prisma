@@ -44,12 +44,12 @@
     const sheet = P.sheet({
       title: 'Adicionar', kicker: '✦ captura rápida',
       render: () => `
-        <div class="tabs" role="tablist">${tabs.map(([k, l]) => `<button type="button" role="tab" class="tab ${k === current ? 'on' : ''}" data-tab="${k}" aria-selected="${k === current}">${l}</button>`).join('')}</div>
+        <div class="tabs" role="group" aria-label="Tipo">${tabs.map(([k, l]) => `<button type="button" class="tab ${k === current ? 'on' : ''}" data-tab="${k}" aria-pressed="${k === current}">${l}</button>`).join('')}</div>
         <div class="tab-body"></div>`,
       mount: api => {
         const body = api.body.querySelector('.tab-body');
         const draw = () => {
-          P.$$('.tab', api.body).forEach(b => { b.classList.toggle('on', b.dataset.tab === current); b.setAttribute('aria-selected', b.dataset.tab === current); });
+          P.$$('.tab', api.body).forEach(b => { b.classList.toggle('on', b.dataset.tab === current); b.setAttribute('aria-pressed', b.dataset.tab === current); });
           if (current === 'tarefa') taskForm(body, { due: preset.due ?? null, itemId: preset.itemId || '' }, false, api);
           if (current === 'prazo') taskForm(body, { kind: 'trabalho', due: preset.due || P.addDays(P.today(), 7), itemId: preset.itemId || '' }, true, api);
           if (current === 'nota') noteForm(body, { itemId: preset.itemId || '', text: '', tags: [] }, api);
@@ -67,7 +67,7 @@
   function taskForm(body, t, isDeadline, api, existing = false) {
     body.innerHTML = `<form class="form" data-f="task">
       ${field('O que precisa ser feito', `<input name="title" required autofocus value="${esc(t.title || '')}" placeholder="${isDeadline ? 'Ex.: Trabalho final de Redação' : 'Ex.: Mandar e-mail pro professor'}">`)}
-      ${isDeadline ? field('Tipo', `<div class="chips compact" data-kind>${['trabalho', 'prova', 'entrega', 'reuniao'].map(k => `<button type="button" class="chip ${t.kind === k ? 'on' : ''}" data-k="${k}">${P.KINDS[k].icon} ${P.KINDS[k].label}</button>`).join('')}</div>`) : ''}
+      ${isDeadline ? field('Tipo', `<div class="chips compact" data-kind>${['trabalho', 'prova', 'entrega', 'reuniao'].map(k => `<button type="button" class="chip ${t.kind === k ? 'on' : ''}" data-k="${k}"><span aria-hidden="true">${P.KINDS[k].icon}</span> ${P.KINDS[k].label}</button>`).join('')}</div>`) : ''}
       ${field(isDeadline ? 'Data de entrega' : 'Quando', dateChips('due', t.due))}
       ${field('Ligado a', `<select name="itemId">${itemOptions(t.itemId)}</select>`)}
       ${isDeadline && !existing ? `<label class="check-line"><input type="checkbox" name="plan" checked> Montar um plano em etapas até a data</label>` : ''}
@@ -110,7 +110,7 @@
           </div>
           ${t.steps?.length ? `<div class="bar big"><div style="width:${pct}%"></div></div>
           <div class="list steps-list">${t.steps.map(s => `<div class="row step-edit ${s.done ? 'done' : ''}">
-              <button class="check small" type="button" data-step-toggle="${s.id}" aria-label="Concluir etapa"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>
+              <button class="check small" type="button" data-step-toggle="${s.id}" aria-label="Concluir etapa"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>
               <input class="inline-input" value="${esc(s.label)}" data-step-label="${s.id}" aria-label="Nome da etapa">
               <input class="inline-date" type="date" value="${s.date}" data-step-date="${s.id}" aria-label="Data da etapa">
               <button class="icon-btn small" type="button" data-step-del="${s.id}" aria-label="Remover etapa">✕</button>
@@ -220,7 +220,7 @@
       const c = it.counters || [];
       const total = k => c.find(x => x.key === k)?.total ?? '';
       body.innerHTML = `<form class="form" data-f="item">
-        ${existing ? '' : `<div class="seg small">${Object.entries(P.AREAS).filter(([k]) => P.areasOn().includes(k) || k === area).map(([k, a]) => `<button type="button" class="seg-btn ${k === area ? 'on' : ''} a-${k}" data-area="${k}">${a.icon} ${a.label}</button>`).join('')}</div>`}
+        ${existing ? '' : `<div class="seg small">${Object.entries(P.AREAS).filter(([k]) => P.areasOn().includes(k) || k === area).map(([k, a]) => `<button type="button" class="seg-btn ${k === area ? 'on' : ''} a-${k}" data-area="${k}" aria-pressed="${k === area}"><span aria-hidden="true">${a.icon}</span> ${a.label}</button>`).join('')}</div>`}
         <div class="row-fields title-row">
           ${field('Ícone', `<input name="emoji" class="emoji-input" maxlength="4" value="${esc(it.emoji || '')}" placeholder="${P.AREAS[area].icon}">`)}
           ${field(area === 'faculdade' ? 'Nome da matéria' : area === 'projetos' ? 'Nome do projeto' : area === 'pessoal' ? 'Meta ou objetivo' : 'Título', `<input name="title" required autofocus value="${esc(it.title || '')}" placeholder="${area === 'faculdade' ? 'Ex.: História da Mídia' : area === 'projetos' ? 'Ex.: Campanha de lançamento' : area === 'pessoal' ? 'Ex.: Correr 5 km, organizar a casa' : 'Ex.: Mulheres que correm com os lobos'}">`)}

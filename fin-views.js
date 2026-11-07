@@ -145,7 +145,7 @@
           if (showNext) { const nx = F.cycleAt(1); F.ensureOccurrences(nx.start, nx.end); next = F.summary({ start: nx.start, end: nx.end }).pending.filter(t => !t.envelope || t.remaining); next.cycle = nx; }
           const row = t => `<div class="row fin-row ${t.date < today && !t.noDue ? 'late' : ''}">
             <button type="button" class="row-main" data-act="finTx" data-id="${t.id}"><span class="row-title">${esc(t.desc)}</span><span class="row-meta">${dueTxt(t, today)}${t.certainty === 'estimado' ? ' · estimado' : ''}</span></button>
-            <span class="fin-amt">${F.money(t.remaining ?? t.amount)}</span>${t.envelope ? '' : `<button class="btn ghost small" type="button" data-act="finPay" data-id="${t.id}">Pagar</button>`}</div>`;
+            <span class="fin-amt">${F.money(t.remaining ?? t.amount)}</span>${t.envelope ? '' : `<button class="btn ghost small" type="button" data-act="finPay" data-id="${t.id}" aria-label="Pagar ${esc(t.desc)}, ${F.money(t.remaining ?? t.amount)}">Pagar</button>`}</div>`;
           const nTotal = next.reduce((a, t) => a + (t.remaining ?? t.amount), 0);
           return `<div class="block-head sub"><h3>Próximas contas</h3><span class="count">${s.committedItems.length}</span>${s.committedItems.length > 4 ? '<button class="link" type="button" data-act="go" data-to="fin-orcamento">Ver todas →</button>' : ''}</div>
           <div class="list">${s.committedItems.length ? s.committedItems.slice(0, 4).map(row).join('') : `<div class="empty"><strong>Nenhuma conta até o salário.</strong>${next.length ? '' : '<span>Cadastre aluguel, luz e assinaturas em Ajustes → Finanças → Contas fixas.</span>'}</div>`}</div>
@@ -190,7 +190,7 @@
     // linha compacta: o grupo já diz quando vence, então a linha só mostra o essencial
     const pendRow = t => `<div class="row fin-row compact ${t.date < today && !t.envelope && !t.noDue ? 'late' : ''}">
         <button type="button" class="row-main" data-act="finTx" data-id="${t.id}"><span class="row-title">${esc(t.desc)}</span><span class="row-meta">${esc(F.cat(t.categoryId)?.name || '')}${t.envelope ? ' · ' + dueTxt(t, today) : t.noDue ? '' : ' · ' + F.date(t.date)}${t.certainty === 'estimado' ? ' · estimado' : ''}</span></button>
-        <span class="fin-amt">${F.money(t.remaining)}</span>${t.envelope ? '' : `<button class="btn ghost small" type="button" data-act="finPay" data-id="${t.id}">Pagar</button>`}</div>`;
+        <span class="fin-amt">${F.money(t.remaining)}</span>${t.envelope ? '' : `<button class="btn ghost small" type="button" data-act="finPay" data-id="${t.id}" aria-label="Pagar ${esc(t.desc)}, ${F.money(t.remaining ?? t.amount)}">Pagar</button>`}</div>`;
     const in7 = C.addDays(today, 7);
     const groups = [
       ['Vencidas', sum.pending.filter(t => !t.envelope && !t.noDue && t.date < today)],
@@ -222,7 +222,7 @@
     <div class="cols">
       <section class="block main-col">
         <div class="block-head"><h2>Pendentes</h2><span class="count">${sum.pending.length}</span><span class="faint small">${F.money(sum.pendingTotal)}</span></div>
-        ${sum.pending.length ? groups.map(([t, l]) => `<div class="pend-group"><div class="pend-head"><span>${t}</span><b>${F.money(l.reduce((a, x) => a + x.remaining, 0))}</b></div><div class="list">${l.map(pendRow).join('')}</div></div>`).join('')
+        ${sum.pending.length ? groups.map(([t, l]) => `<div class="pend-group"><h3 class="pend-head"><span>${t}</span><b><span class="sr-only">, total </span>${F.money(l.reduce((a, x) => a + x.remaining, 0))}</b></h3><div class="list">${l.map(pendRow).join('')}</div></div>`).join('')
           : `<div class="empty"><strong>Nada pendente neste ciclo.</strong><span>Contas a pagar aparecem aqui. Cadastre as fixas uma vez e elas entram sozinhas em todo ciclo.</span><button class="btn small" type="button" data-act="finRecs">Cadastrar contas fixas</button></div>`}
 
         <details class="more" ${sum.paid.length ? 'open' : ''}><summary>Pagas <span class="count">${sum.paid.length}</span> <span class="faint small">${F.money(sum.paidTotal)}</span></summary>

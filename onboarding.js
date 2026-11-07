@@ -55,7 +55,7 @@
         <h1>Qual seu foco no Prisma?</h1>
         <p class="ob-sub">Escolha uma ou mais opções para personalizar sua experiência${st.name ? ', ' + esc(st.name) : ''}.</p>
         <div class="ob-list" role="group" aria-label="Foco">${Object.entries(P.FOCUS).map(([k, f]) => `<button type="button" class="ob-row ${st.focus.includes(k) ? 'on' : ''}" data-focus="${k}" aria-pressed="${st.focus.includes(k)}">
-            <span class="ob-row-ico">${I[k]}</span><span class="ob-row-txt"><b>${f.label}</b><small>${f.desc}</small></span><span class="ob-box" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span></button>`).join('')}</div>
+            <span class="ob-row-ico">${I[k]}</span><span class="ob-row-txt"><b>${f.label}</b><small>${f.desc}</small></span><span class="ob-box" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span></button>`).join('')}</div>
         ${fab(`type="button" data-ob-next ${st.focus.length ? '' : 'disabled'}`, 'Continuar')}
       </div>`;
     else body = `

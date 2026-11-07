@@ -53,7 +53,7 @@
       <section class="block set">
         <h2>Seu foco</h2>
         <p class="hint">O Prisma mostra só o que você marcar. Dá para mudar quando quiser; nada é apagado.</p>
-        <div class="ob-focus compact">${Object.entries(P.FOCUS).map(([k, f]) => `<button type="button" class="ob-opt ${P.focus().includes(k) ? 'on' : ''}" data-act="toggleFocus" data-k="${k}" aria-pressed="${P.focus().includes(k)}"><span class="ob-ico f-${k}">${f.icon}</span><span><b>${f.label}</b><small>${f.desc}</small></span><span class="ob-check" aria-hidden="true">✓</span></button>`).join('')}</div>
+        <div class="ob-focus compact">${Object.entries(P.FOCUS).map(([k, f]) => `<button type="button" class="ob-opt ${P.focus().includes(k) ? 'on' : ''}" data-act="toggleFocus" data-k="${k}" aria-pressed="${P.focus().includes(k)}"><span class="ob-ico f-${k}" aria-hidden="true">${f.icon}</span><span><b>${f.label}</b><small>${f.desc}</small></span><span class="ob-check" aria-hidden="true">✓</span></button>`).join('')}</div>
       </section>
 
       ${P.hasFin() ? `<section class="block set">
@@ -131,7 +131,7 @@
         </div>
       </section>
 
-      <p class="credits">Prisma · versão 30 · Desenvolvido por Lidiane Tavares<br><button class="link" type="button" data-act="repair">Atualizar o app (baixa a versão mais nova; seus dados ficam)</button></p>
+      <p class="credits">Prisma · versão 31 · Desenvolvido por Lidiane Tavares<br><button class="link" type="button" data-act="repair">Atualizar o app (baixa a versão mais nova; seus dados ficam)</button></p>
     </div>`;
   };
 

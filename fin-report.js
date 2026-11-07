@@ -60,18 +60,18 @@
     <p class="rep-phrase">${esc(phrase(r))}</p>
 
     ${r.count ? `
-    <div class="rep-highlights">
-      <div class="rep-hl c1"><span>Onde mais gastou</span><b>${esc(r.top.name)}</b><small>${F.money(r.top.total)} · ${pct(r.top.share)} do total</small></div>
-      ${r.least ? `<div class="rep-hl c3"><span>Onde menos gastou</span><b>${esc(r.least.name)}</b><small>${F.money(r.least.total)} · ${pct(r.least.share)} do total</small></div>` : ''}
-      ${r.biggest ? `<div class="rep-hl c2"><span>Maior gasto único</span><b>${esc(r.biggest.desc)}</b><small>${F.money(r.biggest.amount)} em ${F.date(r.biggest.paidDate || r.biggest.date)}</small></div>` : ''}
-      ${r.topDay ? `<div class="rep-hl c4"><span>Dia mais caro</span><b>${P.DOW_LONG[P.parse(r.topDay.date).getDay()]}, ${F.date(r.topDay.date)}</b><small>${F.money(r.topDay.total)} no dia</small></div>` : ''}
+    <div class="rep-highlights" role="list" aria-label="Destaques">
+      <div role="listitem" class="rep-hl c1"><span>Onde mais gastou</span><b>${esc(r.top.name)}</b><small>${F.money(r.top.total)} · ${pct(r.top.share)} do total</small></div>
+      ${r.least ? `<div role="listitem" class="rep-hl c3"><span>Onde menos gastou</span><b>${esc(r.least.name)}</b><small>${F.money(r.least.total)} · ${pct(r.least.share)} do total</small></div>` : ''}
+      ${r.biggest ? `<div role="listitem" class="rep-hl c2"><span>Maior gasto único</span><b>${esc(r.biggest.desc)}</b><small>${F.money(r.biggest.amount)} em ${F.date(r.biggest.paidDate || r.biggest.date)}</small></div>` : ''}
+      ${r.topDay ? `<div role="listitem" class="rep-hl c4"><span>Dia mais caro</span><b>${P.DOW_LONG[P.parse(r.topDay.date).getDay()]}, ${F.date(r.topDay.date)}</b><small>${F.money(r.topDay.total)} no dia</small></div>` : ''}
     </div>
 
     <section class="block"><div class="block-head"><h2>Para onde foi o dinheiro</h2><span class="faint small">toque para ver os gastos</span></div>
       <div class="rep-cats">${r.cats.map((cat, i) => `<details class="rep-cat ${i === 0 ? 'top' : ''}">
         <summary title="${esc(cat.name)}: ${F.money(cat.total)} (${pct(cat.share)})">
-          <span class="rep-name">${esc(cat.name)}</span><span class="rep-val">${F.money(cat.total)} <small>${pct(cat.share)}</small></span>
-          <span class="rep-bar"><i style="width:${W(cat.total / max * 100)}%"></i></span>
+          <span class="rep-name">${esc(cat.name)}</span><span class="rep-val">${F.money(cat.total)} <small><span class="sr-only">, </span>${pct(cat.share)}<span class="sr-only"> do total,</span></small></span>
+          <span class="rep-bar" aria-hidden="true"><i style="width:${W(cat.total / max * 100)}%"></i></span>
           <span class="rep-meta">${cat.count} gasto${cat.count === 1 ? '' : 's'}${deltaTxt(cat) ? ' · ' + deltaTxt(cat) : ''}</span>
         </summary>
         <div class="rep-items">${cat.items.slice(0, 6).map(t => `<button type="button" class="rep-item" data-act="finTx" data-id="${t.id}"><span>${esc(t.desc)}</span><small>${F.date(t.paidDate || t.date)}</small><b>${F.money(t.amount)}</b></button>`).join('')}${cat.items.length > 6 ? `<p class="hint">e mais ${cat.items.length - 6}.</p>` : ''}</div>
@@ -82,19 +82,20 @@
     <div class="cols rep-cols">
       <section class="block"><div class="block-head"><h2>Contas × dia a dia</h2></div>
         <div class="rep-split">
-          <div><span class="rep-name">Contas e compromissos</span><span class="rep-val">${F.money(r.fixed)} <small>${pct(r.total ? r.fixed / r.total : 0)}</small></span><span class="rep-bar"><i style="width:${W(r.total ? r.fixed / r.total * 100 : 0)}%"></i></span></div>
-          <div><span class="rep-name">Dia a dia</span><span class="rep-val">${F.money(r.variable)} <small>${pct(r.total ? r.variable / r.total : 0)}</small></span><span class="rep-bar alt"><i style="width:${W(r.total ? r.variable / r.total * 100 : 0)}%"></i></span></div>
+          <div><span class="rep-name">Contas e compromissos</span><span class="rep-val">${F.money(r.fixed)} <small><span class="sr-only">, </span>${pct(r.total ? r.fixed / r.total : 0)}<span class="sr-only"> do total.</span></small></span><span class="rep-bar" aria-hidden="true"><i style="width:${W(r.total ? r.fixed / r.total * 100 : 0)}%"></i></span></div>
+          <div><span class="rep-name">Dia a dia</span><span class="rep-val">${F.money(r.variable)} <small><span class="sr-only">, </span>${pct(r.total ? r.variable / r.total : 0)}<span class="sr-only"> do total.</span></small></span><span class="rep-bar alt" aria-hidden="true"><i style="width:${W(r.total ? r.variable / r.total * 100 : 0)}%"></i></span></div>
         </div>
         <p class="hint">Contas e compromissos: contas fixas, planejamento e parcelas de carnê. Dia a dia: o resto.</p>
       </section>
 
       <section class="block"><div class="block-head"><h2>Semana a semana</h2></div>
-        <div class="rep-weeks" role="list">${r.weeks.map(w => { const cur = w.start <= today && today <= w.end; return `<div class="rep-week ${cur ? 'cur' : ''}" role="listitem" title="${w.label} (${F.date(w.start)}–${F.date(w.end)}): ${F.money(w.total)}">
-          <b>${w.total ? F.money(w.total).replace('R$ ', '') : '—'}</b><span class="col"><i style="height:${w.total ? W(w.total / wMax * 100) : 0}%"></i></span><small>${w.label.replace('Semana ', 'Sem. ')}</small></div>`; }).join('')}</div>
+        <div class="rep-weeks" role="list" aria-label="Gastos por ${F.blk().one}">${r.weeks.map(w => { const cur = w.start <= today && today <= w.end; return `<div class="rep-week ${cur ? 'cur' : ''}" role="listitem">
+          <span class="sr-only">${w.label}, de ${F.date(w.start)} a ${F.date(w.end)}${cur ? ' (atual)' : ''}: ${w.total ? F.money(w.total) : 'nenhum gasto'}</span>
+          <b aria-hidden="true">${w.total ? F.money(w.total).replace('R$ ', '') : '—'}</b><span class="col" aria-hidden="true"><i style="height:${w.total ? W(w.total / wMax * 100) : 0}%"></i></span><small aria-hidden="true">${w.label.replace('Semana ', 'Sem. ')}</small></div>`; }).join('')}</div>
       </section>
     </div>
 
-    ${r.envelopes.length ? `<section class="block"><div class="block-head"><h2>Tetos do ciclo</h2></div><div class="rep-split">${r.envelopes.map(e => `<div><span class="rep-name">${esc(e.desc)}</span><span class="rep-val">${F.money(e.used)} <small>de ${F.money(e.limit)}</small></span><span class="rep-bar ${e.used > e.limit ? 'over' : ''}"><i style="width:${W(e.limit ? e.used / e.limit * 100 : 0)}%"></i></span>
+    ${r.envelopes.length ? `<section class="block"><div class="block-head"><h2>Tetos do ciclo</h2></div><div class="rep-split">${r.envelopes.map(e => `<div><span class="rep-name">${esc(e.desc)}</span><span class="rep-val">${F.money(e.used)} <small>de ${F.money(e.limit)}</small></span><span class="rep-bar ${e.used > e.limit ? 'over' : ''}" aria-hidden="true"><i style="width:${W(e.limit ? e.used / e.limit * 100 : 0)}%"></i></span>
       <span class="rep-meta">${e.used > e.limit ? `<b class="st-pendente">passou ${F.money(e.used - e.limit)}</b>` : `sobraram ${F.money(e.limit - e.used)}`}</span></div>`).join('')}</div></section>` : ''}
 
     ${r.cardBuysCount ? `<section class="block"><div class="block-head"><h2>Compras no cartão neste ciclo</h2><span class="faint small">${F.money(r.cardBuysTotal)}</span></div>

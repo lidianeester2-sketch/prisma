@@ -157,6 +157,14 @@ P.sheet = ({ title, kicker = '', render, mount, wide = false, onClose, live = fa
       <div class="sheet-body"></div>
     </section>`;
   host.appendChild(wrap);
+  const opener = document.activeElement;
+  const titleId = 'sh-' + Math.random().toString(36).slice(2, 8);
+  wrap.querySelector('h2').id = titleId;
+  const dlg = wrap.querySelector('.sheet'); dlg.removeAttribute('aria-label'); dlg.setAttribute('aria-labelledby', titleId);
+  const setInert = on => document.querySelectorAll('body > :not(#sheets):not(#toasts):not(script)').forEach(el => { el.inert = on; });
+  setInert(true);
+  // as janelas abertas por baixo também ficam inertes
+  P.openSheets.forEach(s => { s.el.inert = true; });
   const body = wrap.querySelector('.sheet-body');
   const api = {
     el: wrap, body, refreshOnChange: live,
@@ -166,8 +174,13 @@ P.sheet = ({ title, kicker = '', render, mount, wide = false, onClose, live = fa
       wrap.classList.remove('show');
       P.openSheets = P.openSheets.filter(s => s !== api);
       setTimeout(() => wrap.remove(), 220);
+      const top = P.openSheets[P.openSheets.length - 1];
+      if (top) top.el.inert = false; else setInert(false);
       onClose && onClose();
       document.body.classList.toggle('has-sheet', P.openSheets.length > 0);
+      // o foco volta para o botão que abriu a janela (se ele ainda existir e nada mais pegou o foco)
+      const a = document.activeElement;
+      if (opener && opener.isConnected && opener !== document.body && (!a || a === document.body || wrap.contains(a))) try { opener.focus({ preventScroll: true }); } catch (e) {}
     }
   };
   if (render) body.innerHTML = render(api);
@@ -177,7 +190,20 @@ P.sheet = ({ title, kicker = '', render, mount, wide = false, onClose, live = fa
   P.openSheets.push(api);
   document.body.classList.add('has-sheet');
   requestAnimationFrame(() => wrap.classList.add('show'));
-  setTimeout(() => { const f = body.querySelector('[autofocus]'); if (f && window.matchMedia('(min-width: 760px)').matches) f.focus(); }, 60);
+  setTimeout(() => {
+    const f = body.querySelector('[autofocus]');
+    if (f && window.matchMedia('(min-width: 760px)').matches) f.focus();
+    else { const h = wrap.querySelector('h2'); h.setAttribute('tabindex', '-1'); h.focus({ preventScroll: true }); }
+  }, 60);
+  // Tab não sai da janela
+  wrap.addEventListener('keydown', e => {
+    if (e.key !== 'Tab') return;
+    const els = [...wrap.querySelectorAll('button, [href], input, select, textarea, summary, [tabindex]:not([tabindex="-1"])')].filter(x => !x.disabled && x.offsetParent !== null);
+    if (!els.length) return;
+    const first = els[0], last = els[els.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  });
   return api;
 };
 document.addEventListener('keydown', e => {

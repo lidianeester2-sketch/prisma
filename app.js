@@ -80,13 +80,16 @@
     [...P.openSheets].forEach(sh => sh.close());
     P.$$('[data-nav]').forEach(b => { const on = b.dataset.nav === to; b.classList.toggle('on', on); on ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current'); });
     P.$('#mobile-title').textContent = !(P.hasFin() && P.hasPrisma()) ? (P.hasPrisma() ? 'Prisma' : 'Finanças') : 'Prisma';
-    P.$$('.space-switch [data-s]').forEach(b => { const on = b.dataset.s === P.space(); b.classList.toggle('on', on); b.setAttribute('aria-selected', on); });
+    P.$$('.space-switch [data-s]').forEach(b => { const on = b.dataset.s === P.space(); b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
     P.$$('.areas-label').forEach(el => { el.textContent = P.areasShort(); });
     document.title = to === 'hoje' ? 'Prisma' : to === 'fin' ? 'Financeiro+' : `${ROUTES[to]} · ${P.space() === 'fin' ? 'Financeiro+' : 'Prisma'}`;
     const tc = document.querySelector('meta[name="theme-color"]'); if (tc) tc.content = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#eef0fa';
     P.render();
     window.scrollTo(0, 0);
+    if (navigated) { const h = P.$('#view h1'); if (h) { h.setAttribute('tabindex', '-1'); h.focus({ preventScroll: true }); } }
+    navigated = true;
   };
+  let navigated = false;
   window.addEventListener('hashchange', () => P.go(location.hash.slice(1)));
 
   P.renderSyncBadge = () => {
