@@ -7,41 +7,74 @@
   const S = P.store, esc = P.esc;
   const st = { step: 1, name: '', focus: [], mode: 'signup', busy: false };
 
-  const dots = () => `<div class="ob-dots" aria-hidden="true">${[1, 2, 3].map(i => `<i class="${i === st.step ? 'on' : i < st.step ? 'done' : ''}"></i>`).join('')}</div>`;
+  // ícones de linha (mesmo traço dos ícones do app)
+  const I = {
+    user: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>',
+    mail: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>',
+    lock: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>',
+    eye: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+    eyeOff: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.4 10.4 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4.2M6.6 6.6C3.8 8.4 2 12 2 12s3.5 7 10 7c1.6 0 3-.4 4.3-1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>',
+    arrow: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
+    back: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>',
+    faculdade: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c2 2 10 2 12 0v-5"/><path d="M22 9v6"/></svg>',
+    financeiro: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M15 9.5c-.5-1-1.6-1.5-3-1.5-1.7 0-3 .9-3 2.1 0 2.9 6 1.4 6 4.3 0 1.2-1.3 2.1-3 2.1-1.4 0-2.6-.6-3.1-1.6M12 6.5v11"/></svg>',
+    projetos: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 12h18"/></svg>',
+    leituras: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 5c3-1 6-1 10 1v14c-4-2-7-2-10-1z"/><path d="M22 5c-3-1-6-1-10 1v14c4-2 7-2 10-1z"/></svg>',
+    pessoal: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-4.4-9.3-8.6C.9 9.1 2.9 5 6.6 5c2.1 0 3.4 1.2 4.1 2.4h2.6C14 6.2 15.3 5 17.4 5c3.7 0 5.7 4.1 3.9 7.4C19 16.6 12 21 12 21z"/></svg>'
+  };
+  let showPw = false;
+
+  // topo: logo do Prisma + "1/3" com a barrinha de progresso
+  const head = () => `<header class="ob-head">
+      <span class="ob-brand"><img src="icon-192.png" alt="" width="34" height="34"><b>Prisma</b></span>
+      <span class="ob-progress" aria-label="Passo ${st.step} de 3"><small>${st.step} / 3</small><i><u style="width:${Math.round(st.step / 3 * 100)}%"></u></i></span>
+    </header>`;
+  // prisma decorativo: triângulo em tons da cor do app + o feixe de luz virando espectro
+  const prism = `<svg class="ob-prism" viewBox="0 0 400 260" aria-hidden="true" preserveAspectRatio="xMidYMax meet">
+      <defs><linearGradient id="obspec" x1="0" x2="1"><stop offset="0" stop-color="#7c5cff"/><stop offset=".25" stop-color="#ff4fa3"/><stop offset=".5" stop-color="#ff8a3d"/><stop offset=".7" stop-color="#ffd447"/><stop offset=".85" stop-color="#3ddc97"/><stop offset="1" stop-color="#38bdf8"/></linearGradient></defs>
+      <path d="M0 150 L190 60 L190 260 L0 260z" class="p1"/><path d="M190 30 L300 260 L80 260z" class="p2"/><path d="M190 30 L300 260 L190 260z" class="p3"/>
+      <path d="M0 140 L176 118" class="beam"/><path d="M226 150 L400 120 L400 190 L232 168z" fill="url(#obspec)" opacity=".55"/>
+    </svg>`;
+  const fab = (attrs, label) => `<button class="ob-fab" ${attrs} aria-label="${label}">${I.arrow}</button>`;
 
   P.views.boasvindas = () => {
     const canSync = !!P.sync?.state().configured;
     let body;
     if (st.step === 1) body = `
-      <img src="icon-192.png" alt="" width="72" height="72" class="ob-logo">
-      <span class="eyebrow">Bem-vindo ao Prisma</span>
-      <h1>Como podemos te chamar?</h1>
-      <p class="lede">Faculdade, projetos, leituras e dinheiro, tudo num lugar só.</p>
-      <form class="ob-form" data-ob="name">
-        <input id="ob-name" name="name" autocomplete="given-name" maxlength="40" placeholder="Seu nome ou apelido" value="${esc(st.name)}" required>
-        <button class="btn primary" type="submit">Continuar</button>
-      </form>
-      <button class="link quiet-link" type="button" data-ob-login>Já tenho conta → Entrar</button>`;
+      <form class="ob-step" data-ob="name">
+        <h1>Como podemos te chamar?</h1>
+        <p class="ob-sub">Digite seu nome para começar a usar o Prisma.</p>
+        <label class="ob-field">${I.user}<input id="ob-name" name="name" autocomplete="given-name" maxlength="40" placeholder="Seu nome" value="${esc(st.name)}" required></label>
+        <button class="ob-link" type="button" data-ob-login>Já tenho conta → Entrar</button>
+        ${prism}
+        ${fab('type="submit"', 'Continuar')}
+      </form>`;
     else if (st.step === 2) body = `
-      <span class="eyebrow">Prazer, ${esc(st.name)}!</span>
-      <h1>Qual seu foco no Prisma?</h1>
-      <p class="lede">Escolha um ou mais. O app se monta com o que você escolher, e dá para mudar depois em Ajustes.</p>
-      <div class="ob-focus" role="group" aria-label="Foco">${Object.entries(P.FOCUS).map(([k, f]) => `<button type="button" class="ob-opt ${st.focus.includes(k) ? 'on' : ''}" data-focus="${k}" aria-pressed="${st.focus.includes(k)}">
-          <span class="ob-ico f-${k}">${f.icon}</span><span><b>${f.label}</b><small>${f.desc}</small></span><span class="ob-check" aria-hidden="true">✓</span></button>`).join('')}</div>
-      <div class="ob-actions"><button class="btn ghost" type="button" data-ob-back>Voltar</button><button class="btn primary" type="button" data-ob-next ${st.focus.length ? '' : 'disabled'}>Continuar</button></div>`;
+      <div class="ob-step">
+        <button class="ob-back" type="button" data-ob-back>${I.back} Voltar</button>
+        <h1>Qual seu foco no Prisma?</h1>
+        <p class="ob-sub">Escolha uma ou mais opções para personalizar sua experiência${st.name ? ', ' + esc(st.name) : ''}.</p>
+        <div class="ob-list" role="group" aria-label="Foco">${Object.entries(P.FOCUS).map(([k, f]) => `<button type="button" class="ob-row ${st.focus.includes(k) ? 'on' : ''}" data-focus="${k}" aria-pressed="${st.focus.includes(k)}">
+            <span class="ob-row-ico">${I[k]}</span><span class="ob-row-txt"><b>${f.label}</b><small>${f.desc}</small></span><span class="ob-box" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span></button>`).join('')}</div>
+        ${fab(`type="button" data-ob-next ${st.focus.length ? '' : 'disabled'}`, 'Continuar')}
+      </div>`;
     else body = `
-      <span class="eyebrow">Último passo</span>
-      <h1>${st.mode === 'login' ? 'Entrar na sua conta' : 'Crie sua conta'}</h1>
-      <p class="lede">${st.mode === 'login' ? 'Entre com o seu e-mail e senha. Seus dados aparecem em qualquer aparelho.' : 'Com e-mail e senha, seus dados ficam guardados na sua conta e aparecem em qualquer aparelho. Só você vê os seus dados.'}</p>
-      ${canSync ? `<form class="ob-form col" data-ob="account">
-        <input name="email" type="email" autocomplete="email" placeholder="E-mail" required>
-        <input name="pw" type="password" autocomplete="${st.mode === 'login' ? 'current-password' : 'new-password'}" placeholder="Senha (8 ou mais caracteres)" minlength="8" required>
-        <button class="btn primary" type="submit" ${st.busy ? 'disabled' : ''}>${st.busy ? 'Um instante…' : st.mode === 'login' ? 'Entrar' : 'Criar conta'}</button>
-      </form>
-      <button class="link" type="button" data-ob-mode>${st.mode === 'login' ? 'Ainda não tenho conta → Criar' : 'Já tenho conta → Entrar'}</button>`
-      : `<div class="notice">A conta na nuvem ainda não está ligada neste endereço. Você pode começar agora e ligar depois em Ajustes → Sincronização (ou abrindo o link de convite).</div>`}
-      <div class="ob-actions">${st.mode === 'login' && !st.name ? '' : '<button class="btn ghost" type="button" data-ob-back>Voltar</button>'}${canSync ? '' : '<button class="btn primary" type="button" data-ob-skip>Começar</button>'}</div>`;
-    return `<div class="ob">${dots()}<div class="ob-card">${body}</div><p class="credits">Prisma · Desenvolvido por Lidiane Tavares</p></div>`;
+      <div class="ob-step">
+        ${st.mode === 'login' && !st.name ? '' : `<button class="ob-back" type="button" data-ob-back>${I.back} Voltar</button>`}
+        <h1>${st.mode === 'login' ? 'Entrar na sua conta' : 'Crie sua conta'}</h1>
+        <p class="ob-sub">${st.mode === 'login' ? 'Use o seu e-mail e senha. Seus dados aparecem em qualquer aparelho.' : 'Assim, seus dados ficam salvos na sua conta e você pode acessar de qualquer lugar.'}</p>
+        ${canSync ? `<form class="ob-account" data-ob="account">
+          <label class="ob-field">${I.mail}<input name="email" type="email" autocomplete="email" placeholder="E-mail" required></label>
+          <label class="ob-field">${I.lock}<input name="pw" type="${showPw ? 'text' : 'password'}" autocomplete="${st.mode === 'login' ? 'current-password' : 'new-password'}" placeholder="Senha${st.mode === 'login' ? '' : ' (8 ou mais caracteres)'}" minlength="8" required>
+            <button class="ob-eye" type="button" data-ob-eye aria-label="${showPw ? 'Esconder senha' : 'Mostrar senha'}">${showPw ? I.eye : I.eyeOff}</button></label>
+          <button class="ob-main" type="submit" ${st.busy ? 'disabled' : ''}>${st.busy ? 'Um instante…' : st.mode === 'login' ? 'Entrar' : 'Criar conta'}</button>
+        </form>
+        <div class="ob-or"><span>ou</span></div>
+        <button class="ob-link" type="button" data-ob-mode>${st.mode === 'login' ? 'Ainda não tenho conta → Criar' : 'Já tenho conta → Entrar'}</button>`
+        : `<div class="notice">A conta ainda não está ligada neste endereço. Você pode começar agora e ligar depois em Ajustes.</div>
+        <button class="ob-main" type="button" data-ob-skip>Começar</button>`}
+      </div>`;
+    return `<div class="ob2">${head()}${body}<p class="ob-credits">Prisma · Desenvolvido por Lidiane Tavares</p></div>`;
   };
 
   const finish = () => {
@@ -55,6 +88,8 @@
   P.mounts.boasvindas = root => {
     const rerender = () => P.render();
     root.querySelector('#ob-name')?.focus();
+    root.querySelector('#ob-name')?.addEventListener('input', e => { st.name = e.target.value; });
+    root.querySelector('[data-ob-eye]')?.addEventListener('click', () => { const pw = root.querySelector('[name="pw"]'), em = root.querySelector('[name="email"]'); const keep = [em?.value, pw?.value]; showPw = !showPw; rerender(); const r2 = P.$('#view'); if (keep[0]) r2.querySelector('[name="email"]').value = keep[0]; if (keep[1]) r2.querySelector('[name="pw"]').value = keep[1]; });
     const f1 = root.querySelector('[data-ob="name"]');
     if (f1) f1.onsubmit = e => { e.preventDefault(); st.name = f1.name.value.trim(); if (!st.name) return; st.step = 2; rerender(); };
     root.querySelector('[data-ob-login]')?.addEventListener('click', () => { st.mode = 'login'; st.step = 3; rerender(); });
@@ -66,7 +101,7 @@
     const f3 = root.querySelector('[data-ob="account"]');
     if (f3) f3.onsubmit = async e => {
       e.preventDefault(); if (st.busy) return;
-      st.busy = true; const email = f3.email.value.trim(), pw = f3.pw.value; rerender();
+      st.busy = true; const email = f3.email.value.trim(), pw = f3.pw.value; f3.querySelector('.ob-main').disabled = true; f3.querySelector('.ob-main').textContent = 'Um instante…';
       const ok = await P.sync.auth(st.mode, email, pw);
       st.busy = false;
       if (!ok) return rerender();
@@ -81,17 +116,20 @@
 (function () {
   const S = P.store;
   let busy = false;
-  P.views.entrar = () => `<div class="ob"><div class="ob-card">
-      <img src="icon-192.png" alt="" width="64" height="64" class="ob-logo">
-      <h1>Entrar no Prisma</h1>
-      <p class="lede">Use o e-mail e a senha da sua conta.</p>
-      <form class="ob-form col" data-login>
-        <input name="email" type="email" autocomplete="email" placeholder="E-mail" required>
-        <input name="pw" type="password" autocomplete="current-password" placeholder="Senha" minlength="8" required>
-        <button class="btn primary" type="submit" ${busy ? 'disabled' : ''}>${busy ? 'Entrando…' : 'Entrar'}</button>
-      </form>
-      <button class="link" type="button" data-new-account>Criar uma conta nova</button>
-    </div><p class="credits">Prisma · Desenvolvido por Lidiane Tavares</p></div>`;
+  P.views.entrar = () => `<div class="ob2">
+      <header class="ob-head"><span class="ob-brand"><img src="icon-192.png" alt="" width="34" height="34"><b>Prisma</b></span></header>
+      <div class="ob-step">
+        <h1>Que bom te ver de novo</h1>
+        <p class="ob-sub">Entre com o e-mail e a senha da sua conta.</p>
+        <form class="ob-account" data-login>
+          <label class="ob-field"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg><input name="email" type="email" autocomplete="email" placeholder="E-mail" required></label>
+          <label class="ob-field"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><input name="pw" type="password" autocomplete="current-password" placeholder="Senha" minlength="8" required></label>
+          <button class="ob-main" type="submit" ${busy ? 'disabled' : ''}>${busy ? 'Entrando…' : 'Entrar'}</button>
+        </form>
+        <div class="ob-or"><span>ou</span></div>
+        <button class="ob-link" type="button" data-new-account>Criar uma conta nova</button>
+      </div>
+      <p class="ob-credits">Prisma · Desenvolvido por Lidiane Tavares</p></div>`;
   P.mounts.entrar = root => {
     const f = root.querySelector('[data-login]');
     f.onsubmit = async e => {

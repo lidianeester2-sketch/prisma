@@ -1136,3 +1136,62 @@ body.onboarding main { margin: 0; max-width: none; padding: calc(28px + env(safe
 /* um espaço só: o logo não troca de espaço */
 body.one-space .brand-name small, body.one-space .space-tag { display: none; }
 body.no-prisma .brand-name .only-fin { display: inline !important; }
+
+/* ---------- v25: boas-vindas no estilo de app ---------- */
+.ob2 { position: relative; min-height: calc(100dvh - 60px); max-width: 460px; margin: 0 auto; display: flex; flex-direction: column; padding: 4px 6px 24px; }
+.ob-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: clamp(34px, 8vh, 64px); }
+.ob-brand { display: flex; align-items: center; gap: 10px; }
+.ob-brand img { border-radius: 10px; }
+.ob-brand b { font: 800 22px/1 var(--f-body); letter-spacing: -.02em; }
+.ob-progress { display: grid; justify-items: end; gap: 6px; width: 140px; }
+.ob-progress small { font-size: 13px; font-weight: 600; color: var(--muted); letter-spacing: .04em; }
+.ob-progress i { display: block; width: 100%; height: 5px; border-radius: 99px; background: var(--surface-3); overflow: hidden; }
+.ob-progress u { display: block; height: 100%; border-radius: 99px; background: var(--accent); transition: width .3s ease; }
+.ob-step { position: relative; flex: 1; display: flex; flex-direction: column; gap: 14px; }
+.ob-step h1 { font: 800 clamp(34px, 9vw, 44px)/1.08 var(--f-body); letter-spacing: -.03em; margin: 0; }
+.ob-sub { margin: 0 0 14px; font-size: 17px; line-height: 1.45; color: var(--muted); }
+.ob-field { display: flex; align-items: center; gap: 12px; padding: 0 16px; border-radius: 16px; border: 1.5px solid var(--line-2); background: var(--surface); transition: border-color .15s; }
+.ob-field:focus-within { border-color: var(--accent); }
+.ob-field > svg { width: 22px; height: 22px; color: var(--muted); flex: none; }
+.ob-field input { flex: 1; border: 0 !important; background: transparent !important; padding: 17px 0 !important; font-size: 17px !important; box-shadow: none !important; min-width: 0; }
+.ob-eye { border: 0; background: none; padding: 6px; color: var(--muted); display: grid; }
+.ob-eye svg { width: 22px; height: 22px; }
+.ob-link { align-self: center; margin-top: 14px; border: 0; background: none; color: var(--accent); font-weight: 600; font-size: 15.5px; text-decoration: underline; text-underline-offset: 3px; padding: 6px; }
+.ob-back { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; color: var(--muted); font-weight: 600; font-size: 14px; padding: 4px 0; margin: -24px 0 4px; }
+.ob-back svg { width: 18px; height: 18px; }
+.ob-fab { position: absolute; right: 0; bottom: 0; width: 64px; height: 64px; border-radius: 50%; border: 0; display: grid; place-items: center; background: var(--accent); color: var(--on-accent); box-shadow: 0 10px 26px color-mix(in srgb, var(--accent) 40%, transparent); z-index: 2; transition: transform .12s, opacity .15s; }
+.ob-fab svg { width: 28px; height: 28px; stroke-width: 2.2; }
+.ob-fab:active { transform: scale(.94); }
+.ob-fab:disabled { opacity: .35; box-shadow: none; cursor: default; }
+.ob-step[data-ob="name"], .ob-step:has(.ob-list) { padding-bottom: 96px; }
+.ob-prism { position: absolute; left: -22px; right: -22px; bottom: -24px; width: calc(100% + 44px); height: 240px; pointer-events: none; z-index: 0; }
+.ob-prism .p1 { fill: color-mix(in srgb, var(--accent) 10%, transparent); }
+.ob-prism .p2 { fill: color-mix(in srgb, var(--accent) 40%, var(--bg)); }
+.ob-prism .p3 { fill: color-mix(in srgb, var(--accent) 62%, var(--bg)); }
+.ob-prism .beam { stroke: color-mix(in srgb, var(--text) 30%, transparent); stroke-width: 2; }
+.ob-list { display: grid; gap: 10px; }
+.ob-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 16px; padding: 14px 16px; border-radius: 16px; border: 1.5px solid var(--line-2); background: var(--surface); text-align: left; color: var(--text); transition: border-color .15s, background .15s; }
+.ob-row-ico { width: 30px; height: 30px; display: grid; place-items: center; color: var(--accent); }
+.ob-row-ico svg { width: 28px; height: 28px; stroke-width: 1.7; }
+.ob-row-txt b { display: block; font-size: 17px; font-weight: 600; }
+.ob-row-txt small { display: block; font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+.ob-box { width: 26px; height: 26px; border-radius: 7px; border: 2px solid var(--line-2); display: grid; place-items: center; }
+.ob-box svg { width: 17px; height: 17px; stroke: var(--on-accent); stroke-width: 3; opacity: 0; }
+.ob-row.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 6%, var(--surface)); }
+.ob-row.on .ob-box { background: var(--accent); border-color: var(--accent); }
+.ob-row.on .ob-box svg { opacity: 1; }
+.ob-account { display: grid; gap: 12px; }
+.ob-main { margin-top: 6px; padding: 17px; border: 0; border-radius: 16px; background: var(--accent); color: var(--on-accent); font-size: 17px; font-weight: 700; }
+.ob-main:disabled { opacity: .6; }
+.ob-or { display: flex; align-items: center; gap: 14px; color: var(--muted); font-size: 14px; margin-top: 6px; }
+.ob-or::before, .ob-or::after { content: ""; flex: 1; height: 1px; background: var(--line-2); }
+.ob-or + .ob-link { margin-top: 0; }
+.ob-credits { margin: 28px 0 0; text-align: center; font-size: 12px; color: var(--faint); position: relative; z-index: 1; }
+@media (min-width: 701px) { .ob2 { min-height: calc(100vh - 80px); padding-top: 20px; } }
+.ob-prism path { stroke: none; }
+.ob-prism .beam { stroke: color-mix(in srgb, var(--text) 28%, transparent); stroke-width: 2; fill: none; }
+.ob-prism { height: 200px; }
+.ob-fab { position: fixed; right: max(24px, calc(50vw - 230px + 6px)); bottom: calc(26px + env(safe-area-inset-bottom, 0px)); }
+.ob-step:has(.ob-list) { padding-bottom: 110px; }
+.ob-prism { height: auto; aspect-ratio: 400 / 260; max-height: 260px; bottom: -10px; }
+.ob-credits { text-align: left; padding-right: 90px; }

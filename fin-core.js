@@ -142,19 +142,25 @@
     return { current: cur, closeOn: addDays(salaryIso, -1), start: salaryIso, scheduled: cur.nextPay, nextPay: after, end: addDays(after, -1), daysEarly: ahead };
   }
 
-  // Semanas do ciclo: blocos de 7 dias a partir do início; o resto vira "dias finais".
-  function weekRanges(start, end) {
+  // Como dividir o dinheiro do dia a dia dentro do ciclo:
+  //   size 7  → semanas (o resto vira "Dias finais")
+  //   size 14 → quinzenas (sobra de menos de 7 dias entra na última quinzena)
+  //   size 0  → o ciclo inteiro, sem divisão (até o próximo salário)
+  function weekRanges(start, end, size = 7) {
+    if (!size) return [{ start, end, days: diffDays(start, end) + 1, label: 'Ciclo inteiro' }];
     const out = []; let s = start;
     while (s <= end) {
-      const e = addDays(s, 6) <= end ? addDays(s, 6) : end;
+      const e = addDays(s, size - 1) <= end ? addDays(s, size - 1) : end;
       out.push({ start: s, end: e, days: diffDays(s, e) + 1 });
       s = addDays(e, 1);
     }
-    out.forEach((w, i) => { w.label = w.days < 7 ? 'Dias finais' : `Semana ${i + 1}`; });
+    if (size > 7 && out.length > 1 && out[out.length - 1].days < 7) { const last = out.pop(); const prev = out[out.length - 1]; prev.end = last.end; prev.days += last.days; }
+    const name = size === 14 ? 'Quinzena' : 'Semana';
+    out.forEach((w, i) => { w.label = w.days < 7 ? 'Dias finais' : `${name} ${i + 1}`; });
     return out;
   }
-  function splitWeeks(start, end, base) {
-    const ranges = weekRanges(start, end);
+  function splitWeeks(start, end, base, size = 7) {
+    const ranges = weekRanges(start, end, size);
     const limits = allocate(Math.max(0, base), ranges.map(r => r.days));
     return ranges.map((r, i) => ({ start: r.start, end: r.end, days: r.days, label: r.label, limit: limits[i], locked: false }));
   }
@@ -414,7 +420,8 @@
     const committed = commitments.reduce((s, t) => s + t.remaining, 0);
     const reserve = Math.max(0, reserveCents ?? profile.reserve ?? 0);
     const base = available - committed - reserve;
-    return { start, end, nextPay: next, available, commitments, committed, reserve, base, weeks: splitWeeks(start, end, base) };
+    const size = profile.blockDays === undefined || profile.blockDays === null ? 7 : profile.blockDays;
+    return { start, end, nextPay: next, available, commitments, committed, reserve, base, blockDays: size, weeks: splitWeeks(start, end, base, size) };
   }
 
   /* ---------------- frase em linguagem natural ---------------- */

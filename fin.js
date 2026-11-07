@@ -57,6 +57,16 @@
     }
     return saved;
   };
+  /* como o dinheiro do dia a dia é dividido: semanas (7), quinzenas (14) ou o ciclo inteiro (0) */
+  F.BLOCKS = {
+    7: { one: 'semana', One: 'Semana', many: 'semanas', Many: 'Semanas', a: 'a', desc: 'Por semana (blocos de 7 dias)' },
+    14: { one: 'quinzena', One: 'Quinzena', many: 'quinzenas', Many: 'Quinzenas', a: 'a', desc: 'Por quinzena (blocos de 14 dias)' },
+    0: { one: 'ciclo', One: 'Ciclo', many: 'ciclo', Many: 'Dia a dia do ciclo', a: 'o', desc: 'O ciclo inteiro, até o próximo salário (sem dividir)' }
+  };
+  F.blockDaysPref = () => { const b = F.profile().blockDays; return b === 0 || b === 14 ? b : 7; };
+  // o ciclo já planejado manda; sem plano, vale a escolha do perfil
+  F.blockSize = (weeks = F.snap().weeks) => { const l = weeks?.[0]?.label || ''; return /^Ciclo/.test(l) ? 0 : /^Quinzena/.test(l) ? 14 : /^Semana|^Dias/.test(l) ? 7 : F.blockDaysPref(); };
+  F.blk = weeks => F.BLOCKS[F.blockSize(weeks)];
   F.paydayTxt = (p = F.profile()) => p.paydayRule === 'util' ? `salário no ${p.payday}º dia útil do mês` : `salário no dia ${p.payday}${p.paydayRule === 'adia' ? ', adiado quando cai em fim de semana ou feriado' : p.paydayRule === 'antecipa' ? ', antecipado quando cai em fim de semana ou feriado' : ''}`;
   F.setProfile = changes => F.save('meta', { ...F.profile(), ...changes, id: 'finprofile' }, 'Alterou o perfil financeiro');
 

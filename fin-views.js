@@ -92,7 +92,7 @@
     const alerts = [];
     if (s.canSpend < 0) alerts.push(['bad', `O dinheiro disponível não cobre as contas até ${endTxt}. Faltam ${F.money(-s.canSpend)}. Vale olhar as contas previstas e ver o que pode esperar.`]);
     if (overdue.length) alerts.push(['warn', `${overdue.length} conta${overdue.length > 1 ? 's' : ''} já venceu e continua como prevista. Se já pagou, é só marcar como paga.`]);
-    if (s.week && s.week.spent > s.week.limit && !(s.week.ackOver >= s.week.spent)) alerts.push(['warn', `A ${s.week.label.toLowerCase()} passou ${F.money(s.week.spent - s.week.limit)} do previsto. Ainda dá para reorganizar o restante do ciclo.`]);
+    if (s.week && s.week.spent > s.week.limit && !(s.week.ackOver >= s.week.spent)) alerts.push(['warn', `${s.week.label === 'Ciclo inteiro' ? 'O dia a dia do ciclo' : s.week.label} passou ${F.money(s.week.spent - s.week.limit)} do previsto. Dá para decidir o que fazer com o excesso.`]);
     if (s.daysLeft > 0 && s.daysLeft <= 7) alerts.push(['info', `Faltam ${s.daysLeft} dia${s.daysLeft === 1 ? '' : 's'} para o salário (${F.date(s.cycle.nextPay)}). Se ele cair antes, dá para iniciar o ciclo novo no mesmo dia.`]);
     if (s.cycle.projected && s.cycle.start <= today && !F.txs().some(t => t.categoryId === 'cat-salario' && t.status === 'realizado' && t.date >= s.cycle.start)) alerts.push(['info', `O salário estava previsto para ${F.date(s.cycle.start)}. Quando cair, registre para montar o plano do ciclo.`]);
     const lastConc = S.all('fin_conc').sort((a, b) => b.date.localeCompare(a.date))[0];
@@ -137,12 +137,12 @@
 
     <div class="cols">
       <section class="block main-col">
-        <div class="block-head"><h2>Semana</h2>${s.week ? `<span class="faint small">${F.date(s.week.start)}–${F.date(s.week.end)}</span>` : ''}<button class="link" type="button" data-act="go" data-to="fin-orcamento">Orçamento →</button></div>
+        <div class="block-head"><h2>${F.blockSize(s.weeks) === 0 ? 'Dia a dia' : F.blk(s.weeks).One}</h2>${s.week ? `<span class="faint small">${F.date(s.week.start)}–${F.date(s.week.end)}</span>` : ''}<button class="link" type="button" data-act="go" data-to="fin-orcamento">Orçamento →</button></div>
         ${s.week ? `<div class="week-card ${s.week.spent > s.week.limit ? 'over' : ''}">
             <div class="week-nums"><div><span>Gasto</span><b>${F.money(s.week.spent)}</b></div><div><span>Limite</span><b>${F.money(s.week.limit)}</b></div><div><span>${s.week.spent > s.week.limit ? 'Passou' : 'Restam'}</span><b>${F.money(Math.abs(s.week.limit - s.week.spent))}</b></div></div>
             ${bar(s.week.limit ? s.week.spent / s.week.limit * 100 : 100, s.week.spent > s.week.limit ? 'over' : '')}
             <p class="hint">${s.week.label} · só gastos do dia a dia</p></div>`
-          : `<div class="empty"><strong>Sem plano semanal ainda.</strong><span>Quando o salário cair, lance em + Lançar e o app divide o dinheiro livre pelas semanas.</span></div>`}
+          : `<div class="empty"><strong>Sem plano do ciclo ainda.</strong><span>Quando o salário cair, lance em + Lançar e o app monta o plano do ciclo${F.blockDaysPref() ? ' dividido ' + (F.blockDaysPref() === 14 ? 'por quinzena' : 'por semana') : ''}.</span></div>`}
 
         <div class="block-head sub"><h3>Próximas contas</h3><span class="count">${s.committedItems.length}</span>${s.committedItems.length > 4 ? '<button class="link" type="button" data-act="go" data-to="fin-orcamento">Ver todas →</button>' : ''}</div>
         <div class="list">${s.committedItems.length ? s.committedItems.slice(0, 4).map(t => `<div class="row fin-row ${t.date < today ? 'late' : ''}">
@@ -239,7 +239,7 @@
       </aside>
     </div>
 
-    ${ofs === 0 ? (c.projected || !c.plannedAt ? `<section class="block"><div class="notice">${c.projected ? `Este ciclo ainda é uma projeção pelas regras do seu perfil (${F.paydayTxt()}). Quando o salário cair, lance e confirme o plano.` : `O ciclo ${F.date(c.start)}–${F.date(c.end)} já começou, mas o plano das semanas ainda não foi montado.`}</div>
+    ${ofs === 0 ? (c.projected || !c.plannedAt ? `<section class="block"><div class="notice">${c.projected ? `Este ciclo ainda é uma projeção pelas regras do seu perfil (${F.paydayTxt()}). Quando o salário cair, lance e confirme o plano.` : `O ciclo ${F.date(c.start)}–${F.date(c.end)} já começou, mas o plano ainda não foi montado.`}</div>
       <div class="form-actions split">${c.projected ? '<button class="btn primary" type="button" data-act="finSalary">Lançar o salário</button>' : ''}<button class="btn ${c.projected ? 'ghost' : 'primary'}" type="button" data-act="finPlanNow">Montar plano${c.projected ? ' com o saldo de hoje' : ''}</button><span class="grow"></span></div></section>`
     : `<section class="block"><div class="block-head"><h2>Plano confirmado em ${F.date(c.plannedAt || c.start)}</h2><button class="link" type="button" data-act="finReplan">Refazer plano</button></div>
       <div class="calc-table">
@@ -249,7 +249,7 @@
         <div class="calc-total"><span>= Livre para o dia a dia</span><b>${F.money(c.base)}</b></div>
       </div></section>`) : ''}
 
-    ${ofs === 0 && s.weeks.length ? `<section class="block"><div class="block-head"><h2>Semanas</h2><button class="link" type="button" data-act="finWeeks">Editar semanas</button></div>
+    ${ofs === 0 && s.weeks.length ? `<section class="block"><div class="block-head"><h2>${F.blk(s.weeks).Many}</h2>${s.weeks.length > 1 ? `<button class="link" type="button" data-act="finWeeks">Editar ${F.blk(s.weeks).many}</button>` : ''}</div>
       <div class="weeks">${s.weeks.map(w => { const cur = w.start <= today && today <= w.end, past = w.end < today, over = w.spent > w.limit; return `<div class="wk ${cur ? 'cur' : ''} ${past ? 'past' : ''} ${over ? 'over' : ''}">
         <div class="wk-head"><b>${w.label}</b><span class="faint small">${F.date(w.start)}–${F.date(w.end)}</span></div>
         <div class="wk-nums"><span>${F.money(w.spent)} de ${F.money(w.limit)}</span><span class="${over ? 'bad-t' : ''}">${over ? 'passou ' + F.money(w.spent - w.limit) : (past ? 'sobrou ' : 'restam ') + F.money(w.limit - w.spent)}</span></div>
@@ -298,7 +298,7 @@
       <section class="block set"><h2>Seu dinheiro</h2><div class="data-actions">
         ${item('finAccounts', 'Contas', 'Nubank e outras contas, com saldo inicial')}
         ${item('finRecs', 'Contas fixas', 'Aluguel, luz, academia, assinaturas: viram compromissos em cada ciclo')}
-        ${item('finCats', 'Categorias', 'Padrão + as suas; quais entram no limite semanal')}
+        ${item('finCats', 'Categorias', 'Padrão + as suas; quais entram no limite do dia a dia')}
         ${item('finEarly', 'Recebi o salário antes', 'Fecha o ciclo atual e inicia o novo a partir do dia em que o dinheiro entrou')}
         ${item('finConcile', 'Conferir saldo', 'Compare com o saldo do banco e ajuste a diferença')}
         ${item('finCardNew', 'Gasto no cartão (parcelado)', 'Compra no crédito em 1× ou parcelada: as parcelas vão para as faturas, sem contar como gasto do ciclo')}
@@ -311,7 +311,7 @@
         ${item('finAi', 'Assistente', 'Pergunte “posso gastar 200?” ou peça para lançar um gasto. Ele sugere, você confirma')}
       </div></section>
       <section class="block set"><h2>Preferências</h2><div class="data-actions">
-        ${item('finProfile', 'Perfil financeiro', 'Renda, dia do salário, regra de feriado, reserva')}
+        ${item('finProfile', 'Perfil financeiro', 'Renda, dia do salário, reserva e como dividir o dia a dia (semana, quinzena ou ciclo inteiro)')}
         ${item('finSecurity', 'Segurança', 'PIN, esconder valores, bloquear agora')}
         ${item('finHistory', 'Histórico de alterações', 'Tudo que foi criado ou mudado, com antes e depois')}
       </div></section>

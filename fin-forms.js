@@ -12,7 +12,7 @@
   const impactToast = () => {
     const s = F.snap();
     const parts = [`Posso gastar: ${F.money(s.canSpend)}`];
-    if (s.week) parts.push(`semana: ${F.money(s.week.limit - s.week.spent)} restantes`);
+    if (s.week) parts.push(`${F.blk().one}: ${F.money(s.week.limit - s.week.spent)} restantes`);
     return parts.join(' · ');
   };
 
@@ -224,7 +224,7 @@
      PLANO DO CICLO
   ============================================================ */
   F.plan = (start, salaryTxId = null, nextPayOverride = null) => {
-    let reserve = F.profile().reserve || 0;
+    let reserve = F.profile().reserve || 0, blockDays = F.blockDaysPref();
     const prev = F.cycles().find(c => c.start === start);
     if (prev) reserve = prev.reserve || 0;
     P.sheet({
@@ -232,7 +232,8 @@
       render: () => {
         const nextPay = nextPayOverride || C.nextPayday(start, F.profile());
         F.ensureOccurrences(start, C.addDays(nextPay, -1));
-        const p = C.cyclePlan(F.state(), start, reserve, nextPay);
+        const p = C.cyclePlan({ ...F.state(), profile: { ...F.profile(), blockDays } }, start, reserve, nextPay);
+        const B = F.BLOCKS[blockDays];
         return `<p class="lede small">Ciclo de <b>${F.date(p.start)}</b> a <b>${F.date(p.end)}</b>. Próximo salário previsto: ${F.date(p.nextPay)}.</p>
           <div class="calc-table">
             <div><span>Saldo hoje nas contas do disponível</span><b>${F.money(p.available)}</b></div>
@@ -241,9 +242,11 @@
             <div class="calc-total ${p.base < 0 ? 'bad' : ''}"><span>= Livre para o dia a dia</span><b>${F.money(p.base)}</b></div>
           </div>
           ${p.commitments.length ? `<details class="done-today"><summary>${p.commitments.length === 1 ? 'Ver o compromisso' : `Ver os ${p.commitments.length} compromissos`}</summary><div class="list">${p.commitments.map(t => `<div class="row fin-row"><span class="row-main as-text"><span class="row-title">${esc(t.desc)}</span><span class="row-meta">${F.date(t.date)}${t.certainty === 'estimado' ? ' · estimado' : ''}</span></span><span class="fin-amt">${F.money(t.remaining ?? t.amount)}</span></div>`).join('')}</div></details>` : '<p class="faint small">Nenhuma conta prevista no período. Cadastre suas contas fixas em Mais → Contas fixas.</p>'}
-          <div class="block-head sub"><h3>Sugestão para as semanas</h3><span class="faint small">proporcional aos dias</span></div>
+          <div class="block-head sub"><h3>Como dividir o dinheiro do dia a dia</h3></div>
+          <div class="chips compact">${[7, 14, 0].map(k => `<button type="button" class="chip ${blockDays === k ? 'on' : ''}" data-block="${k}">${k === 7 ? 'Por semana' : k === 14 ? 'Por quinzena' : 'Ciclo inteiro'}</button>`).join('')}</div>
+          <p class="hint">${B.desc}. ${blockDays ? 'Proporcional aos dias.' : 'Um limite só para gastar até o próximo salário.'}</p>
           <div class="weeks-preview">${p.weeks.map(w => `<div><span>${w.label}</span><small>${F.date(w.start)}–${F.date(w.end)} · ${w.days} dia${w.days > 1 ? 's' : ''}</small><b>${F.money(w.limit)}</b></div>`).join('')}</div>
-          <p class="hint">Depois você pode mudar e travar o limite de cada semana em Orçamento → Editar semanas.</p>
+          ${blockDays ? `<p class="hint">Depois você pode mudar e travar o limite de cada ${B.one} em Orçamento → Editar ${B.many}.</p>` : ''}
           ${p.base < 0 ? `<div class="notice">O dinheiro de agora não cobre as contas até o próximo salário. Faltam ${F.money(-p.base)}. Dá para começar mesmo assim e acompanhar pelo painel.</div>` : ''}
           <div class="form-actions"><button class="btn ghost" type="button" data-cancel>Agora não</button><button class="btn primary" type="button" data-go>${prev?.plannedAt ? 'Refazer o plano' : 'Começar o ciclo'}</button></div>`;
       },
@@ -251,10 +254,12 @@
         const b = api.body;
         const r = b.querySelector('#plan-reserve');
         r.onchange = () => { const v = C.parseMoney(r.value); if (v !== null && v >= 0) { reserve = v; api.refresh(); } };
+        P.$$('[data-block]', b).forEach(x => x.onclick = () => { const v = C.parseMoney(r.value); if (v !== null && v >= 0) reserve = v; blockDays = +x.dataset.block; api.refresh(); });
         b.querySelector('[data-cancel]').onclick = () => api.close();
         b.querySelector('[data-go]').onclick = () => {
           const v = C.parseMoney(r.value); if (v !== null && v >= 0) reserve = v;
-          const p = C.cyclePlan(F.state(), start, reserve, nextPayOverride || undefined);
+          if (blockDays !== F.blockDaysPref()) F.setProfile({ blockDays });
+          const p = C.cyclePlan({ ...F.state(), profile: { ...F.profile(), blockDays } }, start, reserve, nextPayOverride || undefined);
           F.save('fin_ciclo', { ...(prev || {}), id: 'ciclo-' + start, start: p.start, end: p.end, salaryTxId, available: p.available, committed: p.committed, reserve: p.reserve, base: p.base, weeks: p.weeks.map(w => ({ start: w.start, end: w.end, days: w.days, label: w.label, limit: w.limit, locked: false })), plannedAt: P.today() },
             `${prev?.plannedAt ? 'Refez o plano do' : 'Começou o'} ciclo ${F.date(p.start)}–${F.date(p.end)}`);
           api.close(); P.toast('Ciclo começou. Bom mês! ✦');
@@ -305,14 +310,14 @@
   F.catsSheet = () => P.sheet({
     title: 'Categorias', live: true,
     render: () => ['despesa', 'receita'].map(k => `<div class="block-head sub"><h3>${k === 'despesa' ? 'Despesas' : 'Receitas'}</h3></div>
-      <div class="list">${F.cats(k).map(c => `<div class="row"><span class="row-main as-text"><span class="row-title">${esc(c.name)}</span>${k === 'despesa' ? `<span class="row-meta">${c.weekly !== false ? 'entra no limite semanal' : 'fora do limite semanal'}</span>` : ''}</span>
-        ${k === 'despesa' ? `<button class="btn ghost small" type="button" data-weekly="${c.id}">${c.weekly !== false ? 'Tirar da semana' : 'Pôr na semana'}</button>` : ''}
+      <div class="list">${F.cats(k).map(c => `<div class="row"><span class="row-main as-text"><span class="row-title">${esc(c.name)}</span>${k === 'despesa' ? `<span class="row-meta">${c.weekly !== false ? 'entra no limite do dia a dia' : 'fora do limite do dia a dia'}</span>` : ''}</span>
+        ${k === 'despesa' ? `<button class="btn ghost small" type="button" data-weekly="${c.id}">${c.weekly !== false ? 'Tirar do dia a dia' : 'Pôr no dia a dia'}</button>` : ''}
         ${c.custom ? `<button class="icon-btn small" type="button" data-arch="${c.id}" aria-label="Arquivar ${esc(c.name)}">✕</button>` : ''}</div>`).join('')}</div>`).join('') + `
       <form class="quick-add slim" data-newcat><input name="n" placeholder="Nova categoria" aria-label="Nova categoria"><select name="k" aria-label="Tipo"><option value="despesa">Despesa</option><option value="receita">Receita</option></select><button class="btn primary small" type="submit">Criar</button></form>
-      <p class="hint">“Limite semanal” = gastos do dia a dia. Contas fixas (aluguel, academia, assinaturas) ficam fora, porque já entram no plano do ciclo.</p>`,
+      <p class="hint">“Dia a dia” = gastos que contam no limite da semana, da quinzena ou do ciclo, conforme a sua escolha. Contas fixas (aluguel, academia, assinaturas) ficam fora, porque já entram no plano do ciclo.</p>`,
     mount: api => {
       const b = api.body;
-      P.$$('[data-weekly]', b).forEach(x => x.onclick = () => { const c = F.cat(x.dataset.weekly); F.save('fin_cat', { ...c, weekly: c.weekly === false }, `${c.weekly === false ? 'Pôs' : 'Tirou'} ${c.name} ${c.weekly === false ? 'no' : 'do'} limite semanal`); });
+      P.$$('[data-weekly]', b).forEach(x => x.onclick = () => { const c = F.cat(x.dataset.weekly); F.save('fin_cat', { ...c, weekly: c.weekly === false }, `${c.weekly === false ? 'Pôs' : 'Tirou'} ${c.name} ${c.weekly === false ? 'no' : 'do'} limite do dia a dia`); });
       P.$$('[data-arch]', b).forEach(x => x.onclick = () => { const c = F.cat(x.dataset.arch); F.save('fin_cat', { ...c, archived: true }, `Arquivou a categoria ${c.name}`); });
       b.querySelector('[data-newcat]').onsubmit = e => {
         e.preventDefault(); const n = e.target.n.value.trim(); if (!n) return;
@@ -421,6 +426,7 @@
         <div class="row-fields">${field('Renda líquida habitual', `<input name="income" inputmode="decimal" value="${inMoney(p.income)}" class="money-input">`, 'Usada só como referência e estimativa.')}
         ${field('Dia do salário', `<input name="payday" type="number" min="1" max="31" value="${p.payday}">`, 'Número do dia, ou qual dia útil (ex.: 5 = 5º dia útil).')}</div>
         ${field('Como o dia é contado', `<select name="paydayRule"><option value="util" ${p.paydayRule === 'util' ? 'selected' : ''}>É o Nº dia útil do mês (ex.: 5º dia útil)</option><option value="adia" ${p.paydayRule === 'adia' ? 'selected' : ''}>Dia fixo; adia se cair em fim de semana ou feriado</option><option value="antecipa" ${p.paydayRule === 'antecipa' ? 'selected' : ''}>Dia fixo; antecipa se cair em fim de semana ou feriado</option><option value="mantem" ${p.paydayRule === 'mantem' ? 'selected' : ''}>Dia fixo, sempre na mesma data</option></select>`, 'Feriados nacionais, Carnaval e Corpus Christi contam como dias sem banco.')}
+        ${field('Como dividir o dinheiro do dia a dia', `<select name="blockDays">${[7, 14, 0].map(k => `<option value="${k}" ${F.blockDaysPref() === k ? 'selected' : ''}>${F.BLOCKS[k].desc}</option>`).join('')}</select>`, 'Vale a partir do próximo plano. Para mudar o ciclo atual, use Orçamento → Refazer plano.')}
         ${field('Reserva de segurança por ciclo', `<input name="reserve" inputmode="decimal" value="${inMoney(p.reserve)}" class="money-input">`, 'Valor que fica guardado e não entra no “posso gastar”. Pode ser 0.')}
         <div class="form-actions"><button class="btn primary" type="submit">Salvar</button></div></form>`,
       mount: api => {
@@ -428,7 +434,7 @@
           e.preventDefault(); const f = e.target;
           const income = C.parseMoney(f.income.value), reserve = C.parseMoney(f.reserve.value || '0'), payday = parseInt(f.payday.value, 10);
           if (income === null || reserve === null || !(payday >= 1 && payday <= (f.paydayRule.value === 'util' ? 22 : 31))) { P.toast('Confira os valores.'); return; }
-          F.setProfile({ income, reserve, payday, paydayRule: f.paydayRule.value });
+          F.setProfile({ income, reserve, payday, paydayRule: f.paydayRule.value, blockDays: +f.blockDays.value });
           api.close(); P.toast('Perfil salvo.');
         };
       }
@@ -609,21 +615,22 @@
   ============================================================ */
   const curCycleRec = () => { const c = F.snap().cycle; return c.id ? S.get('fin_ciclo', c.id) : null; };
   F.weeksSheet = () => {
-    const cyc = curCycleRec(); if (!cyc) return P.toast('As semanas aparecem depois que você confirma o plano do ciclo.');
+    const cyc = curCycleRec(); if (!cyc) return P.toast('Os limites aparecem depois que você confirma o plano do ciclo.');
+    const B = F.blk(cyc.weeks);
     const today = P.today(), spent = F.snap().weeks.map(w => w.spent);
     let draft = cyc.weeks.map(w => ({ ...w })), changes = {}, msg = '';
     P.sheet({
-      title: 'Editar semanas', kicker: `livre para o dia a dia: ${F.money(cyc.base)}`, wide: true,
+      title: `Editar ${B.many}`, kicker: `livre para o dia a dia: ${F.money(cyc.base)}`, wide: true,
       render: () => {
         const sum = draft.reduce((a, w) => a + w.limit, 0);
-        return `<p class="lede">Mude o limite de uma semana e as semanas sem cadeado se ajustam sozinhas para a soma continuar ${F.money(cyc.base)}. Nada é salvo até você confirmar.</p>
+        return `<p class="lede">Mude o limite de um${B.a === 'a' ? 'a' : ''} ${B.one} e ${B.a === 'a' ? 'as' : 'os'} ${B.many} sem cadeado se ajustam sozinh${B.a === 'a' ? 'as' : 'os'} para a soma continuar ${F.money(cyc.base)}. Nada é salvo até você confirmar.</p>
         <div class="wk-edit">${draft.map((w, i) => { const past = w.end < today; return `<div class="wk-edit-row ${past ? 'past' : ''}">
           <div><b>${w.label}</b><small>${F.date(w.start)}–${F.date(w.end)} · gasto ${F.money(spent[i] || 0)}</small></div>
           <input class="money-input" data-w="${i}" inputmode="decimal" value="${inMoney(w.limit)}" ${past ? 'disabled' : ''} aria-label="Limite da ${w.label}">
           <label class="check-line small"><input type="checkbox" data-lock="${i}" ${w.locked ? 'checked' : ''} ${past ? 'disabled' : ''}> travar</label></div>`; }).join('')}</div>
-        <div class="calc-table" style="margin-top:12px"><div class="calc-total ${sum !== cyc.base ? 'bad' : ''}"><span>Soma das semanas</span><b>${F.money(sum)} de ${F.money(cyc.base)}</b></div></div>
+        <div class="calc-table" style="margin-top:12px"><div class="calc-total ${sum !== cyc.base ? 'bad' : ''}"><span>Soma ${B.a === 'a' ? 'das' : 'dos'} ${B.many}</span><b>${F.money(sum)} de ${F.money(cyc.base)}</b></div></div>
         ${msg ? `<p class="form-error">${esc(msg)}</p>` : ''}
-        <div class="form-actions"><button class="btn ghost" type="button" data-reset>Dividir igual de novo</button><span class="grow"></span><button class="btn primary" type="button" data-save ${sum !== cyc.base ? 'disabled' : ''}>Salvar semanas</button></div>`;
+        <div class="form-actions"><button class="btn ghost" type="button" data-reset>Dividir igual de novo</button><span class="grow"></span><button class="btn primary" type="button" data-save ${sum !== cyc.base ? 'disabled' : ''}>Salvar</button></div>`;
       },
       mount: api => {
         const b = api.body, again = () => setTimeout(() => api.refresh(), 0);
@@ -632,13 +639,13 @@
           if (v === null || v < 0) { msg = 'Valor inválido.'; return again(); }
           changes[i] = v;
           const r = C.rebalanceWeeks(cyc.weeks.map((w, k) => ({ ...w, locked: draft[k].locked })), cyc.base, changes, today);
-          msg = r.ok ? '' : r.reason === 'nao-cabe' ? `Não cabe: as outras semanas ficariam negativas (faltam ${F.money(-r.rest)}).` : 'Não sobrou semana sem cadeado para ajustar. Destrave alguma.';
+          msg = r.ok ? '' : r.reason === 'nao-cabe' ? `Não cabe: ${B.a === 'a' ? 'as outras' : 'os outros'} ${B.many} ficariam negativ${B.a === 'a' ? 'as' : 'os'} (faltam ${F.money(-r.rest)}).` : `Não sobrou ${B.one} sem cadeado para ajustar. Destrave alguma.`;
           if (r.ok) draft = r.weeks; else delete changes[i];
           again();
         });
         P.$$('[data-lock]', b).forEach(x => x.onchange = () => { draft[+x.dataset.lock].locked = x.checked; });
         b.querySelector('[data-reset]').onclick = () => {
-          const fresh = C.splitWeeks(cyc.start, cyc.end, cyc.base); changes = {}; msg = '';
+          const fresh = C.splitWeeks(cyc.start, cyc.end, cyc.base, F.blockSize(cyc.weeks)); changes = {}; msg = '';
           // semanas que já passaram ficam como estavam; o resto se divide de novo
           const r = C.rebalanceWeeks(cyc.weeks.map((w, k) => ({ ...w, limit: w.end < today ? w.limit : fresh[k].limit, locked: false })), cyc.base, null, today);
           draft = r.weeks.map(w => ({ ...w, locked: false })); again();
@@ -646,9 +653,9 @@
         b.querySelector('[data-save]').onclick = async () => {
           const lines = draft.map((w, i) => (w.limit !== cyc.weeks[i].limit ? `${w.label}: ${F.money(cyc.weeks[i].limit)} → ${F.money(w.limit)}` : null)).filter(Boolean);
           if (!lines.length && draft.every((w, i) => w.locked === cyc.weeks[i].locked)) { api.close(); return; }
-          if (!(await P.ask(`Vou mudar o plano das semanas:\n${lines.join('\n') || 'só os cadeados'}\nConfirma?`, 'Salvar semanas', false))) return;
-          F.save('fin_ciclo', { ...cyc, weeks: draft.map(({ spent: _s, ...w }) => w) }, `Reorganizou as semanas: ${lines.join('; ') || 'cadeados'}`);
-          api.close(); P.toast('Semanas atualizadas.');
+          if (!(await P.ask(`Vou mudar o plano ${B.a === 'a' ? 'das' : 'dos'} ${B.many}:\n${lines.join('\n') || 'só os cadeados'}\nConfirma?`, 'Salvar', false))) return;
+          F.save('fin_ciclo', { ...cyc, weeks: draft.map(({ spent: _s, ...w }) => w) }, `Reorganizou ${B.a === 'a' ? 'as' : 'os'} ${B.many}: ${lines.join('; ') || 'cadeados'}`);
+          api.close(); P.toast('Limites atualizados.');
         };
       }
     });
@@ -656,12 +663,12 @@
 
   F.overSheet = idx => {
     const cyc = curCycleRec(); if (!cyc) return;
-    const w = F.snap().weeks[idx], spent = w.spent, over = spent - w.limit;
-    const opts = ['proximas', 'reserva', 'manter'].map(o => ({ o, r: C.coverOverspend(cyc, idx, spent, o) }));
+    const w = F.snap().weeks[idx], spent = w.spent, over = spent - w.limit, B = F.blk();
+    const opts = (cyc.weeks.length > 1 ? ['proximas', 'reserva', 'manter'] : ['reserva', 'manter']).map(o => ({ o, r: C.coverOverspend(cyc, idx, spent, o) }));
     const TXT = {
-      proximas: ['Tirar das próximas semanas', r => r.ok ? `As semanas seguintes ficam com: ${r.cycle.weeks.slice(idx + 1).map(x => `${x.label} ${F.money(x.limit)}`).join(' · ')}.` : `Não dá: as próximas semanas sem cadeado só têm ${F.money(r.room || 0)}.`],
+      proximas: [`Tirar ${B.a === 'a' ? 'das próximas' : 'dos próximos'} ${B.many}`, r => r.ok ? `${B.a === 'a' ? 'As seguintes' : 'Os seguintes'} ficam com: ${r.cycle.weeks.slice(idx + 1).map(x => `${x.label} ${F.money(x.limit)}`).join(' · ')}.` : (!r.room ? `Não há ${B.many === 'ciclo' ? 'outro bloco' : B.many + ' seguintes'} para dividir o excesso.` : `Não dá: ${B.a === 'a' ? 'as próximas' : 'os próximos'} sem cadeado só têm ${F.money(r.room)}.`)],
       reserva: ['Usar a reserva do ciclo', r => r.ok ? `A reserva fica com ${F.money(r.cycle.reserve)} (era ${F.money(cyc.reserve)}).` : `A reserva tem ${F.money(cyc.reserve || 0)} e não cobre ${F.money(over)}.`],
-      manter: ['Deixar como está', () => 'Os números não mudam. O aviso some e o excesso fica registrado nesta semana.']
+      manter: ['Deixar como está', () => 'Os números não mudam. O aviso some e o excesso fica registrado.']
     };
     P.sheet({
       title: `${w.label} passou ${F.money(over)}`, kicker: `gasto ${F.money(spent)} de ${F.money(w.limit)}`,
@@ -695,7 +702,7 @@
               <div><span>Ciclo atual (${F.date(e.current.start)} a ${F.date(e.current.end)})</span><b>fecha em ${F.date(e.closeOn)}</b></div>
               <div class="calc-total"><span>Ciclo novo</span><b>${F.date(e.start)} a ${F.date(e.end)}</b></div>
             </div>
-            <p class="hint">O salário era esperado em ${F.date(e.scheduled)} e chegou ${e.daysEarly} dia${e.daysEarly === 1 ? '' : 's'} antes. O fim do ciclo novo continua sendo a véspera do próximo salário (${F.date(e.nextPay)}). As contas que vencem de ${F.date(e.start)} em diante passam a contar no ciclo novo. Depois você confirma o plano das semanas.</p>`
+            <p class="hint">O salário era esperado em ${F.date(e.scheduled)} e chegou ${e.daysEarly} dia${e.daysEarly === 1 ? '' : 's'} antes. O fim do ciclo novo continua sendo a véspera do próximo salário (${F.date(e.nextPay)}). As contas que vencem de ${F.date(e.start)} em diante passam a contar no ciclo novo. Depois você confirma o plano do ciclo.</p>`
           : `<div class="notice">Essa data não é um adiantamento: ${F.date(st.date)} ${C.cycleFor(st.date, F.cycles(), prof).start === st.date ? 'já é o início de um ciclo' : 'está longe do próximo salário previsto'}. Use Lançar normalmente.</div>`}
           <p class="form-error" hidden></p>
           <div class="form-actions"><button class="btn ghost" type="button" data-no>Agora não</button><button class="btn primary" type="submit" ${e ? '' : 'disabled'}>Iniciar novo ciclo</button></div>

@@ -87,8 +87,8 @@
       const lines = [];
       if (v <= 0) return { text: 'Me diga um valor maior que zero.' };
       if (s.canSpend < v) lines.push(`Não cabe: hoje você pode gastar ${M(Math.max(0, s.canSpend))} até ${F.date(c.end)} (saldo real ${M(s.real)} − reservado ${M(s.reserved)} − contas até o salário ${M(s.committed)}). Faltariam ${M(v - Math.max(0, s.canSpend))}.`);
-      else if (wk && wRest < v) lines.push(`Cabe no ciclo (você pode gastar ${M(s.canSpend)} até ${F.date(c.end)}), mas passa do limite da ${wk.label.toLowerCase()} em ${M(v - Math.max(0, wRest))}: restam ${M(Math.max(0, wRest))} nela. Se gastar, o app te ajuda a decidir de onde tirar.`);
-      else lines.push(`Sim, cabe. Você pode gastar ${M(s.canSpend)} até ${F.date(c.end)}${wk ? ` e ainda restam ${M(wRest)} na ${wk.label.toLowerCase()}` : ''}. Depois desse gasto, ficariam ${M(s.canSpend - v)}.`);
+      else if (wk && wRest < v) lines.push(`Cabe no ciclo (você pode gastar ${M(s.canSpend)} até ${F.date(c.end)}), mas passa do limite ${wk.label === 'Ciclo inteiro' ? 'do dia a dia' : 'da ' + wk.label.toLowerCase()} em ${M(v - Math.max(0, wRest))}: restam ${M(Math.max(0, wRest))}. Se gastar, o app te ajuda a decidir de onde tirar.`);
+      else lines.push(`Sim, cabe. Você pode gastar ${M(s.canSpend)} até ${F.date(c.end)}${wk ? ` e ainda restam ${M(wRest)} ${wk.label === 'Ciclo inteiro' ? 'no dia a dia' : 'na ' + wk.label.toLowerCase()}` : ''}. Depois desse gasto, ficariam ${M(s.canSpend - v)}.`);
       lines.push('Valores confirmados (saldo real) menos o que já está comprometido.');
       return { text: lines.join(' ') };
     }
@@ -112,9 +112,9 @@
       if (term && !hit.length) return null;   // deixa a IA tentar entender
       return { text: `${term ? `Com “${g[2]}”` : 'No total'}, neste ciclo (${F.date(c.start)} a ${F.date(c.end)}): ${M(hit.reduce((a, x) => a + x.amount, 0))} em ${hit.length} gasto${hit.length === 1 ? '' : 's'} pago${hit.length === 1 ? '' : 's'}.` };
     }
-    if (/\bsemana\b/.test(t) && /(quanto|como|limite|resta|sobr)/.test(t)) {
+    if (/\b(semana|quinzena|dia a dia)\b/.test(t) && /(quanto|como|limite|resta|sobr|tenho)/.test(t)) {
       const wk = s.week;
-      if (!wk) return { text: 'O plano das semanas aparece depois que o salário cai e você confirma o plano do ciclo.' };
+      if (!wk) return { text: 'Os limites do dia a dia aparecem depois que o salário cai e você confirma o plano do ciclo.' };
       const r = wk.limit - wk.spent;
       return { text: `${wk.label} (${F.date(wk.start)} a ${F.date(wk.end)}): gastou ${M(wk.spent)} de ${M(wk.limit)}. ${r >= 0 ? `Restam ${M(r)}.` : `Passou ${M(-r)}.`}` };
     }
@@ -180,7 +180,7 @@
   window.addEventListener('pageshow', () => { busy = false; });
   const scrollEnd = () => setTimeout(() => { const l = P.$('.ai-log'); if (l) l.scrollTop = l.scrollHeight; window.scrollTo(0, document.body.scrollHeight); }, 30);
 
-  const SUGGEST = ['Posso gastar R$ 100 hoje?', 'Quanto falta pagar?', 'Com o que eu mais gastei?', 'Quanto ainda tenho na semana?', 'Gastei 25 de uber no pix'];
+  const SUGGEST = () => ['Posso gastar R$ 100 hoje?', 'Quanto falta pagar?', 'Com o que eu mais gastei?', F.blockSize() === 0 ? 'Quanto ainda tenho no dia a dia?' : `Quanto ainda tenho na ${F.blk().one}?`, 'Gastei 25 de uber no pix'];
 
   P.views['fin-assistente'] = () => {
     const list = chat(), on = !!P.sync?.user();
@@ -196,7 +196,7 @@
         </div>`).join('') : `<div class="ai-empty"><b>Oi${S.settings().name ? ', ' + esc(S.settings().name) : ''}!</b><span>Experimente uma destas:</span></div>`}
       ${busy ? '<div class="ai-msg assistant"><div class="ai-bubble ai-typing"><i></i><i></i><i></i><span class="ai-secs" data-secs>pensando…</span></div></div>' : ''}
     </div>
-    <div class="chips ai-suggest">${SUGGEST.map(q => `<button type="button" class="chip" data-act="aiAsk" data-q="${esc(q)}">${esc(q)}</button>`).join('')}</div>
+    <div class="chips ai-suggest">${SUGGEST().map(q => `<button type="button" class="chip" data-act="aiAsk" data-q="${esc(q)}">${esc(q)}</button>`).join('')}</div>
     <form class="ai-form" data-form="aiAsk"><input id="ai-q" name="q" autocomplete="off" maxlength="600" placeholder="Escreva sua pergunta…" ${busy ? 'disabled' : ''} aria-label="Pergunta"><button class="btn primary" type="submit" ${busy ? 'disabled' : ''}>Enviar</button></form>`;
   };
   F.gate('fin-assistente');
