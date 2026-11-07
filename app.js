@@ -3,7 +3,7 @@
 ============================================================ */
 (function () {
   const S = P.store;
-  const ROUTES = { hoje: 'Hoje', agenda: 'Agenda', areas: 'Áreas', notas: 'Notas', ajustes: 'Ajustes', fin: 'Financeiro+', 'fin-orcamento': 'Orçamento', 'fin-lanc': 'Lançamentos', 'fin-mais': 'Mais', 'fin-relatorio': 'Relatório', 'fin-assistente': 'Assistente', boasvindas: 'Bem-vindo', entrar: 'Entrar' };
+  const ROUTES = { hoje: 'Hoje', agenda: 'Agenda', areas: 'Pastas', notas: 'Notas', ajustes: 'Ajustes', fin: 'Financeiro+', 'fin-orcamento': 'Orçamento', 'fin-lanc': 'Lançamentos', 'fin-mais': 'Configurações de finanças', 'fin-relatorio': 'Relatório', 'fin-assistente': 'Assistente', boasvindas: 'Bem-vindo', entrar: 'Entrar' };
   const PRISMA_ROUTES = ['hoje', 'agenda', 'areas', 'notas'];
   let route = 'hoje', spaceNow = 'prisma';
   // Ajustes fica no espaço em que a pessoa estava (assim quem usa só o Financeiro+ também chega nele)
@@ -68,13 +68,16 @@
     route = to;
     document.body.dataset.space = P.space();
     document.body.classList.toggle('onboarding', to === 'boasvindas' || to === 'entrar');
+    document.body.classList.toggle('on-ai', to === 'fin-assistente');
     P.applyFocus();
     // lembra a última tela de cada espaço (Ajustes não conta: ele não é de nenhum dos dois)
     if (to.startsWith('fin')) P.ui.lastFin = to; else if (PRISMA_ROUTES.includes(to)) P.ui.lastPrisma = to;
     P.saveUI();
     [...P.openSheets].forEach(sh => sh.close());
     P.$$('[data-nav]').forEach(b => { const on = b.dataset.nav === to; b.classList.toggle('on', on); on ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current'); });
-    P.$('#mobile-title').textContent = ROUTES[to];
+    P.$('#mobile-title').textContent = !(P.hasFin() && P.hasPrisma()) ? (P.hasPrisma() ? 'Prisma' : 'Finanças') : 'Prisma';
+    P.$$('.space-switch [data-s]').forEach(b => { const on = b.dataset.s === P.space(); b.classList.toggle('on', on); b.setAttribute('aria-selected', on); });
+    P.$$('.areas-label').forEach(el => { el.textContent = P.areasShort(); });
     document.title = to === 'hoje' ? 'Prisma' : to === 'fin' ? 'Financeiro+' : `${ROUTES[to]} · ${P.space() === 'fin' ? 'Financeiro+' : 'Prisma'}`;
     const tc = document.querySelector('meta[name="theme-color"]'); if (tc) tc.content = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#eef0fa';
     P.render();
@@ -118,6 +121,14 @@
       if (P.space() === 'fin') { if (!P.fin.locked()) P.fin.lancar(); else P.render(); return; }
       P.capture(el.dataset.type || 'tarefa', { due: el.dataset.due, area: el.dataset.area });
     },
+    toSpace: el => {
+      const want = el.dataset.s;
+      if (want === P.space() && route !== 'ajustes') return;
+      const lastFin = String(P.ui.lastFin || '').startsWith('fin') ? P.ui.lastFin : 'fin';
+      const lastPrisma = PRISMA_ROUTES.includes(P.ui.lastPrisma) ? P.ui.lastPrisma : 'hoje';
+      P.go(want === 'fin' ? lastFin : lastPrisma);
+    },
+    goHome: () => P.go(P.space() === 'fin' ? 'fin' : P.home()),
     switchSpace: () => {
       if (!(P.hasFin() && P.hasPrisma())) return P.go(P.home());
       const lastFin = String(P.ui.lastFin || '').startsWith('fin') ? P.ui.lastFin : 'fin';
@@ -201,7 +212,7 @@
     if (P.openSheets.length || e.metaKey || e.ctrlKey || e.altKey) return;
     if (/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName)) return;
     if (e.key === 'n' || e.key === 'N') { e.preventDefault(); P.actions.capture({ dataset: {} }); }
-    const map = P.space() === 'fin' ? { '1': 'fin', '2': 'fin-orcamento', '3': 'fin-lanc', '4': 'fin-mais' } : { '1': 'hoje', '2': 'agenda', '3': 'areas', '4': 'notas' };
+    const map = P.space() === 'fin' ? { '1': 'fin', '2': 'fin-orcamento', '3': 'fin-lanc', '4': 'fin-relatorio' } : { '1': 'hoje', '2': 'agenda', '3': 'areas', '4': 'notas' };
     if (map[e.key]) P.go(map[e.key]);
   });
 

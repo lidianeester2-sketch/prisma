@@ -1195,3 +1195,57 @@ body.no-prisma .brand-name .only-fin { display: inline !important; }
 .ob-step:has(.ob-list) { padding-bottom: 110px; }
 .ob-prism { height: auto; aspect-ratio: 400 / 260; max-height: 260px; bottom: -10px; }
 .ob-credits { text-align: left; padding-right: 90px; }
+
+/* ---------- v26: navegação (etapa 1 de UX) ---------- */
+/* seletor visível entre Estudos e Finanças */
+.space-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 14px; background: var(--surface-2); }
+.space-switch button { border: 0; background: transparent; padding: 8px 10px; border-radius: 10px; font-weight: 700; font-size: 13.5px; color: var(--muted); white-space: nowrap; }
+.space-switch button.on { background: var(--surface); color: var(--text); box-shadow: var(--soft); }
+.sidebar .space-switch { background: color-mix(in srgb, var(--side-text) 8%, transparent); }
+.sidebar .space-switch button { color: var(--side-muted); }
+.sidebar .space-switch button.on { background: var(--surface); color: var(--text); }
+body.one-space .space-switch { display: none; }
+#mobile-title { display: none; }
+body.one-space #mobile-title { display: block; }
+.brand { border: 0; background: none; }
+@media (max-width: 960px) { .sidebar .space-switch { grid-template-columns: 1fr; width: 56px; } .sidebar .space-switch button { font-size: 0; padding: 8px 0; } .sidebar .space-switch button::before { font-size: 12px; font-weight: 800; } .sidebar .space-switch [data-s="prisma"]::before { content: "E"; } .sidebar .space-switch [data-s="fin"]::before { content: "$"; } }
+.set-sub { margin: 10px 0 2px; font-size: 13px; font-weight: 700; color: var(--muted); }
+.set-sub:first-of-type { margin-top: 0; }
+@media (max-width: 700px) {
+  .mobile-top { gap: 10px; }
+  .mobile-top .space-switch { flex: 1; max-width: 260px; margin: 0 auto; }
+  .mobile-top .sync-badge { order: 3; }
+  /* barra de baixo com nome em cada botão */
+  .tabbar a span { position: static; width: auto; height: auto; overflow: visible; clip: auto; font-size: 10.5px; font-weight: 600; white-space: nowrap; }
+  .tabbar a { padding: 6px 0 4px; gap: 2px; }
+  .tabbar a.on::after { display: none; }
+  .tabbar a.on span { color: var(--accent); font-weight: 800; }
+  .tabbar a svg { width: 22px; height: 22px; }
+  .fab { display: grid; place-items: center; align-content: center; gap: 0; width: 60px; height: 56px; }
+  .fab span { font-size: 26px; line-height: .9; }
+  .fab small { font-size: 9.5px; font-weight: 700; color: var(--on-ink); line-height: 1; }
+}
+@media (min-width: 701px) { .fab small { display: none; } }
+
+/* ---------- v27: Hoje e Painel (etapa 2 de UX) ---------- */
+.hoje-head h1 { margin-top: 2px; }
+.today-sum { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin-top: 6px; padding-bottom: 2px; }
+.today-sum::-webkit-scrollbar { display: none; }
+.today-sum > * { flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 99px; border: 0; background: var(--surface); box-shadow: var(--soft); font-size: 13px; color: var(--muted); white-space: nowrap; margin: 0; }
+.today-sum b { color: var(--text); font-weight: 800; }
+.today-sum .bad b, .today-sum .bad { color: var(--bad); }
+/* filtros correm para o lado em vez de quebrar linha */
+.chips.hoje-filter, .notes-tools .chips, .agenda-filters, .page-head + .chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+.chips.hoje-filter::-webkit-scrollbar, .notes-tools .chips::-webkit-scrollbar { display: none; }
+.chips.hoje-filter .chip, .notes-tools .chips .chip { flex: none; }
+.hoje-filter { margin: 0 0 16px; }
+/* Painel: números de apoio dentro do cartão grande */
+.hero-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.hero-chip { border: 0; padding: 7px 12px; border-radius: 99px; background: rgba(255, 255, 255, .18); color: var(--hero-text); font-size: 13px; }
+.hero-chip b { font-weight: 800; }
+.next-total { margin: -6px 0 8px; }
+/* assistente sempre à mão nas Finanças */
+.ai-fab { position: fixed; z-index: 25; right: max(18px, env(safe-area-inset-right, 0px)); bottom: 24px; width: 52px; height: 52px; border-radius: 50%; border: 0; display: grid; place-items: center; background: var(--surface); color: var(--accent); box-shadow: var(--shadow); }
+.ai-fab svg { width: 24px; height: 24px; }
+body.on-ai .ai-fab, body.onboarding .ai-fab, body.has-sheet .ai-fab { display: none !important; }
+@media (max-width: 700px) { .ai-fab { bottom: calc(102px + env(safe-area-inset-bottom, 0px)); right: 16px; width: 48px; height: 48px; } }

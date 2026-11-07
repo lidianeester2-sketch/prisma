@@ -191,7 +191,7 @@
           ${c ? `<button class="plus" type="button" data-act="inc" data-id="${focus.id}" data-key="${c.key}" aria-label="Mais 1 ${esc(c.label)}">+1</button>` : ''}
         </div>`;
       } else if (af === 'faculdade') {
-        ncHtml = `<div class="now-card quiet"><span class="eyebrow">Próxima aula</span><span class="now-title">Nenhuma aula nos próximos dias</span><span class="now-meta">Cadastre horários nas matérias em Áreas.</span></div>`;
+        ncHtml = `<div class="now-card quiet"><span class="eyebrow">Próxima aula</span><span class="now-title">Nenhuma aula nos próximos dias</span><span class="now-meta">Cadastre os horários na matéria, em Pastas.</span></div>`;
       } else {
         ncHtml = `<button class="now-card quiet" type="button" data-act="capture" data-type="item" data-area="${af === 'all' ? (P.areasOn()[0] || 'projetos') : af}"><span class="eyebrow">Em foco</span><span class="now-title">Nada em andamento ainda</span><span class="now-meta">Toque para criar uma matéria, um projeto ou uma leitura.</span></button>`;
       }
@@ -204,24 +204,19 @@
 
     return `
     <header class="page-head hoje-head">
-      <div class="hello"><span class="avatar" aria-hidden="true">${esc((st.name || 'P').trim().charAt(0).toUpperCase())}</span>
-        <div class="hello-text"><span class="eyebrow">${greet} · ${P.DOW_LONG[now.getDay()]}, ${now.getDate()} de ${P.MONTHS[now.getMonth()]}</span>
-        <h1>${st.name ? esc(st.name) : 'Olá!'}</h1></div></div>
+      <span class="eyebrow">${P.DOW_LONG[now.getDay()]}, ${now.getDate()} de ${P.MONTHS[now.getMonth()]}${semLeft !== null && semLeft >= 0 ? ` · ${semLeft === 0 ? 'último dia do semestre' : `${semLeft} dias pro fim do semestre`}` : ''}</span>
+      <h1>${greet}${st.name ? ', ' + esc(st.name) : ''}</h1>
       <p class="prisma-says">${esc(phrase())}</p>
-      <span class="score-pill" title="${esc(scoreLine(ws.score))}">Caos sob controle <b>${ws.score === null ? '—' : ws.score + '%'}</b>${semLeft !== null && semLeft >= 0 ? ` · ${semLeft === 0 ? 'último dia do semestre' : `${semLeft} dias pro fim do semestre`}` : ''}</span>
+      <div class="today-sum">
+        <button type="button" data-act="scrollTo" data-id="para-hoje"><b>${todayCount + classes.length + evToday.length}</b> para hoje</button>
+        ${overdue.length ? `<button type="button" class="bad" data-act="scrollTo" data-id="para-hoje"><b>${overdue.length}</b> atrasada${overdue.length === 1 ? '' : 's'}</button>` : ''}
+        <button type="button" data-act="go" data-to="agenda"><b>${upcoming.length}</b> nos próximos 7 dias</button>
+        <span class="score-pill" title="${esc(scoreLine(ws.score))}">Semana em dia <b>${ws.score === null ? '—' : ws.score + '%'}</b></span>
+      </div>
     </header>
     ${filterHtml}
 
-    <div class="tiles">
-      ${tile('c1', todayCount + classes.length + evToday.length, 'Para hoje', 'data-act="scrollTo" data-id="para-hoje"')}
-      ${tile('c2', overdue.length, overdue.length === 1 ? 'Atrasada' : 'Atrasadas', 'data-act="scrollTo" data-id="para-hoje"')}
-      ${tile('c3', upcoming.length, 'Próximos 7 dias', 'data-act="go" data-to="agenda"')}
-      ${tile('c4', active.length, 'Em andamento', 'data-act="go" data-to="areas"')}
-    </div>
-
-    <div class="hero-grid">
-      ${ncHtml}
-    </div>
+    ${ncHtml ? `<div class="hero-grid">${ncHtml}</div>` : ''}
 
     <div class="cols">
       <section class="block main-col" id="para-hoje">
@@ -249,7 +244,6 @@
       </section>
 
       <aside class="side-col">
-        ${showReading ? P.readingBlock() : ''}
         <section class="block">
           <div class="block-head"><h2>Hábitos</h2><button class="link" type="button" data-act="manageHabits">Editar</button></div>
           <div class="habits">
@@ -262,6 +256,7 @@
             }).join('') : empty('Sem hábitos ainda.', 'Pequenas rotinas mudam o mês inteiro.', 'data-act="manageHabits"', 'Criar hábito')}
           </div>
         </section>
+        ${showReading ? P.readingBlock() : ''}
 
         ${st.playlist ? `<section class="block"><div class="block-head"><h2>Trilha de estudo</h2></div>
           <a class="playlist-link" href="https://www.youtube.com/playlist?list=${encodeURIComponent(st.playlist)}" target="_blank" rel="noopener"><span class="play">▶</span><span><strong>Abrir sua playlist</strong><small>YouTube</small></span></a>
@@ -270,7 +265,7 @@
     </div>
 
     <section class="block">
-      <div class="block-head"><h2>Em andamento</h2><button class="link" type="button" data-act="go" data-to="areas">Todas as áreas →</button></div>
+      <div class="block-head"><h2>Em andamento</h2><button class="link" type="button" data-act="go" data-to="areas">Ver pastas →</button></div>
       ${active.length ? `<div class="strip">${active.slice(0, 10).map(P.itemMini).join('')}</div>` : empty('Nada em andamento.', 'Crie uma matéria, projeto ou leitura para acompanhar o progresso.', 'data-act="capture" data-type="item"', 'Criar')}
     </section>`;
   };
@@ -445,7 +440,7 @@
     }
 
     return `
-    <header class="page-head"><h1>Áreas</h1><p class="lede">${summary}</p></header>
+    <header class="page-head"><h1>${P.areasTitle()}</h1><p class="lede">${summary}</p></header>
     <div class="seg" role="tablist" aria-label="Área">
       ${Object.entries(P.AREAS).filter(([k]) => P.areasOn().includes(k)).map(([k, a]) => `<button type="button" role="tab" aria-selected="${k === area}" class="seg-btn ${k === area ? 'on' : ''} a-${k}" data-act="setArea" data-a="${k}"><span aria-hidden="true">${a.icon}</span> ${a.label}</button>`).join('')}
     </div>

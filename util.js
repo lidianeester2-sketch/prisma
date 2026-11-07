@@ -99,6 +99,10 @@ P.focus = () => { const f = P.store?.settings?.().focus; return Array.isArray(f)
 P.areasOn = () => Object.keys(P.AREAS).filter(a => P.focus().includes(a));
 P.hasFin = () => P.focus().includes('financeiro');
 P.hasPrisma = () => P.areasOn().length > 0;
+// nome da tela de pastas conforme o que a pessoa usa: "Matérias, projetos e leituras"
+P.AREA_PLURAL = { faculdade: 'matérias', projetos: 'projetos', leituras: 'leituras', pessoal: 'metas' };
+P.areasTitle = () => { const l = P.areasOn().map(a => P.AREA_PLURAL[a]); const t = l.length > 1 ? l.slice(0, -1).join(', ') + ' e ' + l[l.length - 1] : (l[0] || 'pastas'); return t.charAt(0).toUpperCase() + t.slice(1); };
+P.areasShort = () => (P.areasOn().length === 1 ? P.areasTitle() : 'Pastas');
 P.ACTIVE = ['cursando', 'ativo', 'lendo'];
 P.statusLabel = (area, s) => (P.STATUS[area] || []).find(x => x[0] === s)?.[1] || s;
 

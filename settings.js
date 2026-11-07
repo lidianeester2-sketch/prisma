@@ -31,6 +31,13 @@
         <div class="ob-focus compact">${Object.entries(P.FOCUS).map(([k, f]) => `<button type="button" class="ob-opt ${P.focus().includes(k) ? 'on' : ''}" data-act="toggleFocus" data-k="${k}" aria-pressed="${P.focus().includes(k)}"><span class="ob-ico f-${k}">${f.icon}</span><span><b>${f.label}</b><small>${f.desc}</small></span><span class="ob-check" aria-hidden="true">✓</span></button>`).join('')}</div>
       </section>
 
+      ${P.hasFin() ? `<section class="block set">
+        <h2>Finanças</h2>
+        ${P.fin?.settingsHTML ? P.fin.settingsHTML() : ''}
+      </section>
+
+      ` : ''}
+
       <section class="block set">
         <h2>Você</h2>
         <form class="form" data-form="profile">
@@ -119,7 +126,7 @@
         </div>
       </section>
 
-      <p class="credits">Prisma · versão 25 · Desenvolvido por Lidiane Tavares<br><button class="link" type="button" data-act="repair">Atualizar o app (baixa a versão mais nova; seus dados ficam)</button></p>
+      <p class="credits">Prisma · versão 27 · Desenvolvido por Lidiane Tavares<br><button class="link" type="button" data-act="repair">Atualizar o app (baixa a versão mais nova; seus dados ficam)</button></p>
     </div>`;
   };
 
