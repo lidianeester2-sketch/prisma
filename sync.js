@@ -26,6 +26,8 @@
   const LIB = 'https://cdn.jsdelivr.net/npm/appwrite@16.1.0';
   const DB = 'prisma', TABLE = 'records';
   let A = null, client = null, account = null, db = null, user = null;
+  // noSession: o Appwrite respondeu e NÃO há login neste aparelho (sem internet não conta)
+  let noSession = false;
   let status = 'idle', lastSync = null, running = false, again = false, errorMsg = '';
 
   const cfg = () => (P.CONFIG?.appwriteEndpoint && P.CONFIG?.appwriteProject
@@ -62,7 +64,8 @@
       client = new A.Client().setEndpoint(c.endpoint).setProject(c.project);
       account = new A.Account(client);
       db = new A.Databases(client);
-      try { user = await account.get(); } catch (e) { user = null; }
+      try { user = await account.get(); noSession = false; }
+      catch (e) { user = null; noSession = e?.code === 401 || e?.code === 403; if (!noSession) setStatus('offline', 'sem conexão'); }
       if (user && !P.ls.get(OWNER_KEY)) P.ls.set(OWNER_KEY, user.$id);
       P.renderSyncBadge?.();
       if (user) now();
@@ -162,7 +165,9 @@
 
   P.sync = {
     init, now, schedule,
-    state: () => ({ configured: !!cfg()?.project && !P.PREVIEW, user: user ? { email: user.email } : null, status }),
+    state: () => ({ configured: !!cfg()?.project && !P.PREVIEW, builtIn: !!(P.CONFIG?.appwriteEndpoint && P.CONFIG?.appwriteProject), user: user ? { email: user.email } : null, status }),
+    // app "de conta": quando o Appwrite já vem configurado no app, é preciso estar logado
+    needsLogin: () => !!(P.CONFIG?.appwriteEndpoint && P.CONFIG?.appwriteProject) && !P.PREVIEW && noSession && !user,
     label() {
       if (status === 'syncing') return 'sincronizando…';
       if (status === 'error') return 'erro: ' + errorMsg;
@@ -185,7 +190,7 @@
         if (mode === 'signup') await account.create(A.ID.unique(), email, pw);
         try { await account.deleteSession('current'); } catch (e) {}
         await account.createEmailPasswordSession(email, pw);
-        user = await account.get();
+        user = await account.get(); noSession = false;
       } catch (e) {
         const m = e?.message || '';
         P.toast(e.code === 401 ? 'E-mail ou senha incorretos.' : e.code === 409 ? 'Já existe uma conta com esse e-mail. Use “Entrar”.' : /password/i.test(m) ? 'A senha precisa ter pelo menos 8 caracteres.' : m || 'Erro ao entrar.');
@@ -207,7 +212,7 @@
       try { if (user) await now(true); } catch (e) {}
       if (wipeDevice && S.pendingCount()) { P.toast('Ainda há alterações que não subiram para a nuvem. Conecte à internet e tente de novo.'); return false; }
       try { await account?.deleteSession('current'); } catch (e) {}
-      user = null; setStatus('idle');
+      user = null; noSession = true; setStatus('idle');
       if (wipeDevice) { S.resetDevice(); clearPersonal(); P.ls.del(OWNER_KEY); }
       return true;
     },

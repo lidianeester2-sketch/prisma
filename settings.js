@@ -58,8 +58,8 @@
       </section>
 
       <section class="block set">
-        <h2>Sincronização</h2>
-        <p class="lede small">Para ver os mesmos dados no computador e no celular. Sem isso, tudo fica salvo só neste aparelho.</p>
+        <h2>${sync.builtIn ? 'Sua conta' : 'Sincronização'}</h2>
+        <p class="lede small">${sync.builtIn ? 'Seus dados ficam guardados na sua conta e aparecem em qualquer aparelho em que você entrar.' : 'Para ver os mesmos dados no computador e no celular. Sem isso, tudo fica salvo só neste aparelho.'}</p>
         ${!sync.configured ? `
           <div class="notice">Ainda não conectado. Siga o guia <b>APPWRITE.md</b> que veio junto com o projeto (leva uns 15 minutos) e cole aqui os dois códigos.</div>
           <form class="form" data-form="appw">
@@ -119,7 +119,7 @@
         </div>
       </section>
 
-      <p class="credits">Prisma · versão 20 · Desenvolvido por Lidiane Tavares<br><button class="link" type="button" data-act="repair">Atualizar o app (baixa a versão mais nova; seus dados ficam)</button></p>
+      <p class="credits">Prisma · versão 22 · Desenvolvido por Lidiane Tavares<br><button class="link" type="button" data-act="repair">Atualizar o app (baixa a versão mais nova; seus dados ficam)</button></p>
     </div>`;
   };
 
@@ -168,7 +168,8 @@
     syncNow: () => P.sync.now(true),
     signOut: () => P.sheet({
       title: 'Sair da conta', kicker: P.sync.state().user?.email || '',
-      render: () => `<p class="lede">Antes de sair, o Prisma manda para a nuvem o que ainda não subiu.</p>
+      render: () => P.sync.state().builtIn ? `<p class="lede">Antes de sair, o Prisma guarda na sua conta o que ainda não subiu. Depois, os dados saem deste aparelho e voltam quando você entrar de novo.</p>
+        <div class="form-actions"><button class="btn primary" type="button" data-out="wipe">Sair</button></div>` : `<p class="lede">Antes de sair, o Prisma manda para a nuvem o que ainda não subiu.</p>
         <div class="data-actions">
           <button type="button" class="data-btn" data-out="keep"><strong>Sair e manter os dados aqui</strong><small>Para quando o aparelho é só seu.</small></button>
           <button type="button" class="data-btn" data-out="wipe"><strong>Sair e apagar deste aparelho</strong><small>Para aparelho emprestado ou de outra pessoa. Tudo continua guardado na sua conta; é só entrar de novo.</small></button>
@@ -176,7 +177,7 @@
       mount: api => P.$$('[data-out]', api.body).forEach(b => b.onclick = async () => {
         b.disabled = true;
         const ok = await P.sync.signOut(b.dataset.out === 'wipe');
-        if (ok !== false) { api.close(); P.toast(b.dataset.out === 'wipe' ? 'Você saiu e os dados saíram deste aparelho.' : 'Você saiu da conta.'); P.render(); } else b.disabled = false;
+        if (ok !== false) { api.close(); P.toast(b.dataset.out === 'wipe' ? 'Você saiu. Seus dados continuam na sua conta.' : 'Você saiu da conta.'); P.go(P.home()); } else b.disabled = false;
       })
     }),
     toggleFocus: el => {

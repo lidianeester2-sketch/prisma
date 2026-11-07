@@ -7,6 +7,6 @@
 ============================================================ */
 window.P = window.P || {};
 P.CONFIG = {
-  appwriteEndpoint: ''https://nyc.cloud.appwrite.io/v1'
-  appwriteProject: '' 6ae688590001378b6f42'
+  appwriteEndpoint: 'https://nyc.cloud.appwrite.io/v1',
+  appwriteProject: '6ae688590001378b6f42'
 };

@@ -32,7 +32,7 @@
     else body = `
       <span class="eyebrow">Último passo</span>
       <h1>${st.mode === 'login' ? 'Entrar na sua conta' : 'Crie sua conta'}</h1>
-      <p class="lede">${st.mode === 'login' ? 'Seus dados voltam para este aparelho.' : 'Para guardar tudo na nuvem e usar no celular e no computador. Só você vê os seus dados.'}</p>
+      <p class="lede">${st.mode === 'login' ? 'Entre com o seu e-mail e senha. Seus dados aparecem em qualquer aparelho.' : 'Com e-mail e senha, seus dados ficam guardados na sua conta e aparecem em qualquer aparelho. Só você vê os seus dados.'}</p>
       ${canSync ? `<form class="ob-form col" data-ob="account">
         <input name="email" type="email" autocomplete="email" placeholder="E-mail" required>
         <input name="pw" type="password" autocomplete="${st.mode === 'login' ? 'current-password' : 'new-password'}" placeholder="Senha (8 ou mais caracteres)" minlength="8" required>
@@ -40,7 +40,7 @@
       </form>
       <button class="link" type="button" data-ob-mode>${st.mode === 'login' ? 'Ainda não tenho conta → Criar' : 'Já tenho conta → Entrar'}</button>`
       : `<div class="notice">A conta na nuvem ainda não está ligada neste endereço. Você pode começar agora e ligar depois em Ajustes → Sincronização (ou abrindo o link de convite).</div>`}
-      <div class="ob-actions">${st.mode === 'login' && !st.name ? '' : '<button class="btn ghost" type="button" data-ob-back>Voltar</button>'}<button class="btn ${canSync ? 'ghost' : 'primary'}" type="button" data-ob-skip>${canSync ? 'Agora não, usar só neste aparelho' : 'Começar'}</button></div>`;
+      <div class="ob-actions">${st.mode === 'login' && !st.name ? '' : '<button class="btn ghost" type="button" data-ob-back>Voltar</button>'}${canSync ? '' : '<button class="btn primary" type="button" data-ob-skip>Começar</button>'}</div>`;
     return `<div class="ob">${dots()}<div class="ob-card">${body}</div><p class="credits">Prisma · Desenvolvido por Lidiane Tavares</p></div>`;
   };
 
@@ -73,6 +73,37 @@
       if (S.settings().onboarded) { P.toast(`Que bom te ver de novo${S.settings().name ? ', ' + S.settings().name : ''}!`); P.go(P.home()); return; }
       if (!st.name) { st.step = 1; st.mode = 'signup'; P.toast('Conta conectada. Agora conta como podemos te chamar.'); return rerender(); }
       finish();
+    };
+  };
+})();
+
+/* ---------- tela "Entrar" (sessão expirou ou saiu da conta) ---------- */
+(function () {
+  const S = P.store;
+  let busy = false;
+  P.views.entrar = () => `<div class="ob"><div class="ob-card">
+      <img src="icon-192.png" alt="" width="64" height="64" class="ob-logo">
+      <h1>Entrar no Prisma</h1>
+      <p class="lede">Use o e-mail e a senha da sua conta.</p>
+      <form class="ob-form col" data-login>
+        <input name="email" type="email" autocomplete="email" placeholder="E-mail" required>
+        <input name="pw" type="password" autocomplete="current-password" placeholder="Senha" minlength="8" required>
+        <button class="btn primary" type="submit" ${busy ? 'disabled' : ''}>${busy ? 'Entrando…' : 'Entrar'}</button>
+      </form>
+      <button class="link" type="button" data-new-account>Criar uma conta nova</button>
+    </div><p class="credits">Prisma · Desenvolvido por Lidiane Tavares</p></div>`;
+  P.mounts.entrar = root => {
+    const f = root.querySelector('[data-login]');
+    f.onsubmit = async e => {
+      e.preventDefault(); if (busy) return; busy = true; P.render();
+      const ok = await P.sync.auth('login', f.email.value.trim(), f.pw.value);
+      busy = false;
+      if (ok) P.go(P.home()); else P.render();
+    };
+    root.querySelector('[data-new-account]').onclick = async () => {
+      if (!(await P.ask('Criar uma conta nova neste aparelho? Os dados que estão aqui saem do aparelho (continuam guardados na conta de quem usou antes).', 'Criar conta nova', false))) return;
+      S.resetDevice(); try { localStorage.removeItem('prisma2:owner'); } catch (e) {}
+      P.go('boasvindas');
     };
   };
 })();

@@ -3,7 +3,7 @@
 ============================================================ */
 (function () {
   const S = P.store;
-  const ROUTES = { hoje: 'Hoje', agenda: 'Agenda', areas: 'Áreas', notas: 'Notas', ajustes: 'Ajustes', fin: 'Financeiro+', 'fin-orcamento': 'Orçamento', 'fin-lanc': 'Lançamentos', 'fin-mais': 'Mais', 'fin-relatorio': 'Relatório', 'fin-assistente': 'Assistente', boasvindas: 'Bem-vindo' };
+  const ROUTES = { hoje: 'Hoje', agenda: 'Agenda', areas: 'Áreas', notas: 'Notas', ajustes: 'Ajustes', fin: 'Financeiro+', 'fin-orcamento': 'Orçamento', 'fin-lanc': 'Lançamentos', 'fin-mais': 'Mais', 'fin-relatorio': 'Relatório', 'fin-assistente': 'Assistente', boasvindas: 'Bem-vindo', entrar: 'Entrar' };
   const PRISMA_ROUTES = ['hoje', 'agenda', 'areas', 'notas'];
   let route = 'hoje', spaceNow = 'prisma';
   // Ajustes fica no espaço em que a pessoa estava (assim quem usa só o Financeiro+ também chega nele)
@@ -57,6 +57,9 @@
     // primeira vez no app: fluxo de boas-vindas
     if (!S.settings().onboarded && to !== 'boasvindas') to = 'boasvindas';
     if (S.settings().onboarded && to === 'boasvindas') to = P.home();
+    // app com conta: sem login (sessão expirou ou saiu), mostra a tela de entrar
+    if (S.settings().onboarded && P.sync?.needsLogin()) to = 'entrar';
+    else if (to === 'entrar') to = P.home();
     // o app mostra só o que a pessoa escolheu usar
     if (to.startsWith('fin') && !P.hasFin()) to = P.home();
     if (PRISMA_ROUTES.includes(to) && !P.hasPrisma()) to = P.home();
@@ -64,7 +67,7 @@
     if (to.startsWith('fin')) spaceNow = 'fin'; else if (to !== 'ajustes') spaceNow = 'prisma';
     route = to;
     document.body.dataset.space = P.space();
-    document.body.classList.toggle('onboarding', to === 'boasvindas');
+    document.body.classList.toggle('onboarding', to === 'boasvindas' || to === 'entrar');
     P.applyFocus();
     P.ui[P.space() === 'fin' ? 'lastFin' : 'lastPrisma'] = to; P.saveUI();
     [...P.openSheets].forEach(sh => sh.close());
@@ -89,7 +92,7 @@
     P.applyFocus();
     // entrou numa conta que já existe durante as boas-vindas: usa o que já está na conta dela
     if (route === 'boasvindas' && S.settings().onboarded) { P.go(P.home()); return; }
-    if (route === 'boasvindas') return;   // não redesenha no meio do formulário
+    if (route === 'boasvindas' || route === 'entrar') return;   // não redesenha no meio do formulário
     const act = document.activeElement;
     const typing = act && P.$('#view').contains(act) && /^(INPUT|TEXTAREA|SELECT)$/.test(act.tagName) && !act.dataset.input && act.type !== 'checkbox';
     if (typing) { pendingRender = true; return; }
@@ -113,7 +116,7 @@
       if (P.space() === 'fin') { if (!P.fin.locked()) P.fin.lancar(); else P.render(); return; }
       P.capture(el.dataset.type || 'tarefa', { due: el.dataset.due, area: el.dataset.area });
     },
-    switchSpace: () => !(P.hasFin() && P.hasPrisma()) ? P.go('ajustes') : P.go(P.space() === 'fin' ? (P.ui.lastPrisma || 'hoje') : (P.ui.lastFin || 'fin')),
+    switchSpace: () => !(P.hasFin() && P.hasPrisma()) ? P.go(P.home()) : P.go(P.space() === 'fin' ? (P.ui.lastPrisma || 'hoje') : (P.ui.lastFin || 'fin')),
     openTask: el => P.openTask(el.dataset.id),
     openItem: el => P.openItem(el.dataset.id),
     openNote: el => P.openNote(el.dataset.id),
@@ -218,6 +221,6 @@
     P.renderSyncBadge();
     P.push?.registration().then(() => P.push.check());
     // depois que a sincronização conecta, confirma o cadastro deste aparelho no robô
-    P.sync?.init().then(() => { P.renderSyncBadge(); if (S.settings().notify.enabled) P.push?.resubscribe(); });
+    P.sync?.init().then(() => { P.renderSyncBadge(); if (P.sync.needsLogin() || route === 'entrar') P.go(route === 'entrar' ? P.home() : route); if (S.settings().notify.enabled) P.push?.resubscribe(); });
   };
 })();
