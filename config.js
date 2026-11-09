@@ -8,5 +8,7 @@
 window.P = window.P || {};
 P.CONFIG = {
   appwriteEndpoint: 'https://nyc.cloud.appwrite.io/v1',
-  appwriteProject: '6ae688590001378b6f42'
+  appwriteProject: '6ae688590001378b6f42',
+  // ID da função do robô de notificações (Appwrite → Functions → Prisma Robô)
+  roboFunction: '6ae69619001fca9407c7'
 };

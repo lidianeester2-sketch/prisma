@@ -132,7 +132,7 @@
         </div>
       </section>
 
-      <p class="credits">Prisma · versão 33 · Desenvolvido por Lidiane Tavares<br><button class="link" type="button" data-act="repair">Atualizar o app (baixa a versão mais nova; seus dados ficam)</button></p>
+      <p class="credits">Prisma · versão 34 · Desenvolvido por Lidiane Tavares<br><button class="link" type="button" data-act="repair">Atualizar o app (baixa a versão mais nova; seus dados ficam)</button></p>
     </div>`;
   };
 

@@ -122,8 +122,8 @@
       await subscribePush();
       P.toast('Pedindo um aviso ao robô…');
       let r;
-      try { r = await P.sync.execute('prisma-robo', { teste: 1 }); }
-      catch (e) { r = { ok: false, erro: /not.?found|could not be found/i.test(e.message) ? 'Não achei a função prisma-robo no Appwrite. Confira se o ID dela é prisma-robo.' : /unauthori|permission|missing scope/i.test(e.message) ? 'A função não deixa o app chamar. No Appwrite: prisma-robo → Settings → Execute access → adicione Users.' : e.message }; }
+      try { r = await P.sync.execute(P.CONFIG?.roboFunction || 'prisma-robo', { teste: 1 }); }
+      catch (e) { r = { ok: false, erro: /not.?found|could not be found/i.test(e.message) ? 'Não achei a função do robô no Appwrite. Confira o ID dela em Functions → Prisma Robô.' : /unauthori|permission|missing scope/i.test(e.message) ? 'A função não deixa o app chamar. No Appwrite: Functions → Prisma Robô → aba Security → Execute access → adicione All users.' : e.message }; }
       const ago = r.ultimaRodada ? Math.round((Date.now() - r.ultimaRodada) / 60000) : null;
       const clock = ago === null ? 'O despertador ainda não rodou nenhuma vez com a versão nova do robô. Confira o cron-job.org.'
         : ago <= 20 ? `O despertador está funcionando: rodou há ${ago} min.`
