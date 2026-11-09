@@ -107,12 +107,32 @@
       return P.ls.get('prisma2:pushSaved') ? 'Chegam mesmo com o app fechado.' : 'Só com o app aberto por enquanto. Toque em Desativar e Ativar de novo para cadastrar este aparelho.';
     },
     async enable() {
-      if (!('Notification' in window)) return;
-      const perm = await Notification.requestPermission();
-      if (perm !== 'granted') { P.toast('Permissão negada. Dá pra liberar nas configurações do site.'); P.render(); return; }
+      const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+      const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+      const help = (title, msg) => P.sheet({ title, kicker: 'Notificações', render: () => `<p class="ask-msg">${msg}</p><div class="form-actions"><button class="btn primary" type="button" data-ok>Entendi</button></div>`, mount: api => { api.body.querySelector('[data-ok]').onclick = () => api.close(); } });
+      const blockedTxt = isIOS ? 'No iPhone: Ajustes → Notificações → <b>Prisma</b> → Permitir Notificações. Depois volte aqui e toque em Ativar.'
+        : standalone ? 'No Android: segure o ícone do Prisma → <b>Informações do app</b> (ⓘ) → Notificações → ativar. Se não aparecer, vá em Configurações → Apps → <b>Chrome</b> → Notificações → ativar. Depois volte aqui e toque em Ativar.'
+        : 'Toque no <b>cadeado</b> ao lado do endereço → Permissões → Notificações → Permitir. Depois toque em Ativar de novo.';
+      if (!('Notification' in window)) return help('Este aparelho não deixa', isIOS && !standalone ? 'No iPhone, as notificações só funcionam com o Prisma instalado. Abra no <b>Safari</b>, toque em Compartilhar → <b>Adicionar à Tela de Início</b> e abra pelo ícone novo.' : 'Este navegador não tem notificações. Abra o Prisma no <b>Chrome</b> (Android) ou instale pelo <b>Safari</b> (iPhone).');
+      P.toast('Pedindo permissão…');
+      let perm;
+      try {
+        // alguns celulares escondem a pergunta: se em 10 segundos não vier resposta, mostramos o caminho manual
+        perm = await Promise.race([Notification.requestPermission(), new Promise(r => setTimeout(() => r('sem-resposta'), 10000))]);
+      } catch (e) { perm = Notification.permission; }
+      if (perm === 'sem-resposta') return help('O celular não mostrou a pergunta', `Alguns celulares escondem o pedido de permissão. ${blockedTxt}`);
+      if (perm === 'denied') { P.render(); return help('Notificações bloqueadas', blockedTxt); }
+      if (perm !== 'granted') { P.toast('Você fechou a pergunta sem escolher. Toque em Ativar de novo e escolha Permitir.'); return; }
       S.setSettings({ notify: { ...S.settings().notify, enabled: true } });
-      await subscribePush();
-      await show('Prisma', 'Notificações ativadas. Agora eu sei onde você mora.', 'prisma-on');
+      P.render();
+      try {
+        const r = await Promise.race([registration(), new Promise(res => setTimeout(() => res(null), 8000))]);
+        if (!r) { P.toast('Ativadas com o app aberto. Para receber com o app fechado, toque em "Atualizar o app" em Ajustes e ative de novo.'); return; }
+        const sub = await subscribePush();
+        await show('Prisma', 'Notificações ativadas. Agora eu sei onde você mora.', 'prisma-on');
+        if (!sub) P.toast('Ativadas com o app aberto. O cadastro para o app fechado falhou: confira a internet e toque em Desativar e Ativar.');
+        else if (!P.sync?.user()) P.toast('Ativadas. Entre na sua conta para receber também com o app fechado.');
+      } catch (e) { P.toast('Ativadas, mas algo falhou no cadastro: ' + (e.message || e)); }
       P.render();
     },
     disable() { S.setSettings({ notify: { ...S.settings().notify, enabled: false } }); P.toast('Notificações desativadas neste aparelho.'); },

@@ -7,7 +7,7 @@
      na hora); sem internet, usa o guardado. Ícones: usa o guardado.
    - Ao publicar uma versão nova, mude o número em VERSION.
 ============================================================ */
-const VERSION = 'prisma-v34';
+const VERSION = 'prisma-v35';
 const SHELL = [
   './', './index.html', './manifest.json', './app.css',
   './config.js', './util.js', './store.js', './views.js', './forms.js',
