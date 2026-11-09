@@ -100,10 +100,11 @@
         <div class="sync-box"><div><span class="status-dot ${notifState === 'granted' && n.enabled ? 'ok' : notifState === 'denied' ? 'error' : 'idle'}"></span>
           <strong>${notifState === 'granted' && n.enabled ? 'Ativadas neste aparelho' : notifState === 'denied' ? 'Bloqueadas no navegador' : 'Desativadas'}</strong>
           <small>${notifState === 'denied' ? 'Libere nas configurações do site (cadeado na barra de endereço).' : P.push?.label() || ''}</small></div>
-          <div class="form-actions split"><span class="grow"></span>${notifState === 'granted' && n.enabled ? `<button class="btn ghost small" type="button" data-act="testNotif">Testar</button><button class="btn ghost small" type="button" data-act="disableNotif">Desativar</button>` : notifState !== 'denied' ? `<button class="btn primary small" type="button" data-act="enableNotif">Ativar</button>` : ''}</div></div>
+          <div class="form-actions split"><span class="grow"></span>${notifState === 'granted' && n.enabled ? `${P.sync?.user() ? '<button class="btn ghost small" type="button" data-act="testNotifRemote">Testar com o app fechado</button>' : ''}<button class="btn ghost small" type="button" data-act="testNotif">Testar</button><button class="btn ghost small" type="button" data-act="disableNotif">Desativar</button>` : notifState !== 'denied' ? `<button class="btn primary small" type="button" data-act="enableNotif">Ativar</button>` : ''}</div></div>
         <div class="field"><span class="field-label">Avisar sobre prazos</span>
           <div class="chips compact">${[[0, 'no dia'], [1, '1 dia antes'], [3, '3 dias antes'], [7, '1 semana antes']].map(([d, l]) => `<button type="button" class="chip ${n.daysBefore.includes(d) ? 'on' : ''}" data-act="notifDay" data-d="${d}">${l}</button>`).join('')}</div></div>
         <label class="check-line"><input type="checkbox" id="notif-class" data-act="notifClass" ${n.classReminder ? 'checked' : ''}> Lembrar 1 hora antes de cada aula</label>
+        ${P.hasFin() ? `<label class="check-line"><input type="checkbox" data-act="notifFin" ${n.fin !== false ? 'checked' : ''}> Avisar contas do Financeiro que vencem hoje e amanhã (sem mostrar valores)</label>` : ''}
         <label class="field inline"><span class="field-label">Resumo do dia às</span><input type="time" id="notif-hour" value="${n.digestHour || '08:00'}" data-change="digestHour"></label>`}
       </section>
 
@@ -131,7 +132,7 @@
         </div>
       </section>
 
-      <p class="credits">Prisma · versão 31 · Desenvolvido por Lidiane Tavares<br><button class="link" type="button" data-act="repair">Atualizar o app (baixa a versão mais nova; seus dados ficam)</button></p>
+      <p class="credits">Prisma · versão 33 · Desenvolvido por Lidiane Tavares<br><button class="link" type="button" data-act="repair">Atualizar o app (baixa a versão mais nova; seus dados ficam)</button></p>
     </div>`;
   };
 
@@ -176,6 +177,8 @@
     setTextSize: el => { S.setSettings({ textSize: el.dataset.z }); P.applyTheme(); P.render(); },
     setTheme: el => { S.setSettings({ theme: el.dataset.t }); P.applyTheme(); },
     notifDay: el => { const d = +el.dataset.d; const n = S.settings().notify; const days = n.daysBefore.includes(d) ? n.daysBefore.filter(x => x !== d) : [...n.daysBefore, d].sort((a, b) => a - b); S.setSettings({ notify: { ...n, daysBefore: days } }); },
+    notifFin: el => S.setSettings({ notify: { ...S.settings().notify, fin: el.checked } }),
+    testNotifRemote: () => P.push.remoteTest(),
     notifClass: el => S.setSettings({ notify: { ...S.settings().notify, classReminder: el.checked } }),
     enableNotif: () => P.push.enable(),
     disableNotif: () => P.push.disable(),

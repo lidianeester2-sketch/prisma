@@ -464,7 +464,7 @@
     else if (/\bboleto\b/.test(t)) out.method = 'boleto';
     else if (/\b(credito|cartao)\b/.test(t)) out.method = 'credito';
     const inst = t.match(/\b(\d{1,2})\s*(x|vezes)\b/);
-    if (inst) { out.installments = Math.max(1, Number(inst[1])); out.method = 'credito'; }
+    if (inst) { out.installments = Math.max(1, Number(inst[1])); if (!out.method) out.method = 'credito'; }
 
     if (/\bontem\b/.test(t)) out.date = addDays(today, -1);
     else if (/\banteontem\b/.test(t)) out.date = addDays(today, -2);

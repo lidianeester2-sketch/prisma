@@ -40,7 +40,7 @@
   ============================================================ */
   F.lancar = (preset = {}, existing = null) => {
     const today = P.today();
-    let tx = existing ? { ...existing } : { kind: 'despesa', date: today, status: 'realizado', certainty: 'confirmado', method: 'debito', accountId: F.accounts()[0]?.id || '', ...preset };
+    let tx = existing ? { ...existing } : { kind: 'despesa', date: today, status: 'realizado', certainty: 'confirmado', method: 'debito', accountId: F.accounts()[0]?.id || '', n: 1, firstPaid: true, ...preset };
     let parsed = null;
     // rascunho: se a janela fechou sem querer, o que você digitou volta (vale por 12 horas, só para lançamento novo)
     const DRAFT = 'prisma2:lancDraft';
@@ -49,11 +49,19 @@
     let restored = false;
     if (draft && Date.now() - draft.at < 12 * 3600e3 && (draft.tx.amount || draft.tx.desc)) { tx = { ...tx, ...draft.tx }; restored = true; }
     else if (draft) P.ls.del(DRAFT);
-    const saveDraft = () => { if (useDraft && (tx.amount || tx.desc)) P.ls.set(DRAFT, { at: Date.now(), tx: { kind: tx.kind, amount: tx.amount, date: tx.date, desc: tx.desc, categoryId: tx.categoryId, toAccountId: tx.toAccountId, accountId: tx.accountId, status: tx.status, method: tx.method, notes: tx.notes, certainty: tx.certainty } }); };
+    const saveDraft = () => { if (useDraft && (tx.amount || tx.desc)) P.ls.set(DRAFT, { at: Date.now(), tx: { kind: tx.kind, amount: tx.amount, date: tx.date, desc: tx.desc, categoryId: tx.categoryId, toAccountId: tx.toAccountId, accountId: tx.accountId, status: tx.status, method: tx.method, notes: tx.notes, certainty: tx.certainty, n: tx.n, cardId: tx.cardId, firstPaid: tx.firstPaid } }); };
     const dropDraft = () => P.ls.del(DRAFT);
     const sheet = P.sheet({
       title: existing ? 'Editar lançamento' : 'Lançar', kicker: 'Financeiro+',
-      render: () => `
+      render: () => {
+        const buy = tx.kind === 'despesa', credit = buy && tx.method === 'credito' && !existing, n = buy && !existing ? (tx.n || 1) : 1;
+        const cards = F.cards();
+        if (credit) { if (!tx.cardId || !F.acc(tx.cardId)) tx.cardId = cards[0]?.id || ''; if (!tx.monthTouched) tx.firstMonth = firstInvoice(tx.date || today, F.acc(tx.cardId)); }
+        const payDay = Number((tx.date || today).slice(8, 10));
+        const firstYm = tx.firstPaid ? (tx.date || today).slice(0, 7) : C.addMonths((tx.date || today).slice(0, 7), 1);
+        const dueOf = ym => { const [y, m] = ym.split('-').map(Number); const last = new Date(y, m, 0).getDate(); return `${ym}-${String(Math.min(payDay, last)).padStart(2, '0')}`; };
+        const sched = buy && (credit || n > 1) && Number.isInteger(tx.amount) && tx.amount > 0 ? C.installments({ id: 'x', type: credit ? 'cartao' : 'carne', total: tx.amount, n, firstMonth: credit ? tx.firstMonth : firstYm }) : [];
+        return `
         ${restored ? '<div class="notice draft-note">Recuperei o que você estava lançando. <button type="button" class="link" data-discard>Começar do zero</button></div>' : ''}
         ${existing ? '' : `<label class="field fin-phrase"><span class="field-label">Escreva do seu jeito</span>
           <input id="fin-frase" autocomplete="off" placeholder="ex.: gastei 50,48 com hambúrguer no débito" autofocus>
@@ -61,52 +69,75 @@
         <form class="form" data-f="tx">
           <div class="seg small">${['despesa', 'receita', 'transferencia'].map(k => `<button type="button" class="seg-btn ${tx.kind === k ? 'on' : ''}" data-kind="${k}">${F.KINDS[k]}</button>`).join('')}</div>
           <div class="row-fields">
-            ${field('Valor', `<input name="amount" inputmode="decimal" required value="${inMoney(tx.amount)}" placeholder="0,00" class="money-input">`)}
-            ${field(tx.kind === 'transferencia' ? 'Data' : tx.status === 'previsto' ? 'Vencimento' : 'Data', `<input type="date" name="date" required value="${tx.date || today}">`)}
+            ${field(n > 1 ? 'Valor total' : 'Valor', `<input name="amount" inputmode="decimal" required value="${inMoney(tx.amount)}" placeholder="0,00" class="money-input">`)}
+            ${field(tx.kind === 'despesa' && !existing && (tx.method === 'credito' || (tx.n || 1) > 1) ? 'Data da compra' : tx.kind === 'transferencia' ? 'Data' : tx.status === 'previsto' ? 'Vencimento' : 'Data', `<input type="date" name="date" required value="${tx.date || today}">`)}
           </div>
           ${field('Descrição', `<input name="desc" required value="${esc(tx.desc || '')}" placeholder="${tx.kind === 'receita' ? 'ex.: Freela banner' : 'ex.: Mercado'}">`)}
           ${tx.kind === 'transferencia' ? `<div class="row-fields">
               ${field('De', `<select name="accountId">${accOptions(tx.accountId)}</select>`)}
               ${field('Para', `<select name="toAccountId"><option value="">Escolha…</option>${accOptions(tx.toAccountId)}</select>`)}
             </div>` : field('Categoria', `<select name="categoryId">${catOptions(tx.kind, tx.categoryId)}</select>`)}
-          <div class="field"><span class="field-label">Situação</span><div class="chips compact" data-status>
+          ${buy ? `<div class="field"><span class="field-label" id="lbl-como">Como pagou</span><div class="chips compact pay-chips" role="group" aria-labelledby="lbl-como">${(existing ? ['debito', 'pix', 'dinheiro', 'boleto'] : ['credito', 'debito', 'pix', 'dinheiro', 'boleto']).map(m => `<button type="button" class="chip ${tx.method === m ? 'on' : ''}" aria-pressed="${tx.method === m}" data-m="${m}">${F.METHODS[m]}</button>`).join('')}</div></div>
+          ${existing ? '' : `<div class="field"><span class="field-label" id="lbl-parc">Parcelou?</span><div class="parc-line"><div class="seg small" role="group" aria-labelledby="lbl-parc"><button type="button" class="seg-btn ${n === 1 ? 'on' : ''}" aria-pressed="${n === 1}" data-parc="1">À vista</button><button type="button" class="seg-btn ${n > 1 ? 'on' : ''}" aria-pressed="${n > 1}" data-parc="2">Parcelado</button></div>
+            ${n > 1 ? `<select name="n" aria-label="Número de parcelas">${Array.from({ length: 23 }, (_, i) => i + 2).map(k => `<option value="${k}" ${n === k ? 'selected' : ''}>${k}×</option>`).join('')}</select>` : ''}</div></div>`}
+          ${credit ? `${field('Cartão', cards.length ? `<select name="cardId">${cards.map(c => `<option value="${c.id}" ${c.id === tx.cardId ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}<option value="__new">+ Outro cartão…</option></select>` : `<input name="newCard" placeholder="ex.: Nubank crédito" value="${esc(tx.newCard || '')}">`, cards.length ? '' : 'Só o nome do cartão, nada de número ou senha.')}` : ''}
+          ${sched.length ? `<div class="parc-preview" aria-live="polite"><b>${n > 1 ? `${n}× de ${F.money(sched[0].amount)}` : F.money(sched[0].amount)}</b><span>${credit ? (n > 1 ? `1ª na fatura de ${ymTxt(sched[0].month)}, última em ${ymTxt(sched[sched.length - 1].month)}` : `na fatura de ${ymTxt(sched[0].month)}`) : `${tx.firstPaid ? `1ª paga em ${F.date(tx.date)}` : `1ª em ${F.date(dueOf(sched[0].month))}`}, depois todo dia ${payDay} até ${ymTxt(sched[sched.length - 1].month)}`}</span>
+            <small>${credit ? 'Não sai do saldo agora: entra quando você pagar a fatura.' : 'Cada parcela vira uma conta a pagar no ciclo do mês dela.'}</small></div>` : ''}
+          ${!credit && n > 1 ? `<div class="field"><span class="field-label" id="lbl-1a">Primeira parcela</span><div class="chips compact" role="group" aria-labelledby="lbl-1a"><button type="button" class="chip ${tx.firstPaid ? 'on' : ''}" aria-pressed="${!!tx.firstPaid}" data-first="1">Já paguei hoje</button><button type="button" class="chip ${!tx.firstPaid ? 'on' : ''}" aria-pressed="${!tx.firstPaid}" data-first="0">Começa no mês que vem</button></div></div>` : ''}` : ''}
+          ${buy && (credit || n > 1) ? '' : `<div class="field"><span class="field-label">Situação</span><div class="chips compact" data-status>
             <button type="button" class="chip ${tx.status === 'realizado' ? 'on' : ''}" data-s="realizado">${tx.kind === 'receita' ? 'Já recebi' : tx.kind === 'transferencia' ? 'Já fiz' : 'Já paguei'}</button>
             <button type="button" class="chip ${tx.status === 'previsto' ? 'on' : ''}" data-s="previsto">${tx.kind === 'receita' ? 'Vou receber' : 'Vou pagar'}</button>
-          </div></div>
-          ${tx.kind === 'despesa' && !existing ? '<button type="button" class="link credit-link" data-m="credito">Comprei no cartão de crédito (à vista ou parcelado) →</button>' : ''}
+          </div></div>`}
           <details class="more-opts" ${tx.notes || tx.certainty === 'estimado' ? 'open' : ''}>
-            <summary>Mais opções <span class="faint">· ${tx.kind === 'transferencia' ? 'observações' : `${esc(F.acc(tx.accountId)?.name || 'conta')}${tx.kind === 'despesa' ? ' · ' + (F.METHODS[tx.method] || '') : ''}`}</span></summary>
-            ${tx.kind === 'transferencia' ? '' : field(tx.kind === 'receita' ? 'Entrou na conta' : 'Conta', `<select name="accountId">${accOptions(tx.accountId)}</select>`)}
-            ${tx.kind === 'despesa' ? field('Forma de pagamento', `<div class="chips compact" data-method>${['debito', 'pix', 'dinheiro', 'boleto'].map(m => `<button type="button" class="chip ${tx.method === m ? 'on' : ''}" data-m="${m}">${F.METHODS[m]}</button>`).join('')}</div>`) : ''}
-            <label class="check-line"><input type="checkbox" name="estimado" ${tx.certainty === 'estimado' ? 'checked' : ''}> Valor estimado (ainda não sei o valor exato)</label>
+            <summary>Mais opções <span class="faint">· ${credit ? 'fatura, observações' : tx.kind === 'transferencia' ? 'observações' : `${esc(F.acc(tx.accountId)?.name || 'conta')}, observações`}</span></summary>
+            ${tx.kind === 'transferencia' || credit ? '' : field(tx.kind === 'receita' ? 'Entrou na conta' : 'Conta', `<select name="accountId">${accOptions(tx.accountId)}</select>`)}
+            ${credit ? field('Primeira parcela na fatura de', `<input type="month" name="firstMonth" value="${tx.firstMonth}">`, F.acc(tx.cardId)?.closingDay ? `Calculado pelo fechamento (dia ${F.acc(tx.cardId).closingDay}) do cartão.` : 'Cadastre o fechamento do cartão em Ajustes → Finanças → Cartões para o app acertar sozinho.') : ''}
+            ${credit || n > 1 ? '' : `<label class="check-line"><input type="checkbox" name="estimado" ${tx.certainty === 'estimado' ? 'checked' : ''}> Valor estimado (ainda não sei o valor exato)</label>`}
             ${field('Observações', `<input name="notes" value="${esc(tx.notes || '')}" placeholder="opcional">`)}
           </details>
           <p class="form-error" hidden></p>
-          <div class="form-actions"><button class="btn primary" type="submit">${existing ? 'Salvar' : 'Lançar'}</button></div>
-        </form>`,
+          <div class="form-actions"><button class="btn primary" type="submit">${existing ? 'Salvar' : credit ? 'Lançar no cartão' : n > 1 ? `Lançar em ${n}×` : 'Lançar'}</button></div>
+        </form>`; },
       mount: api => {
         const b = api.body, f = b.querySelector('form');
-        const keep = () => { const fd = new FormData(f); tx = { ...tx, amount: C.parseMoney(fd.get('amount')) ?? tx.amount, date: fd.get('date'), desc: fd.get('desc'), accountId: fd.get('accountId') || tx.accountId, toAccountId: fd.get('toAccountId') ?? tx.toAccountId, categoryId: fd.get('categoryId') ?? tx.categoryId, notes: fd.get('notes'), certainty: fd.get('estimado') ? 'estimado' : 'confirmado' }; };
+        const keep = () => { const fd = new FormData(f); tx = { ...tx, amount: C.parseMoney(fd.get('amount')) ?? tx.amount, date: fd.get('date'), desc: fd.get('desc'), accountId: fd.get('accountId') || tx.accountId, toAccountId: fd.get('toAccountId') ?? tx.toAccountId, categoryId: fd.get('categoryId') ?? tx.categoryId, notes: fd.get('notes'), certainty: fd.get('estimado') ? 'estimado' : 'confirmado', n: fd.has('n') ? +fd.get('n') : tx.n, newCard: fd.get('newCard') ?? tx.newCard, firstMonth: fd.get('firstMonth') || tx.firstMonth }; if (fd.has('cardId') && fd.get('cardId') !== '__new') tx.cardId = fd.get('cardId'); };
         const redraw = () => { const v = b.querySelector('#fin-frase')?.value; api.refresh(); const fr = b.querySelector('#fin-frase'); if (fr && v) { fr.value = v; showParsed(); } };
         P.$$('[data-kind]', b).forEach(x => x.onclick = () => { keep(); tx.kind = x.dataset.kind; tx.categoryId = ''; redraw(); });
-        const toCard = () => { keep(); dropDraft(); api.close(); setTimeout(() => F.cardForm({ desc: tx.desc, total: tx.amount, n: parsed?.installments, categoryId: tx.categoryId, date: tx.date }), 220); };
-        P.$$('[data-m]', b).forEach(x => x.onclick = () => { if (x.disabled) return; if (x.dataset.m === 'credito') return toCard(); tx.method = x.dataset.m; P.$$('[data-method] [data-m]', b).forEach(y => y.classList.toggle('on', y === x)); });
+        P.$$('[data-m]', b).forEach(x => x.onclick = () => { keep(); tx.method = x.dataset.m; redraw(); });
+        P.$$('[data-parc]', b).forEach(x => x.onclick = () => { keep(); tx.n = x.dataset.parc === '1' ? 1 : Math.max(2, tx.n || 2); redraw(); });
+        P.$$('[data-first]', b).forEach(x => x.onclick = () => { keep(); tx.firstPaid = x.dataset.first === '1'; redraw(); });
+        const on = (name, fn) => { const el = f.querySelector(`[name="${name}"]`); if (el) el.addEventListener('change', fn); };
+        on('n', () => { keep(); redraw(); });
+        // valor mudou numa compra parcelada/no cartão: atualiza a prévia sem tirar você do campo em que está
+        on('amount', () => { if (!(tx.method === 'credito' || (tx.n || 1) > 1)) return; setTimeout(() => {
+          const a = document.activeElement, nm = a && b.contains(a) ? a.getAttribute('name') || a.id : null, pos = a && 'selectionStart' in a ? a.selectionStart : null;
+          keep(); redraw();
+          const el = nm && (b.querySelector(`[name="${nm}"]`) || b.querySelector('#' + nm)); if (el) { el.focus(); try { if (pos !== null) el.setSelectionRange(pos, pos); } catch (e) {} }
+        }, 0); });
+        on('firstMonth', () => { tx.monthTouched = true; keep(); redraw(); });
+        on('cardId', () => {
+          const sel = f.querySelector('[name="cardId"]');
+          if (sel.value !== '__new') { keep(); tx.monthTouched = false; redraw(); return; }
+          const name = prompt('Nome do cartão (ex.: Nubank crédito):');
+          keep();
+          if (name && name.trim()) { const c = F.save('fin_conta', { name: name.trim(), type: 'cartao', inAvailable: false, opening: 0, openingSet: true, openingDate: today, order: 9 }, `Criou o cartão “${name.trim()}”`); tx.cardId = c.id; tx.monthTouched = false; }
+          redraw();
+        });
         P.$$('[data-s]', b).forEach(x => x.onclick = () => { keep(); tx.status = x.dataset.s; redraw(); });
-        f.date.onchange = () => { keep(); if (!existing && tx.date > today && tx.status === 'realizado') { tx.status = 'previsto'; redraw(); } };
+        f.date.onchange = () => { keep(); if (!tx.monthTouched && tx.method === 'credito') redraw(); if (!existing && tx.date > today && tx.status === 'realizado' && tx.method !== 'credito' && (tx.n || 1) === 1) { tx.status = 'previsto'; redraw(); } };
         const ds = b.querySelector('[data-discard]');
-        if (ds) ds.onclick = () => { dropDraft(); restored = false; tx = { kind: 'despesa', date: today, status: 'realizado', certainty: 'confirmado', method: 'debito', accountId: F.accounts()[0]?.id || '' }; parsed = null; api.refresh(); };
+        if (ds) ds.onclick = () => { dropDraft(); restored = false; tx = { kind: 'despesa', date: today, status: 'realizado', certainty: 'confirmado', method: 'debito', accountId: F.accounts()[0]?.id || '', n: 1, firstPaid: true }; parsed = null; api.refresh(); };
         if (useDraft) { const sd = P.debounce(() => { if (!b.isConnected) return; keep(); saveDraft(); }, 400); b.addEventListener('input', sd); b.addEventListener('click', sd); }
 
         const out = b.querySelector('#fin-frase-out');
         const showParsed = () => {
           if (!parsed || !out) return;
           const bits = [F.KINDS[parsed.kind], parsed.amount ? C.formatMoney(parsed.amount) : null, parsed.desc || null,
-            parsed.categoryKey ? F.cat('cat-' + parsed.categoryKey)?.name : null, parsed.method ? F.METHODS[parsed.method] : null,
+            parsed.categoryKey ? F.cat('cat-' + parsed.categoryKey)?.name : null, parsed.method ? F.METHODS[parsed.method] : null, parsed.installments > 1 ? `${parsed.installments}×` : null,
             parsed.date !== today ? F.date(parsed.date) : 'hoje'].filter(Boolean);
           const miss = { valor: 'o valor', categoria: 'a categoria', forma: 'a forma de pagamento', descricao: 'a descrição' };
           const missing = parsed.missing.filter(m => miss[m]).map(m => miss[m]);
-          out.innerHTML = `<b>Entendi:</b> ${esc(bits.join(' · '))}${missing.length ? `<br><span class="warn-t">Falta confirmar ${missing.join(', ')}.</span>` : ''}${parsed.notes.length ? `<br><span class="warn-t">${esc(parsed.notes.join(' '))}</span>` : ''}${parsed.method === 'credito' ? '<br><button type="button" class="btn primary small" data-tocard style="margin-top:8px">Continuar como compra no cartão →</button>' : ''}`;
-          const tc = out.querySelector('[data-tocard]'); if (tc) tc.onclick = () => toCard();
+          out.innerHTML = `<b>Entendi:</b> ${esc(bits.join(' · '))}${missing.length ? `<br><span class="warn-t">Falta confirmar ${missing.join(', ')}.</span>` : ''}${parsed.notes.length ? `<br><span class="warn-t">${esc(parsed.notes.join(' '))}</span>` : ''}`;
         };
         const fr = b.querySelector('#fin-frase');
         if (fr) fr.oninput = P.debounce(() => {
@@ -117,9 +148,10 @@
           if (parsed.amount) tx.amount = parsed.amount;
           if (parsed.desc) tx.desc = parsed.desc;
           tx.date = parsed.date;
-          tx.status = parsed.date > today ? 'previsto' : 'realizado';
+          tx.status = parsed.date > today && parsed.method !== 'credito' ? 'previsto' : 'realizado';
           tx.categoryId = parsed.categoryKey ? 'cat-' + parsed.categoryKey : '';
-          if (parsed.method && parsed.method !== 'credito') tx.method = parsed.method;
+          if (parsed.method) tx.method = parsed.method;
+          if (parsed.installments) tx.n = parsed.installments;
           if (parsed.person) tx.notes = tx.notes || `Para ${parsed.person}`;
           redraw();
           const fr2 = b.querySelector('#fin-frase'); fr2.focus(); fr2.setSelectionRange(fr2.value.length, fr2.value.length);
@@ -128,16 +160,46 @@
         f.onsubmit = async e => {
           e.preventDefault(); keep();
           const err = msg => { const p = b.querySelector('.form-error'); p.textContent = msg; p.hidden = false; };
-          if (parsed?.method === 'credito' && !existing) return toCard();
           if (!Number.isInteger(tx.amount) || tx.amount <= 0) return err('Informe um valor maior que zero, por exemplo 50,48.');
           if (!tx.desc?.trim()) return err('Escreva uma descrição curta.');
           if (!tx.date) return err('Escolha a data.');
+          const n = tx.n || 1;
+          if (!existing && tx.kind === 'despesa' && (tx.method === 'credito' || n > 1)) {
+            if (!tx.categoryId) return err('Escolha a categoria.');
+            const base = { desc: tx.desc.trim(), total: tx.amount, n, purchaseDate: tx.date, categoryId: tx.categoryId || null, notes: tx.notes || '', paidBefore: 0 };
+            let parc, extra = null;
+            if (tx.method === 'credito') {
+              let cardId = tx.cardId;
+              if (!F.cards().length) { const name = (tx.newCard || '').trim(); if (!name) return err('Escreva o nome do cartão.'); cardId = F.save('fin_conta', { name, type: 'cartao', inAvailable: false, opening: 0, openingSet: true, openingDate: today, order: 9 }, `Criou o cartão “${name}”`).id; }
+              if (!cardId || !F.acc(cardId)) return err('Escolha o cartão.');
+              if (!/^\d{4}-\d{2}$/.test(tx.firstMonth || '')) return err('Escolha o mês da primeira fatura.');
+              parc = F.save('fin_parc', { ...base, type: 'cartao', accountId: cardId, firstMonth: tx.firstMonth }, `Compra no cartão “${base.desc}” (${C.formatMoney(base.total)}${n > 1 ? ` em ${n}×` : ''})`);
+            } else {
+              if (!tx.accountId) return err('Escolha a conta.');
+              const day = Number(tx.date.slice(8, 10));
+              const firstMonth = tx.firstPaid ? tx.date.slice(0, 7) : C.addMonths(tx.date.slice(0, 7), 1);
+              parc = F.save('fin_parc', { ...base, type: 'carne', accountId: tx.accountId, method: tx.method, day, firstMonth }, `Compra parcelada no ${F.METHODS[tx.method].toLowerCase()} “${base.desc}” (${C.formatMoney(base.total)} em ${n}×)`);
+              if (tx.firstPaid) {
+                const first = C.installments(parc)[0];
+                extra = F.save('fin_lanc', { id: `parc-${parc.id}-1`, kind: 'despesa', desc: `${base.desc} — parcela 1/${n}`, amount: first.amount, date: tx.date, paidDate: tx.date, status: 'realizado', certainty: 'confirmado', method: tx.method, accountId: tx.accountId, categoryId: tx.categoryId, parcId: parc.id, parcNum: 1, origin: 'parcelamento' }, `Pagou “${base.desc}” — parcela 1/${n}`);
+              }
+              F.ensureParcOccurrences(tx.date, C.addMonths(tx.date.slice(0, 7), n + 1) + '-28');
+            }
+            dropDraft(); api.close();
+            const sch = C.installments(parc);
+            const msg = tx.method === 'credito'
+              ? (n > 1 ? `${n}× ${C.formatMoney(sch[0].amount)} no cartão, a 1ª na fatura de ${ymTxt(parc.firstMonth)}.` : `No cartão, na fatura de ${ymTxt(parc.firstMonth)}.`)
+              : `${n}× ${C.formatMoney(sch[0].amount)} no ${F.METHODS[tx.method].toLowerCase()}${tx.firstPaid ? ', 1ª já paga' : ''}. As outras viram contas a pagar.`;
+            P.toast(msg, { undo: () => { F.txs().filter(t => t.parcId === parc.id).forEach(t => S.remove('fin_lanc', t.id)); if (extra) S.remove('fin_lanc', extra.id); F.save('fin_parc', { ...parc, canceled: true }, `Desfez a compra “${parc.desc}”`); S.remove('fin_parc', parc.id); } });
+            return;
+          }
           if (!tx.accountId) return err('Escolha a conta.');
           if (tx.kind === 'transferencia') {
             if (!tx.toAccountId) return err('Escolha a conta de destino.');
             if (tx.toAccountId === tx.accountId) return err('A conta de destino precisa ser diferente da de origem.');
           } else if (!tx.categoryId) return err('Escolha a categoria.');
           const rec = { ...tx, desc: tx.desc.trim(), origin: existing ? tx.origin : (parsed ? 'frase' : 'manual') };
+          ['n', 'cardId', 'firstPaid', 'firstMonth', 'monthTouched', 'newCard'].forEach(k => delete rec[k]);
           if (rec.kind === 'transferencia') { delete rec.categoryId; rec.method = 'transferencia'; } else delete rec.toAccountId;
           if (rec.kind === 'receita') rec.method = 'transferencia';
           if (rec.status === 'realizado' && !rec.paidDate) rec.paidDate = rec.date;
@@ -504,7 +566,7 @@
 
   F.securitySheet = () => P.sheet({
     title: 'Segurança', live: true,
-    render: () => `<div class="sync-box"><div><span class="status-dot ok"></span><strong>PIN ativo neste aparelho</strong><small>O Financeiro+ pede o PIN ao abrir e depois de 2 minutos fora do app.</small></div></div>
+    render: () => `<div class="sync-box"><div><span class="status-dot ok"></span><strong>PIN ativo neste aparelho</strong><small>O Financeiro+ pede o PIN uma vez quando você abre o app. Fechou o app ou tocou em Bloquear, pede de novo.</small></div></div>
       <form class="form" data-change>
         <div class="row-fields">${field('PIN atual', '<input name="cur" type="password" inputmode="numeric" maxlength="4" pattern="[0-9]{4}" required>')}${field('Novo PIN', '<input name="nw" type="password" inputmode="numeric" maxlength="4" pattern="[0-9]{4}" required>')}</div>
         <div class="form-actions"><button class="btn ghost small" type="submit">Trocar PIN</button></div></form>

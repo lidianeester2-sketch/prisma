@@ -133,6 +133,7 @@
     <div class="cols">
       <section class="block main-col">
         <div class="block-head"><h2>${F.blockSize(s.weeks) === 0 ? 'Dia a dia' : F.blk(s.weeks).One}</h2>${s.week ? `<span class="faint small">${F.date(s.week.start)}–${F.date(s.week.end)}</span>` : ''}<button class="link" type="button" data-act="go" data-to="fin-orcamento">Orçamento →</button></div>
+        ${F.blockSeg()}
         ${s.week ? `<div class="week-card ${s.week.spent > s.week.limit ? 'over' : ''}">
             <div class="week-nums"><div><span>Gasto</span><b>${F.money(s.week.spent)}</b></div><div><span>Limite</span><b>${F.money(s.week.limit)}</b></div><div><span>${s.week.spent > s.week.limit ? 'Passou' : 'Restam'}</span><b>${F.money(Math.abs(s.week.limit - s.week.spent))}</b></div></div>
             ${bar(s.week.limit ? s.week.spent / s.week.limit * 100 : 100, s.week.spent > s.week.limit ? 'over' : '')}
@@ -200,6 +201,7 @@
       ['Tetos do ciclo', sum.pending.filter(t => t.envelope)]
     ].filter(([, l]) => l.length);
 
+    const wk = ofs === 0 ? s.weeks : [];
     return `
     <header class="page-head"><h1>Orçamento</h1>
       <div class="cycle-nav">
@@ -208,6 +210,16 @@
         <button class="icon-btn" type="button" data-act="finCycle" data-d="1" aria-label="Próximo ciclo">›</button>
       </div>
       <div class="head-links">${ofs === 0 && C.diffDays(today, c.nextPay) <= 15 && C.diffDays(today, c.nextPay) > 0 ? '<button class="link" type="button" data-act="finEarly">Recebi o salário antes → iniciar novo ciclo</button>' : ''}${ofs ? '<button class="link" type="button" data-act="finCycle" data-d="0">← Voltar para o ciclo atual</button>' : ''}<button class="link" type="button" data-act="finReport">Ver relatório do ciclo →</button></div></header>
+
+    ${`<section class="block day-split"><div class="block-head"><h2>Dinheiro do dia a dia</h2>${wk.length > 1 ? `<button class="link" type="button" data-act="finWeeks">Editar valores</button>` : ''}</div>
+      ${F.blockSeg()}
+      ${!wk.length ? `<p class="hint">Vale para o plano do ciclo: quando você montar o plano, o dinheiro livre é dividido assim.</p>` : ''}
+      <div class="weeks">${wk.map(w => { const cur = w.start <= today && today <= w.end, past = w.end < today, over = w.spent > w.limit; return `<div class="wk ${cur ? 'cur' : ''} ${past ? 'past' : ''} ${over ? 'over' : ''}">
+        <div class="wk-head"><b>${w.label}</b><span class="faint small">${F.date(w.start)}–${F.date(w.end)}</span></div>
+        <div class="wk-nums"><span>${F.money(w.spent)} de ${F.money(w.limit)}</span><span class="${over ? 'bad-t' : ''}">${over ? 'passou ' + F.money(w.spent - w.limit) : (past ? 'sobrou ' : 'restam ') + F.money(w.limit - w.spent)}</span></div>
+        ${bar(w.limit ? w.spent / w.limit * 100 : (w.spent ? 100 : 0), over ? 'over' : '')}
+        ${w.locked ? '<span class="faint small">travada</span>' : ''}
+        ${over && !(w.ackOver >= w.spent) && w.start <= today ? `<button class="btn ghost small" type="button" data-act="finOver" data-i="${wk.indexOf(w)}">O que fazer com o excesso?</button>` : over && w.ackOver >= w.spent ? '<span class="faint small">excesso mantido</span>' : ''}</div>`; }).join('')}</div></section>`}
 
     <section class="block">
       <div class="block-head"><h2>Resumo do ciclo</h2></div>
@@ -259,42 +271,68 @@
         <div class="calc-total"><span>= Livre para o dia a dia</span><b>${F.money(c.base)}</b></div>
       </div></section>`) : ''}
 
-    ${ofs === 0 && s.weeks.length ? `<section class="block"><div class="block-head"><h2>${F.blk(s.weeks).Many}</h2>${s.weeks.length > 1 ? `<button class="link" type="button" data-act="finWeeks">Editar ${F.blk(s.weeks).many}</button>` : ''}</div>
-      <div class="weeks">${s.weeks.map(w => { const cur = w.start <= today && today <= w.end, past = w.end < today, over = w.spent > w.limit; return `<div class="wk ${cur ? 'cur' : ''} ${past ? 'past' : ''} ${over ? 'over' : ''}">
-        <div class="wk-head"><b>${w.label}</b><span class="faint small">${F.date(w.start)}–${F.date(w.end)}</span></div>
-        <div class="wk-nums"><span>${F.money(w.spent)} de ${F.money(w.limit)}</span><span class="${over ? 'bad-t' : ''}">${over ? 'passou ' + F.money(w.spent - w.limit) : (past ? 'sobrou ' : 'restam ') + F.money(w.limit - w.spent)}</span></div>
-        ${bar(w.limit ? w.spent / w.limit * 100 : (w.spent ? 100 : 0), over ? 'over' : '')}
-        ${w.locked ? '<span class="faint small">travada</span>' : ''}
-        ${over && !(w.ackOver >= w.spent) && w.start <= today ? `<button class="btn ghost small" type="button" data-act="finOver" data-i="${s.weeks.indexOf(w)}">O que fazer com o excesso?</button>` : over && w.ackOver >= w.spent ? '<span class="faint small">excesso mantido</span>' : ''}</div>`; }).join('')}</div></section>` : ''}`;
+`;
   };
 
   /* ============================================================
      LANÇAMENTOS
   ============================================================ */
+  /* como dividir o dinheiro do dia a dia: troca na hora, com desfazer */
+  F.setBlocks = size => {
+    const today = P.today(), prevSize = F.blockDaysPref();
+    const c = F.cycles().find(x => x.start <= today && today <= x.end && x.plannedAt && x.weeks?.length);
+    if (size === F.blockSize() && size === prevSize) return;
+    const before = c ? { ...c, weeks: c.weeks.map(w => ({ ...w })) } : null;
+    const B = F.BLOCKS[size];
+    F.setProfile({ blockDays: size });
+    if (c) F.save('fin_ciclo', { ...c, weeks: C.splitWeeks(c.start, c.end, c.base, size) }, `Mudou a divisão do dia a dia: ${B.desc.toLowerCase()}`);
+    P.toast(size ? `Agora o dia a dia é dividido por ${B.one}.` : 'Agora é um limite só até o próximo salário.', { undo: () => { F.setProfile({ blockDays: prevSize }); if (before) F.save('fin_ciclo', before, 'Desfez a mudança na divisão do dia a dia'); } });
+  };
+  F.blockSeg = () => { const cur = F.blockSize(); return `<div class="seg small block-seg" role="group" aria-label="Como dividir o dinheiro do dia a dia">${[[7, 'Por semana'], [14, 'Por quinzena'], [0, 'Ciclo inteiro']].map(([k, l]) => `<button type="button" class="seg-btn ${cur === k ? 'on' : ''}" aria-pressed="${cur === k}" data-act="finBlocks" data-v="${k}">${l}</button>`).join('')}</div>`; };
+
   P.views['fin-lanc'] = () => {
     F.ensureSeeds();
-    const u = P.ui, s = F.snap(), q = (u.finQ || '').trim().toLowerCase();
+    const u = P.ui, s = F.snap(), today = P.today(), q = (u.finQ || '').trim().toLowerCase();
+    if (!['all', 'feitos', 'abertos', 'cancelado'].includes(u.finStatus)) u.finStatus = 'all';
+    // a data que importa: quando foi pago (feitos) ou quando vence (a pagar)
+    const when = t => (t.status === 'realizado' ? t.paidDate || t.date : t.date);
     let list = F.txs();
-    if (u.finPeriod === 'ciclo') list = list.filter(t => t.date >= s.cycle.start && t.date <= s.cycle.end);
-    if (u.finPeriod === 'mes') { const m = P.today().slice(0, 7); list = list.filter(t => t.date.startsWith(m)); }
+    if (u.finPeriod === 'ciclo') list = list.filter(t => { const d = when(t); return (d >= s.cycle.start && d <= s.cycle.end) || (t.status === 'previsto' && t.date <= s.cycle.end && t.date >= s.cycle.start); });
+    if (u.finPeriod === 'mes') { const m = today.slice(0, 7); list = list.filter(t => when(t).startsWith(m)); }
     if (u.finKind !== 'all') list = list.filter(t => t.kind === u.finKind);
-    if (u.finStatus !== 'all') list = list.filter(t => F.status(t) === u.finStatus);
-    if (q) list = list.filter(t => `${t.desc} ${t.notes || ''} ${F.cat(t.categoryId)?.name || ''}`.toLowerCase().includes(q));
-    list.sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || 0) - (a.createdAt || 0));
-    const groups = {}; list.forEach(t => (groups[t.date] = groups[t.date] || []).push(t));
-    const chips = (key, opts) => opts.map(([k, l]) => `<button type="button" class="chip ${u[key] === k ? 'on' : ''}" data-act="finFilter" data-k="${key}" data-v="${k}">${l}</button>`).join('');
+    if (q) list = list.filter(t => `${t.desc} ${t.notes || ''} ${F.cat(t.categoryId)?.name || ''} ${(t.amount / 100).toFixed(2).replace('.', ',')}`.toLowerCase().includes(q));
+    const open = list.filter(t => t.status === 'previsto').sort((a, b) => (a.noDue ? 1 : 0) - (b.noDue ? 1 : 0) || a.date.localeCompare(b.date));
+    const done = list.filter(t => t.status === 'realizado' || (t.status !== 'previsto' && t.status !== 'cancelado')).sort((a, b) => when(b).localeCompare(when(a)) || (b.createdAt || 0) - (a.createdAt || 0));
+    const canc = list.filter(t => t.status === 'cancelado').sort((a, b) => b.date.localeCompare(a.date));
+    const showOpen = ['all', 'abertos'].includes(u.finStatus), showDone = ['all', 'feitos'].includes(u.finStatus), showCanc = u.finStatus === 'cancelado';
+    const dayLabel = d => { const r = P.relDay(d); if (r === 'hoje') return 'Hoje'; if (r === 'ontem') return 'Ontem'; if (r === 'amanhã') return 'Amanhã'; return `${P.DOW[P.parse(d).getDay()]}, ${F.date(d)}`; };
+    const byDay = arr => { const g = {}; arr.forEach(t => (g[when(t)] = g[when(t)] || []).push(t)); return Object.entries(g).map(([d, items]) => `<div class="day-group"><h3 class="day-label">${dayLabel(d)}</h3><div class="list">${items.map(txRow).join('')}</div></div>`).join(''); };
+    const dueTxt = t => (t.noDue ? `sem data · até ${F.date(t.date)}` : F.status(t) === 'pendente' ? `venceu ${F.date(t.date)}` : `vence ${dayLabel(t.date).toLowerCase()}`);
+    const openRow = t => { const st = F.status(t), cat = F.cat(t.categoryId); return `<div class="row fin-row compact st-row-${st}"><button type="button" class="row-main" data-act="finTx" data-id="${t.id}"><span class="row-title">${esc(t.desc)}</span><span class="row-meta">${st === 'pendente' ? `<b class="st-pendente">${dueTxt(t)}</b>` : dueTxt(t)}${cat ? ' · ' + esc(cat.name) : ''}${t.certainty === 'estimado' ? ' · estimado' : ''}</span></button>
+      <span class="fin-amt ${t.kind === 'receita' ? 'in' : ''}">${F.money(t.kind === 'receita' ? t.amount : -t.amount, { plus: t.kind === 'receita' })}</span>${t.envelope ? '' : `<button class="btn ghost small" type="button" data-act="finPay" data-id="${t.id}" aria-label="${t.kind === 'receita' ? 'Recebi' : 'Pagar'} ${esc(t.desc)}">${t.kind === 'receita' ? 'Recebi' : 'Pagar'}</button>`}</div>`; };
+    const seg = (key, opts) => `<div class="seg small" role="group">${opts.map(([k, l]) => `<button type="button" class="seg-btn ${u[key] === k ? 'on' : ''}" aria-pressed="${u[key] === k}" data-act="finFilter" data-k="${key}" data-v="${k}">${l}</button>`).join('')}</div>`;
+    const sumOut = done.filter(t => t.kind === 'despesa').reduce((a, t) => a + t.amount, 0);
+    const periodTxt = u.finPeriod === 'ciclo' ? `no ciclo ${F.date(s.cycle.start)}–${F.date(s.cycle.end)}` : u.finPeriod === 'mes' ? 'neste mês' : 'desde o começo';
     return `
-    <header class="page-head row-head"><div><h1>Lançamentos</h1><p class="lede">${list.length} lançamento${list.length === 1 ? '' : 's'} ${u.finPeriod === 'ciclo' ? 'neste ciclo' : u.finPeriod === 'mes' ? 'neste mês' : 'no total'}</p></div>
+    <header class="page-head row-head"><div><h1>Lançamentos</h1><p class="lede">${done.length} feito${done.length === 1 ? '' : 's'}${sumOut ? ` · ${F.money(sumOut)} em despesas` : ''} ${periodTxt}</p></div>
       <button class="btn primary" type="button" data-act="finLancar">+ Lançar</button></header>
-    <div class="notes-tools">
-      <label class="search"><span aria-hidden="true">⌕</span><input id="fin-q" type="search" placeholder="Buscar" value="${esc(u.finQ || '')}" data-input="finQ" aria-label="Buscar lançamentos"></label>
-      <div class="chips">${chips('finPeriod', [['ciclo', 'Ciclo atual'], ['mes', 'Este mês'], ['tudo', 'Tudo']])}</div>
-      <div class="chips">${chips('finKind', [['all', 'Todos'], ['despesa', 'Despesas'], ['receita', 'Receitas'], ['transferencia', 'Transferências'], ['ajuste', 'Ajustes']])}</div>
-      <div class="chips">${chips('finStatus', [['all', 'Qualquer situação'], ['realizado', 'Realizados'], ['previsto', 'Pendentes'], ['pendente', 'Vencidas'], ['cancelado', 'Cancelados']])}</div>
+    <div class="lanc-tools">
+      <label class="search"><span aria-hidden="true">⌕</span><input id="fin-q" type="search" placeholder="Buscar por nome, categoria ou valor" value="${esc(u.finQ || '')}" data-input="finQ" aria-label="Buscar lançamentos"></label>
+      ${seg('finStatus', [['all', 'Tudo'], ['feitos', 'Feitos'], ['abertos', 'A pagar'], ['cancelado', 'Cancelados']])}
+      <div class="lanc-filters">
+        <label class="mini-select"><span>Período</span><select data-ui="finPeriod">${[['ciclo', 'Ciclo atual'], ['mes', 'Este mês'], ['tudo', 'Tudo']].map(([k, l]) => `<option value="${k}" ${u.finPeriod === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+        <label class="mini-select"><span>Tipo</span><select data-ui="finKind">${[['all', 'Todos'], ['despesa', 'Despesas'], ['receita', 'Receitas'], ['transferencia', 'Transferências'], ['ajuste', 'Ajustes']].map(([k, l]) => `<option value="${k}" ${u.finKind === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+      </div>
     </div>
-    ${list.length ? Object.entries(groups).map(([d, items]) => `<div class="day-group"><div class="day-label">${P.relDay(d) === 'hoje' ? 'Hoje' : P.relDay(d) === 'ontem' ? 'Ontem' : F.date(d)}</div><div class="list">${items.map(txRow).join('')}</div></div>`).join('')
-      : '<div class="empty"><strong>Nada por aqui.</strong><span>Escreva do seu jeito, por exemplo “gastei 23,90 de uber no pix”.</span><button class="btn primary small" type="button" data-act="finLancar">Lançar agora</button></div>'}`;
+    ${showOpen && open.length ? `<section class="block lanc-open"><div class="block-head"><h2>A pagar e a receber</h2><span class="count">${open.length}</span></div><div class="list">${(u.finStatus === 'all' ? open.slice(0, 3) : open).map(openRow).join('')}</div>${u.finStatus === 'all' && open.length > 3 ? `<button class="link" type="button" data-act="finFilter" data-k="finStatus" data-v="abertos">Ver as ${open.length} contas a pagar →</button>` : ''}</section>` : ''}
+    ${showDone ? `<section class="block"><div class="block-head"><h2>Feitos</h2><span class="count">${done.length}</span></div>
+      ${done.length ? byDay(done) : `<div class="empty"><strong>Nenhum lançamento feito ${periodTxt}.</strong><span>Escreva do seu jeito, por exemplo “gastei 23,90 de uber no pix”.</span><button class="btn primary small" type="button" data-act="finLancar">Lançar agora</button></div>`}</section>` : ''}
+    ${showCanc ? (canc.length ? `<section class="block"><div class="list">${canc.map(txRow).join('')}</div></section>` : '<div class="empty"><span>Nenhum lançamento cancelado.</span></div>') : ''}
+    ${!showDone && !showCanc && !open.length ? '<div class="empty"><strong>Nada a pagar neste período.</strong></div>' : ''}`;
   };
+
+  // filtros em lista (Período, Tipo)
+  document.addEventListener('change', e => { const k = e.target.dataset?.ui; if (!k) return; P.ui[k] = e.target.value; P.saveUI(); P.render(); });
 
   /* ============================================================
      MAIS
@@ -369,6 +407,7 @@
     finWeeks: () => F.weeksSheet(),
     finOver: el => F.overSheet(+el.dataset.i),
     finCards: () => F.cardList(),
+    finBlocks: el => F.setBlocks(+el.dataset.v),
     finFilter: el => { P.ui[el.dataset.k] = el.dataset.v; P.saveUI(); P.render(); }
   });
 })();

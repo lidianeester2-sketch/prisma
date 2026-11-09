@@ -119,7 +119,7 @@
       if (end < from || start > to) return;
       const id = `parc-${p.id}-${i.n}`;
       if (raw[id]) return;
-      S.seed('fin_lanc', { id, kind: 'despesa', desc: `${p.desc} — parcela ${i.n}/${p.n}`, amount: i.amount, date: p.day ? `${i.month}-${String(p.day).padStart(2, '0')}` : end, noDue: !p.day,
+      S.seed('fin_lanc', { id, kind: 'despesa', desc: `${p.desc} — parcela ${i.n}/${p.n}`, amount: i.amount, date: p.day ? `${i.month}-${String(Math.min(p.day, new Date(y, m, 0).getDate())).padStart(2, '0')}` : end, noDue: !p.day,
         status: 'previsto', certainty: 'confirmado', method: p.method || 'pix', accountId: p.accountId || null, categoryId: p.categoryId || null, parcId: p.id, parcNum: i.n, origin: 'parcelamento' });
     }));
   };
@@ -134,31 +134,30 @@
 
   /* ---------------- PIN ---------------- */
   const PIN_KEY = 'prisma2:finpin';
-  let unlocked = false, hiddenAt = 0;
+  // o PIN vale enquanto o app estiver aberto: fechou o app (ou saiu da conta), pede de novo
+  const OPEN_KEY = 'prisma2:finOpen';
+  const sess = { get() { try { return sessionStorage.getItem(OPEN_KEY) === '1'; } catch (e) { return false; } }, set(v) { try { v ? sessionStorage.setItem(OPEN_KEY, '1') : sessionStorage.removeItem(OPEN_KEY); } catch (e) {} } };
+  let unlocked = false;
   const sha = async s => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)))].map(b => b.toString(16).padStart(2, '0')).join('');
   F.hasPin = () => !!P.ls.get(PIN_KEY);
-  F.locked = () => !unlocked;
-  F.setPin = async pin => { const salt = P.uid(); P.ls.set(PIN_KEY, { salt, hash: await sha(salt + ':' + pin), attempts: 0, until: 0 }); unlocked = true; };
+  F.locked = () => { if (!unlocked && F.hasPin() && sess.get()) unlocked = true; return !unlocked; };
+  F.setPin = async pin => { const salt = P.uid(); P.ls.set(PIN_KEY, { salt, hash: await sha(salt + ':' + pin), attempts: 0, until: 0 }); unlocked = true; sess.set(true); };
   F.checkPin = async pin => {
     const p = P.ls.get(PIN_KEY); if (!p) return { ok: false };
     if (p.until && Date.now() < p.until) return { ok: false, wait: Math.ceil((p.until - Date.now()) / 1000) };
-    if (await sha(p.salt + ':' + pin) === p.hash) { P.ls.set(PIN_KEY, { ...p, attempts: 0, until: 0 }); unlocked = true; return { ok: true }; }
+    if (await sha(p.salt + ':' + pin) === p.hash) { P.ls.set(PIN_KEY, { ...p, attempts: 0, until: 0 }); unlocked = true; sess.set(true); return { ok: true }; }
     const attempts = (p.attempts || 0) + 1;
     const until = attempts >= 5 ? Date.now() + 30000 : 0;
     P.ls.set(PIN_KEY, { ...p, attempts: until ? 0 : attempts, until });
     return { ok: false, left: until ? 0 : 5 - attempts, wait: until ? 30 : 0 };
   };
-  F.lock = () => { unlocked = false; };
+  F.lock = () => { unlocked = false; sess.set(false); };
   // Esqueci o PIN: apaga o PIN e os dados financeiros DESTE aparelho e sai da conta.
   // Para ver os dados de novo é preciso entrar com a senha da conta (Ajustes → Sincronização).
   F.forgotPin = async () => {
-    P.ls.del(PIN_KEY); unlocked = false;
+    P.ls.del(PIN_KEY); unlocked = false; sess.set(false);
     S.purgeLocal(['fin_conta', 'fin_cat', 'fin_lanc', 'fin_rec', 'fin_ciclo', 'fin_conc', 'fin_hist', 'fin_parc']);
     try { Object.keys(localStorage).filter(k => k.startsWith('prisma2:lastPull')).forEach(k => localStorage.removeItem(k)); } catch (e) {}
     if (P.sync?.user()) await P.sync.signOut();
   };
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') hiddenAt = Date.now();
-    else if (hiddenAt && Date.now() - hiddenAt > 2 * 60 * 1000) { unlocked = false; if (P.space?.() === 'fin') P.render(); }
-  });
 })();

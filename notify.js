@@ -81,6 +81,17 @@
       send(`prazo:${t.id}:${d}`, it ? `${P.KINDS[t.kind]?.label || 'Prazo'} · ${it}` : 'Prazo chegando', body);
     });
 
+    // Financeiro+: contas que vencem hoje e amanhã (sem valores) e vencidas
+    if (n.fin !== false && P.hasFin?.() && P.fin && P.nowMinutes() >= P.minutes(n.digestHour || '08:00')) {
+      try {
+        P.fin.ensureOccurrences?.(today, P.addDays(today, 1));
+        const bills = P.fin.txs().filter(t => t.kind === 'despesa' && t.status === 'previsto' && !t.envelope && !t.noDue);
+        const late = bills.filter(t => t.date < today);
+        if (late.length) send('fin-vencidas', 'Financeiro+', late.length === 1 ? `${late[0].desc} está vencida. Marque como paga se já pagou.` : `${late.length} contas vencidas. Abra o Orçamento para ver.`);
+        bills.forEach(t => { const d = P.daysUntil(t.date); if (d === 0) send(`fin:${t.id}:0`, 'Conta vence hoje', `${t.desc} vence hoje.`); else if (d === 1) send(`fin:${t.id}:1`, 'Conta vence amanhã', `${t.desc} vence amanhã.`); });
+      } catch (e) { console.warn('Prisma: aviso do financeiro falhou.', e); }
+    }
+
     // calendário acadêmico (provas e prazos) no dia anterior
     S.all('events').filter(e => (e.cat === 'prova' || e.cat === 'prazo') && P.daysUntil(e.date) === 1).forEach(e => send('ev:' + e.id, 'Amanhã no calendário', e.title));
 
@@ -92,7 +103,7 @@
   P.push = {
     registration, check,
     label() {
-      if (!P.sync?.user()) return 'Só com o app aberto. Entre na sincronização para receber com o app fechado.';
+      if (!P.sync?.user()) return 'Só com o app aberto. Entre na sua conta para receber com o app fechado.';
       return P.ls.get('prisma2:pushSaved') ? 'Chegam mesmo com o app fechado.' : 'Só com o app aberto por enquanto. Toque em Desativar e Ativar de novo para cadastrar este aparelho.';
     },
     async enable() {
@@ -106,6 +117,21 @@
     },
     disable() { S.setSettings({ notify: { ...S.settings().notify, enabled: false } }); P.toast('Notificações desativadas neste aparelho.'); },
     test() { show('Prisma', 'Teste de notificação. Se você está lendo isso, funcionou.', 'prisma-test'); },
+    // pede ao robô do Appwrite um aviso de verdade (o mesmo caminho de quando o app está fechado)
+    async remoteTest() {
+      await subscribePush();
+      P.toast('Pedindo um aviso ao robô…');
+      let r;
+      try { r = await P.sync.execute('prisma-robo', { teste: 1 }); }
+      catch (e) { r = { ok: false, erro: /not.?found|could not be found/i.test(e.message) ? 'Não achei a função prisma-robo no Appwrite. Confira se o ID dela é prisma-robo.' : /unauthori|permission|missing scope/i.test(e.message) ? 'A função não deixa o app chamar. No Appwrite: prisma-robo → Settings → Execute access → adicione Users.' : e.message }; }
+      const ago = r.ultimaRodada ? Math.round((Date.now() - r.ultimaRodada) / 60000) : null;
+      const clock = ago === null ? 'O despertador ainda não rodou nenhuma vez com a versão nova do robô. Confira o cron-job.org.'
+        : ago <= 20 ? `O despertador está funcionando: rodou há ${ago} min.`
+        : `O despertador está parado: a última rodada foi há ${ago < 120 ? ago + ' min' : Math.round(ago / 60) + ' horas'}. Confira o cron-job.org (o serviço pausa o agendamento quando ele falha várias vezes).`;
+      P.sheet({ title: r.ok ? 'O aviso foi enviado' : 'Algo está faltando', kicker: 'Notificações com o app fechado',
+        render: () => `<p class="ask-msg">${r.ok ? `Enviei para ${r.aparelhos} aparelho${r.aparelhos === 1 ? '' : 's'}. Se a notificação “Teste do robô” apareceu, o envio funciona.` : P.esc(r.erro || 'O robô não respondeu.')}</p>${r.ok || r.ultimaRodada !== undefined ? `<p class="ask-msg">${clock}</p>` : ''}<div class="form-actions"><button class="btn primary" type="button" data-close-ok>Ok</button></div>`,
+        mount: api => { api.body.querySelector('[data-close-ok]').onclick = () => api.close(); } });
+    },
     resubscribe() { if ('Notification' in window && Notification.permission === 'granted' && S.settings().notify.enabled) subscribePush(); }
   };
 

@@ -1353,3 +1353,29 @@ details > summary { gap: 6px; }
 .skip-link:focus { transform: none; }
 h1[tabindex="-1"]:focus, .sheet h2[tabindex="-1"]:focus { outline: none; }
 h3.pend-head { font-size: 13px; }
+
+/* ---------- v32: divisão do dia a dia à vista e Lançamentos mais simples ---------- */
+.block-seg { display: grid; grid-template-columns: repeat(3, 1fr); margin: 4px 0 12px; }
+.block-seg .seg-btn { min-height: 44px; font-size: 13.5px; white-space: nowrap; padding-inline: 6px; }
+.day-split .weeks { margin-top: 4px; }
+.lanc-tools { display: grid; gap: 10px; margin-bottom: 18px; }
+.lanc-tools .seg { display: grid; grid-template-columns: repeat(4, 1fr); }
+.lanc-tools .seg-btn { min-height: 44px; padding-inline: 4px; white-space: nowrap; }
+.lanc-filters { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.mini-select { display: grid; gap: 4px; }
+.mini-select span { font-size: 12px; font-weight: 700; color: var(--muted); }
+.mini-select select { min-height: 44px; }
+.lanc-open .fin-row .btn.small { margin-left: 8px; }
+h3.day-label { font-size: 13px; margin: 14px 2px 8px; color: var(--muted); font-weight: 700; text-transform: none; }
+.fin-hero.tone-bad { background: var(--bad); }
+.pill.ok { color: var(--text); }
+
+/* ---------- v33: Lançar compra completo ---------- */
+.pay-chips .chip { min-width: 72px; justify-content: center; }
+.parc-line { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.parc-line .seg { margin: 0; }
+.parc-line select { width: auto; min-width: 90px; min-height: 44px; }
+.parc-preview { display: grid; gap: 2px; padding: 12px 14px; border-radius: var(--r-md); background: var(--t1); }
+.parc-preview b { font-size: 17px; }
+.parc-preview span { font-size: 13.5px; font-weight: 600; }
+.parc-preview small { font-size: 12.5px; color: var(--muted); }
