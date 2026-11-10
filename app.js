@@ -86,10 +86,13 @@
     const tc = document.querySelector('meta[name="theme-color"]'); if (tc) tc.content = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#eef0fa';
     P.render();
     window.scrollTo(0, 0);
+    // entrada suave da tela nova (só ao trocar de tela, não a cada atualização)
+    if (navigated && route !== lastAnimated) { const v = P.$('#view'); v.classList.remove('enter'); void v.offsetWidth; v.classList.add('enter'); clearTimeout(enterT); enterT = setTimeout(() => v.classList.remove('enter'), 650); }
+    lastAnimated = route;
     if (navigated) { const h = P.$('#view h1'); if (h) { h.setAttribute('tabindex', '-1'); h.focus({ preventScroll: true }); } }
     navigated = true;
   };
-  let navigated = false;
+  let navigated = false, lastAnimated = null, enterT = 0;
   window.addEventListener('hashchange', () => P.go(location.hash.slice(1)));
 
   P.renderSyncBadge = () => {
@@ -248,5 +251,6 @@
     P.push?.registration().then(() => P.push.check());
     // depois que a sincronização conecta, confirma o cadastro deste aparelho no robô
     P.sync?.init().then(() => { P.renderSyncBadge(); if (P.sync.needsLogin() || route === 'entrar') P.go(route === 'entrar' ? P.home() : route); if (S.settings().notify.enabled) P.push?.resubscribe(); });
+    P.tour?.maybe();
   };
 })();

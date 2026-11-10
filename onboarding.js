@@ -79,10 +79,10 @@
   };
 
   const finish = () => {
-    S.setSettings({ name: st.name.trim(), focus: st.focus.length ? st.focus : Object.keys(P.FOCUS), onboarded: true });
+    S.setSettings({ name: st.name.trim(), focus: st.focus.length ? st.focus : Object.keys(P.FOCUS), onboarded: true, tourPending: !S.settings().tourDone });
     P.applyFocus();
     P.go(P.home());
-    setTimeout(() => P.toast(P.hasPrisma() ? 'Tudo pronto! Toque em + para criar sua primeira coisa.' : 'Tudo pronto! Comece informando o saldo da sua conta.'), 300);
+    P.tour?.maybe();
   };
 
   P.mounts = P.mounts || {};

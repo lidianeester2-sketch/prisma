@@ -91,6 +91,7 @@
         <div class="field-label" id="ts-label">Tamanho do texto</div>
         <div class="chips text-size" role="group" aria-labelledby="ts-label">${[['normal', 'Normal'], ['grande', 'Grande'], ['maior', 'Maior']].map(([k, l]) => `<button type="button" class="chip ${(st.textSize || 'normal') === k ? 'on' : ''}" data-act="setTextSize" data-z="${k}" aria-pressed="${(st.textSize || 'normal') === k}">${l}</button>`).join('')}</div>
         <p class="hint">Aumenta letras e botões no app inteiro.</p>
+        <button class="btn ghost small" type="button" data-act="tour">Ver o tutorial</button>
       </section>
 
 
@@ -133,7 +134,7 @@
         </div>
       </section>
 
-      <p class="credits">Prisma · versão 36 · Desenvolvido por Lidiane Tavares<br><button class="link" type="button" data-act="repair">Atualizar o app (baixa a versão mais nova; seus dados ficam)</button></p>
+      <p class="credits">Prisma · versão 37 · Desenvolvido por Lidiane Tavares<br><button class="link" type="button" data-act="repair">Atualizar o app (baixa a versão mais nova; seus dados ficam)</button></p>
     </div>`;
   };
 
