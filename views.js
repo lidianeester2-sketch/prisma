@@ -203,17 +203,16 @@
     </div>` : '';
 
     return `
-    <header class="page-head hoje-head">
-      <span class="eyebrow">${P.DOW_LONG[now.getDay()]}, ${now.getDate()} de ${P.MONTHS[now.getMonth()]}${semLeft !== null && semLeft >= 0 ? ` · ${semLeft === 0 ? 'último dia do semestre' : `${semLeft} dias pro fim do semestre`}` : ''}</span>
-      <h1>${greet}${st.name ? ', ' + esc(st.name) : ''}</h1>
-      <p class="prisma-says">${esc(phrase())}</p>
-      <div class="today-sum">
-        <button type="button" data-act="scrollTo" data-id="para-hoje"><b>${todayCount + classes.length + evToday.length}</b> para hoje</button>
-        ${overdue.length ? `<button type="button" class="bad" data-act="scrollTo" data-id="para-hoje"><b>${overdue.length}</b> atrasada${overdue.length === 1 ? '' : 's'}</button>` : ''}
-        <button type="button" data-act="go" data-to="agenda"><b>${upcoming.length}</b> nos próximos 7 dias</button>
-        <span class="score-pill" title="${esc(scoreLine(ws.score))}">Semana em dia <b>${ws.score === null ? '—' : ws.score + '%'}</b></span>
-      </div>
+    <header class="page-head big-head">
+      <span class="head-date">${P.DOW_LONG[now.getDay()]}, ${now.getDate()} de ${P.MONTHS[now.getMonth()]}${semLeft !== null && semLeft >= 0 ? ` · ${semLeft === 0 ? 'último dia do semestre' : `${semLeft} dias pro fim do semestre`}` : ''}</span>
+      <h1>Hoje</h1>
     </header>
+    <div class="smart-grid" role="group" aria-label="Resumo do dia">
+      <button type="button" class="smart k-accent" data-act="scrollTo" data-id="para-hoje"><span class="sm-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M4 10h16M9 3v4M15 3v4"/></svg></span><b>${todayCount + classes.length + evToday.length}</b><small>Para hoje</small></button>
+      <button type="button" class="smart k-bad" data-act="scrollTo" data-id="para-hoje"><span class="sm-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v5M12 16h.01"/></svg></span><b>${overdue.length}</b><small>Atrasada${overdue.length === 1 ? '' : 's'}</small></button>
+      <button type="button" class="smart k-blue" data-act="go" data-to="agenda"><span class="sm-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span><b>${upcoming.length}</b><small>Próximos 7 dias</small></button>
+      <div class="smart k-ok" title="${esc(scoreLine(ws.score))}"><span class="sm-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 13l4 4L19 7"/></svg></span><b>${ws.score === null ? '—' : ws.score + '%'}</b><small>Semana em dia</small></div>
+    </div>
     ${filterHtml}
 
     ${ncHtml ? `<div class="hero-grid">${ncHtml}</div>` : ''}

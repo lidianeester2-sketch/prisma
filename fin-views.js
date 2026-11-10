@@ -99,9 +99,9 @@
     if (F.txs().length > 5 && (!lastConc || C.diffDays(lastConc.date, today) > 7)) alerts.push(['info', 'Faz mais de uma semana que você não confere o saldo com o banco. Leva 30 segundos.']);
 
     return `
-    <header class="page-head fin-head">
-      <div class="date-line">${P.DOW_LONG[new Date().getDay()]}, ${new Date().getDate()} de ${P.MONTHS[new Date().getMonth()]} <span class="sep">·</span> ciclo ${F.date(s.cycle.start)}–${endTxt}${s.cycle.projected ? ' (projetado)' : ''}</div>
-      <div class="fin-title-row"><h1>${greet}${st.name ? ', ' + esc(st.name) : ''}.</h1>
+    <header class="page-head big-head fin-head">
+      <span class="head-date">${P.DOW_LONG[new Date().getDay()]}, ${new Date().getDate()} de ${P.MONTHS[new Date().getMonth()]} · ciclo ${F.date(s.cycle.start)}–${endTxt}</span>
+      <div class="fin-title-row"><h1>Finanças</h1>
         <div class="fin-tools"><button class="icon-btn" type="button" data-act="finHide" aria-label="${F.hidden() ? 'Mostrar valores' : 'Esconder valores'}">${F.hidden() ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.4 10.4 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4.2M6.6 6.6C3.8 8.4 2 12 2 12s3.5 7 10 7c1.6 0 3-.4 4.3-1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>' : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>'}</button><button class="icon-btn" type="button" data-act="finLock" aria-label="Bloquear"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></button></div></div>
     </header>
 
@@ -116,7 +116,7 @@
       <span class="eyebrow">Quanto posso gastar até ${endTxt}</span>
       <div class="fin-big">${F.money(s.canSpend)}</div>
       <div class="fin-sub">${s.canSpend > 0 ? `≈ ${F.money(s.perDay)} por dia · ` : ''}${s.daysLeft} dia${s.daysLeft === 1 ? '' : 's'} até o salário (${F.date(s.cycle.nextPay)})</div>
-      <div class="hero-row"><button type="button" class="hero-chip" data-act="finAccounts">Nas contas: <b>${F.money(s.real)}</b></button><button type="button" class="hero-chip" data-act="go" data-to="fin-orcamento">Contas até o salário: <b>${F.money(s.committed)}</b></button></div>
+
       <details class="calc">
         <summary>Como calculei</summary>
         <div class="calc-table">
@@ -129,6 +129,10 @@
         <ul class="premissas">${s.premissas.map(p => `<li>${esc(p)}</li>`).join('')}</ul>
       </details>
     </section>
+    <div class="smart-grid two" role="group" aria-label="Contas">
+      <button type="button" class="smart k-ok" data-act="finAccounts"><span class="sm-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10l9-6 9 6M5 10v8M19 10v8M9 10v8M15 10v8M3 20h18"/></svg></span><b>${F.money(s.real)}</b><small>Nas contas</small></button>
+      <button type="button" class="smart k-orange" data-act="go" data-to="fin-orcamento"><span class="sm-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg></span><b>${F.money(s.committed)}</b><small>Contas até o salário</small></button>
+    </div>
 
     <div class="cols">
       <section class="block main-col">

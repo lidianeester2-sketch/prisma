@@ -1515,3 +1515,24 @@ body[data-space="fin"] .fin-hero, .fin-hero, .fin-hero.tone-warn, .fin-hero.tone
 .tour-tip .btn:focus-visible { outline-width: 2px; outline-offset: 1px; }
 @media (max-width: 700px) { .tabbar a { color: var(--muted); } .tabbar a span { font-size: 11px; } }
 .chip.on { color: var(--on-accent); } .fab span { color: var(--on-accent); }
+
+/* ---------- v38: topo estilo Lembretes ---------- */
+.big-head { margin-bottom: 14px; }
+.head-date { display: block; font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .02em; margin-bottom: 2px; }
+.big-head h1 { font-size: 34px; font-weight: 700; letter-spacing: -.025em; line-height: 1.1; }
+.fin-head .fin-title-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.smart-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 18px; }
+.smart-grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: -4px; }
+@media (max-width: 700px) { .smart-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.smart { --k: var(--accent); position: relative; display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; align-items: center; gap: 8px 6px; padding: 10px 12px 12px; border-radius: var(--r-md); background: var(--surface); border: 0; text-align: left; color: var(--text); min-height: 76px; }
+.smart.k-bad { --k: var(--bad); } .smart.k-blue { --k: #0a7ad4; } .smart.k-ok { --k: var(--ok); } .smart.k-orange { --k: #c2610c; } .smart.k-accent { --k: var(--accent); }
+[data-theme="escuro"] .smart.k-blue { --k: #409cff; } [data-theme="escuro"] .smart.k-orange { --k: #ff9f0a; }
+.smart .sm-ico { grid-row: 1; grid-column: 1; width: 30px; height: 30px; border-radius: 50%; background: var(--k); display: grid; place-items: center; }
+.smart .sm-ico svg { width: 17px; height: 17px; stroke: #fff; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+[data-theme="escuro"] .smart .sm-ico svg { stroke: #000; }
+.smart b { grid-row: 1; grid-column: 2; justify-self: end; font-size: 26px; font-weight: 700; line-height: 1; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.smart-grid.two .smart b { font-size: 19px; }
+.smart small { grid-row: 2; grid-column: 1 / -1; font-size: 14px; font-weight: 600; color: var(--muted); }
+button.smart:active { transform: scale(.97); opacity: .85; }
+.smart { transition: transform .18s var(--ease-out), opacity .18s; -webkit-tap-highlight-color: transparent; }
+.smart-grid.two .smart b { font-size: clamp(15px, 4.6vw, 19px); white-space: nowrap; } .smart { min-width: 0; }

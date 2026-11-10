@@ -117,6 +117,15 @@
     return true;
   }
 
+  // desligou as notificações neste aparelho: tira o cadastro dele do robô
+  async function removePush(sub) {
+    if (!db || !user || !sub?.endpoint) return false;
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(sub.endpoint));
+    const rid = 'push-' + [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 24);
+    await upsertRow(rid, 'push', { endpoint: sub.endpoint }, true);
+    return true;
+  }
+
   async function now(manual = false) {
     if (!db || !user) return;
     if (!navigator.onLine) { setStatus('offline'); return; }
@@ -307,7 +316,7 @@
       if (ex.status === 'failed' && !out.erro) out = { ok: false, erro: 'A função falhou. Veja em Appwrite → Functions → prisma-assistente → Executions.' };
       return out;
     },
-    savePush,
+    savePush, removePush,
     // recuperação de senha pelo e-mail (o Appwrite manda o link)
     async recover(email) {
       if (!account) await init();

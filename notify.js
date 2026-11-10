@@ -135,7 +135,11 @@
       } catch (e) { P.toast('Ativadas, mas algo falhou no cadastro: ' + (e.message || e)); }
       P.render();
     },
-    disable() { S.setSettings({ notify: { ...S.settings().notify, enabled: false } }); P.toast('Notificações desativadas neste aparelho.'); },
+    async disable() {
+      S.setSettings({ notify: { ...S.settings().notify, enabled: false } });
+      P.toast('Notificações desativadas neste aparelho.');
+      try { const r = await registration(); const sub = await r?.pushManager?.getSubscription(); if (sub) { await P.sync?.removePush?.(sub.toJSON()); await sub.unsubscribe(); } P.ls.del('prisma2:pushSaved'); } catch (e) {}
+    },
     test() { show('Prisma', 'Teste de notificação. Se você está lendo isso, funcionou.', 'prisma-test'); },
     // pede ao robô do Appwrite um aviso de verdade (o mesmo caminho de quando o app está fechado)
     async remoteTest() {
