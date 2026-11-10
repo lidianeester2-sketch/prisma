@@ -77,7 +77,7 @@
     // lembra a última tela de cada espaço (Ajustes não conta: ele não é de nenhum dos dois)
     if (to.startsWith('fin')) P.ui.lastFin = to; else if (PRISMA_ROUTES.includes(to)) P.ui.lastPrisma = to;
     P.saveUI();
-    [...P.openSheets].forEach(sh => sh.close());
+    [...P.openSheets].filter(sh => !sh.keep).forEach(sh => sh.close());
     P.$$('[data-nav]').forEach(b => { const on = b.dataset.nav === to; b.classList.toggle('on', on); on ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current'); });
     P.$('#mobile-title').textContent = !(P.hasFin() && P.hasPrisma()) ? (P.hasPrisma() ? 'Prisma' : 'Finanças') : 'Prisma';
     P.$$('.space-switch [data-s]').forEach(b => { const on = b.dataset.s === P.space(); b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
@@ -243,6 +243,7 @@
     const inv = location.hash.match(/^#convite=(.+)$/);
     if (inv) { const ok = P.sync?.acceptInvite(decodeURIComponent(inv[1])); history.replaceState(null, '', location.pathname + '#ajustes'); if (ok) setTimeout(() => P.toast('Bem-vindo ao Prisma! Crie sua conta em Sincronização (e-mail e senha de 8+ letras).'), 600); }
     P.go(location.hash.slice(1) || P.home());
+    P.newPasswordFromLink?.();
     P.renderSyncBadge();
     P.push?.registration().then(() => P.push.check());
     // depois que a sincronização conecta, confirma o cadastro deste aparelho no robô

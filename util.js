@@ -139,7 +139,7 @@ P.toast = (msg, opts = {}) => {
 
 /* ---------- Sheet (janela) ---------- */
 P.openSheets = [];
-P.sheet = ({ title, kicker = '', render, mount, wide = false, onClose, live = false }) => {
+P.sheet = ({ title, kicker = '', render, mount, wide = false, onClose, live = false, keep = false }) => {
   const host = P.$('#sheets');
   const wrap = document.createElement('div');
   wrap.className = 'sheet-wrap';
@@ -167,7 +167,7 @@ P.sheet = ({ title, kicker = '', render, mount, wide = false, onClose, live = fa
   P.openSheets.forEach(s => { s.el.inert = true; });
   const body = wrap.querySelector('.sheet-body');
   const api = {
-    el: wrap, body, refreshOnChange: live,
+    el: wrap, body, refreshOnChange: live, keep,
     setTitle(t) { wrap.querySelector('h2').textContent = t; },
     refresh() { if (render) { const st = body.scrollTop; body.innerHTML = render(api); mount && mount(api); body.scrollTop = st; } },
     close() {

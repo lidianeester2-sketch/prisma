@@ -68,13 +68,13 @@
       catch (e) { user = null; noSession = e?.code === 401 || e?.code === 403; if (!noSession) setStatus('offline', 'sem conexão'); }
       if (user && !P.ls.get(OWNER_KEY)) P.ls.set(OWNER_KEY, user.$id);
       P.renderSyncBadge?.();
-      if (user) now();
+      if (user) { await vaultOnStart(); now(); P.vaultUI?.maybePrompt(); }
     } catch (e) { setStatus('offline', e.message); }
   }
 
   async function upsertRow(rid, col, payloadData, deleted = false) {
     const id = await rowId(rid);
-    const payload = { rid, col, data: JSON.stringify(payloadData), deleted: !!deleted };
+    const payload = { rid, col, data: typeof payloadData === 'string' ? payloadData : JSON.stringify(payloadData), deleted: !!deleted };
     try {
       await retry(() => db.updateDocument(DB, TABLE, id, payload));
     } catch (e) {
@@ -83,7 +83,30 @@
       await retry(() => db.createDocument(DB, TABLE, id, payload, perms));
     }
   }
-  const pushOne = d => upsertRow(d.id, d.col, d.rec, d.rec.deleted);
+  // o financeiro sai do aparelho já trancado (P.vault); sem a chave, ele espera aqui
+  const V = P.vault;
+  const locked = d => V.isEnc(d.col, d.id) && !V.ready();
+  const pushOne = async d => upsertRow(d.id, d.col, V.isEnc(d.col, d.id) ? await V.encrypt(d.rec) : d.rec, d.rec.deleted);
+
+  /* Avisos de contas com o app fechado: o robô não consegue ler o financeiro (está trancado).
+     Então o aparelho manda só "quantas contas vencem em cada dia" (sem nome e sem valor). */
+  let lastAvisos = '';
+  async function saveFinAvisos() {
+    try {
+      if (!db || !user || !P.hasFin?.() || !P.fin) return;
+      const n = S.settings().notify || {};
+      const today = P.today(), end = P.addDays(today, 35);
+      const d = {};
+      if (n.enabled && n.fin !== false) {
+        P.fin.ensureOccurrences?.(today, end);
+        P.fin.txs().filter(t => t.kind === 'despesa' && t.status === 'previsto' && !t.envelope && !t.noDue && t.date >= today && t.date <= end).forEach(t => { d[t.date] = (d[t.date] || 0) + 1; });
+      }
+      const late = n.enabled && n.fin !== false ? P.fin.txs().filter(t => t.kind === 'despesa' && t.status === 'previsto' && !t.envelope && !t.noDue && t.date < today).length : 0;
+      const body = JSON.stringify({ d, late, lateAt: today });
+      if (body === lastAvisos) return;
+      await upsertRow('fin-avisos', 'fin_avisos', body); lastAvisos = body;
+    } catch (e) { console.warn('Prisma: avisos do financeiro não subiram.', e); }
+  }
 
   /* cadastra este aparelho para receber avisos do robô (Etapa 3) */
   async function savePush(sub) {
@@ -102,9 +125,10 @@
     try {
       const pullKey = PULL_KEY + ':' + user.$id;
       const first = !P.ls.get(pullKey);
+      const plainSeen = [];
 
       const push = async () => {
-        const dirty = S.dirtyRecords();
+        const dirty = S.dirtyRecords().filter(d => !locked(d));
         // 4 envios por vez, pra não esbarrar no limite de pedidos por minuto
         for (let i = 0; i < dirty.length; i += 4) {
           const chunk = dirty.slice(i, i + 4);
@@ -122,10 +146,17 @@
           const res = await retry(() => db.listDocuments(DB, TABLE, q));
           const docs = res.documents || [];
           if (!docs.length) break;
-          const rows = docs.map(doc => {
-            let data = {}; try { data = JSON.parse(doc.data); } catch (e) {}
+          const rows = (await Promise.all(docs.map(async doc => {
+            if (V.isCipher(doc.data)) {
+              if (!V.ready()) return null;                       // trancado e sem a chave: fica para depois
+              try { return { id: doc.rid, collection: doc.col, data: await V.decrypt(doc.data), deleted: doc.deleted }; }
+              catch (e) { console.warn('Prisma: não consegui destrancar', doc.rid); return null; }
+            }
+            let data = {}; try { data = JSON.parse(doc.data); } catch (e) { return null; }
+            // financeiro que ainda está aberto na nuvem (de antes do cofre): volta trancado no próximo envio
+            if (V.isEnc(doc.col, doc.rid) && V.ready() && !doc.deleted) plainSeen.push(doc.col + ':' + doc.rid);
             return { id: doc.rid, collection: doc.col, data, deleted: doc.deleted };
-          });
+          }))).filter(Boolean);
           // 1ª vez neste aparelho: o que já está na nuvem vale mais que os dados de exemplo daqui
           S.applyRemote(rows, first);
           maxSeen = docs[docs.length - 1].$updatedAt;
@@ -137,6 +168,8 @@
 
       if (first) { await pull(); await push(); await pull(); }
       else { await push(); await pull(); }
+      if (plainSeen.length) { S.markDirty(plainSeen); await push(); }
+      saveFinAvisos();
 
       lastSync = new Date();
       setStatus('ok');
@@ -162,6 +195,43 @@
   }
 
   const schedule = P.debounce(() => now(), 1500);
+
+  /* ============ cofre do financeiro ============ */
+  // estados: off · ready · need-password (logado, sem a chave neste aparelho) ·
+  //          need-recovery (a senha não abre: foi trocada e nenhum aparelho tem a chave) · pw-changed
+  let vstate = 'off', vrow = null, pendingPw = null, prompted = false;
+  async function readVault() {
+    try { const doc = await db.getDocument(DB, TABLE, await rowId('vault')); return JSON.parse(doc.data); }
+    catch (e) { if (e.code === 404) return null; throw e; }
+  }
+  const saveVault = async row => { vrow = row; await upsertRow('vault', 'vault', row); };
+  // depois de destrancar: busca tudo de novo (agora dá para abrir) e tranca o que estava aberto na nuvem
+  async function afterUnlock() { vstate = 'ready'; pendingPw = null; P.ls.set(PULL_KEY + ':' + user.$id, '1970-01-01T00:00:00.000+00:00'); await now(); P.render?.(); }
+
+  async function vaultAfterLogin(pw) {
+    await V.load(user.$id);
+    let row; try { row = await readVault(); } catch (e) { vstate = V.ready() ? 'ready' : 'need-password'; return; }
+    if (!row) {
+      row = V.ready() ? await V.rewrapPassword({ v: 1, rc: null }, pw, user.passwordUpdate) : await V.create(user.$id, pw, user.passwordUpdate);
+      await saveVault(row); P.vaultUI?.offerCode(true);
+      return afterUnlock();
+    }
+    vrow = row;
+    if (await V.openWithPassword(user.$id, pw, row)) { if (row.pwAt !== user.passwordUpdate) await saveVault({ ...row, pwAt: user.passwordUpdate }); return afterUnlock(); }
+    // a senha não abre: ela foi trocada (pelo e-mail). Se este aparelho tem a chave, tranca de novo com a senha nova.
+    if (V.ready()) { await saveVault(await V.rewrapPassword(row, pw, user.passwordUpdate)); return afterUnlock(); }
+    vstate = 'need-recovery'; pendingPw = pw;
+  }
+  async function vaultOnStart() {
+    await V.load(user.$id);
+    let row; try { row = await readVault(); } catch (e) { row = undefined; }      // undefined = sem internet
+    vrow = row || null;
+    if (V.ready()) {
+      vstate = row === null ? 'need-password' : row && row.pwAt && user.passwordUpdate && row.pwAt !== user.passwordUpdate ? 'pw-changed' : 'ready';
+      if (vstate === 'need-password') V.forget();   // chave sem cofre na nuvem: refaz com a senha
+    } else vstate = 'need-password';
+  }
+
 
   P.sync = {
     init, now, schedule,
@@ -199,12 +269,14 @@
       // Outra pessoa já usou este aparelho: os dados dela saem daqui (continuam na conta dela)
       const owner = P.ls.get(OWNER_KEY);
       if (owner && owner !== user.$id) {
-        S.resetDevice(); clearPersonal();
+        S.resetDevice(); clearPersonal(); await V.forget();
         P.toast('Este aparelho estava com os dados de outra conta. Eles saíram daqui e continuam guardados na conta da outra pessoa.');
       } else if (!P.ls.get(PULL_KEY + ':' + user.$id)) S.markAllDirty();   // primeiro login: sobe o que já existe aqui
       P.ls.set(OWNER_KEY, user.$id);
+      try { await vaultAfterLogin(pw); } catch (e) { console.error('Prisma cofre:', e); vstate = V.ready() ? 'ready' : 'need-password'; }
       await now(true);
       P.push?.resubscribe?.();
+      setTimeout(() => P.vaultUI?.maybePrompt(true), 900);
       return true;
     },
     // Sair: antes manda para a nuvem o que ainda não subiu. Com "apagar", tira tudo deste aparelho.
@@ -212,7 +284,8 @@
       try { if (user) await now(true); } catch (e) {}
       if (wipeDevice && S.pendingCount()) { P.toast('Ainda há alterações que não subiram para a nuvem. Conecte à internet e tente de novo.'); return false; }
       try { await account?.deleteSession('current'); } catch (e) {}
-      user = null; noSession = true; setStatus('idle');
+      user = null; noSession = true; setStatus('idle'); vstate = 'off';
+      await V.forget();   // a chave do cofre sai do aparelho junto com a sessão; volta no próximo login (com a senha)
       if (wipeDevice) { S.resetDevice(); clearPersonal(); P.ls.del(OWNER_KEY); }
       return true;
     },
@@ -234,7 +307,46 @@
       if (ex.status === 'failed' && !out.erro) out = { ok: false, erro: 'A função falhou. Veja em Appwrite → Functions → prisma-assistente → Executions.' };
       return out;
     },
-    savePush
+    savePush,
+    // recuperação de senha pelo e-mail (o Appwrite manda o link)
+    async recover(email) {
+      if (!account) await init();
+      if (!account) throw new Error('Sem conexão com o servidor.');
+      await account.createRecovery(email, location.origin + location.pathname + '?nova-senha=1');
+    },
+    async completeRecovery(userId, secret, pw) { if (!account) await init(); await account.updateRecovery(userId, secret, pw); },
+    vault: {
+      state: () => vstate,
+      hasCode: () => !!vrow?.rc,
+      // logado, mas sem a chave neste aparelho: confirma a senha e abre (ou cria) o cofre
+      // (o Appwrite não deixa conferir a senha com a sessão aberta; quem confere é o próprio cofre,
+      //  e na primeira vez a tela pede a senha duas vezes)
+      async unlock(pw) {
+        try { await vaultAfterLogin(pw); } catch (e) { return { ok: false, erro: 'Sem conexão. Tente de novo com internet.' }; }
+        return vstate === 'ready' ? { ok: true } : { ok: false, recovery: true, erro: 'Essa senha não abre o cofre. Confira se digitou certo. Se você trocou a senha pelo e-mail, use o código de recuperação ou abra o Prisma no aparelho em que você continua logada.' };
+      },
+      exists: async () => { if (vrow) return true; try { vrow = await readVault(); } catch (e) {} return !!vrow; },
+      async unlockCode(code) {
+        if (!vrow) vrow = await readVault();
+        if (!vrow || !(await V.openWithCode(user.$id, code, vrow))) return { ok: false, erro: 'Código incorreto.' };
+        if (pendingPw) await saveVault(await V.rewrapPassword(vrow, pendingPw, user.passwordUpdate));
+        else { vstate = 'pw-changed'; }
+        if (pendingPw) await afterUnlock(); else { P.ls.set(PULL_KEY + ':' + user.$id, '1970-01-01T00:00:00.000+00:00'); await now(); }
+        return { ok: true };
+      },
+      // trocou a senha pelo e-mail e este aparelho tem a chave: tranca de novo com a senha nova
+      async updatePassword(pw) {
+        await saveVault(await V.rewrapPassword(vrow || { v: 1, rc: null }, pw, user.passwordUpdate));
+        vstate = 'ready'; return { ok: true };
+      },
+      async newCode() {
+        if (!V.ready()) return null;
+        if (!vrow) vrow = await readVault();
+        const { code, row } = await V.newRecovery(vrow || { v: 1, pw: null });
+        await saveVault(row); return code;
+      },
+      setPrompted: v => { prompted = v; }, prompted: () => prompted
+    }
   };
 
   S.on(info => { if (!info.remote) schedule(); });

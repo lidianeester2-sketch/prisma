@@ -69,6 +69,7 @@
             <button class="ob-eye" type="button" data-ob-eye aria-label="${showPw ? 'Esconder senha' : 'Mostrar senha'}">${showPw ? I.eye : I.eyeOff}</button></label>
           <button class="ob-main" type="submit" ${st.busy ? 'disabled' : ''}>${st.busy ? 'Um instante…' : st.mode === 'login' ? 'Entrar' : 'Criar conta'}</button>
         </form>
+        ${st.mode === 'login' ? '<button class="ob-link small" type="button" data-forgot>Esqueci a senha</button>' : ''}
         <div class="ob-or"><span>ou</span></div>
         <button class="ob-link" type="button" data-ob-mode>${st.mode === 'login' ? 'Ainda não tenho conta → Criar' : 'Já tenho conta → Entrar'}</button>`
         : `<div class="notice">A conta ainda não está ligada neste endereço. Você pode começar agora e ligar depois em Ajustes.</div>
@@ -96,6 +97,7 @@
     P.$$('[data-focus]', root).forEach(b => b.onclick = () => { const k = b.dataset.focus; st.focus = st.focus.includes(k) ? st.focus.filter(x => x !== k) : [...st.focus, k]; rerender(); });
     root.querySelector('[data-ob-next]')?.addEventListener('click', () => { if (P.sync?.user()) return finish(); st.step = 3; st.mode = 'signup'; rerender(); });
     root.querySelector('[data-ob-back]')?.addEventListener('click', () => { st.step = st.mode === 'login' && !st.name ? 1 : st.step - 1; if (st.step === 1) st.mode = 'signup'; rerender(); });
+    root.querySelector('[data-forgot]')?.addEventListener('click', () => P.forgotPassword(root.querySelector('[name=email]')?.value || ''));
     root.querySelector('[data-ob-mode]')?.addEventListener('click', () => { st.mode = st.mode === 'login' ? 'signup' : 'login'; rerender(); });
     root.querySelector('[data-ob-skip]')?.addEventListener('click', () => { if (!st.name) { st.step = 1; st.mode = 'signup'; return rerender(); } finish(); });
     const f3 = root.querySelector('[data-ob="account"]');
@@ -126,6 +128,7 @@
           <label class="ob-field"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><input name="pw" type="password" autocomplete="current-password" placeholder="Senha" minlength="8" required></label>
           <button class="ob-main" type="submit" ${busy ? 'disabled' : ''}>${busy ? 'Entrando…' : 'Entrar'}</button>
         </form>
+        <button class="ob-link small" type="button" data-forgot>Esqueci a senha</button>
         <div class="ob-or"><span>ou</span></div>
         <button class="ob-link" type="button" data-new-account>Criar uma conta nova</button>
       </div>
@@ -138,10 +141,52 @@
       busy = false;
       if (ok) P.go(P.home()); else P.render();
     };
+    root.querySelector('[data-forgot]').onclick = () => P.forgotPassword(f.email.value);
     root.querySelector('[data-new-account]').onclick = async () => {
       if (!(await P.ask('Criar uma conta nova neste aparelho? Os dados que estão aqui saem do aparelho (continuam guardados na conta de quem usou antes).', 'Criar conta nova', false))) return;
       S.resetDevice(); try { localStorage.removeItem('prisma2:owner'); } catch (e) {}
       P.go('boasvindas');
     };
+  };
+})();
+
+/* ---------- esqueci a senha (link pelo e-mail) ---------- */
+(function () {
+  P.forgotPassword = (email = '') => P.sheet({
+    title: 'Esqueci a senha', kicker: 'Vou mandar um link para o seu e-mail',
+    render: () => `<form class="form"><label class="field"><span class="field-label">E-mail da conta</span><input name="email" type="email" autocomplete="email" value="${P.esc(email)}" required></label>
+      <p class="hint">Abra o link no mesmo aparelho em que o Prisma está instalado e crie uma senha nova. Seus estudos e projetos voltam na hora; o financeiro destranca sozinho quando você abrir o Prisma num aparelho em que ainda está logada (ou com o código de recuperação).</p>
+      <p class="form-error" hidden></p><div class="form-actions"><button class="btn primary" type="submit">Mandar o link</button></div></form>`,
+    mount: api => {
+      api.body.querySelector('form').onsubmit = async e => {
+        e.preventDefault(); const b = e.target.querySelector('[type=submit]'); b.disabled = true; b.textContent = 'Mandando…';
+        try { await P.sync.recover(e.target.email.value.trim()); api.close(); P.toast('Pronto! Se esse e-mail tiver conta, o link chega em alguns minutos. Olhe também o spam.'); }
+        catch (err) { b.disabled = false; b.textContent = 'Mandar o link'; const p = api.body.querySelector('.form-error'); p.textContent = /rate|limit/i.test(err.message) ? 'Muitas tentativas. Espere alguns minutos.' : 'Não consegui mandar agora. Confira a internet e tente de novo.'; p.hidden = false; }
+      };
+    }
+  });
+  // chegou pelo link do e-mail: ?nova-senha=1&userId=...&secret=...
+  P.newPasswordFromLink = () => {
+    const q = new URLSearchParams(location.search);
+    const userId = q.get('userId'), secret = q.get('secret');
+    if (!userId || !secret) return false;
+    history.replaceState(null, '', location.pathname + location.hash);
+    setTimeout(() => P.sheet({
+      title: 'Criar senha nova', kicker: 'Prisma', keep: true,
+      render: () => `<form class="form"><label class="field"><span class="field-label">Senha nova (8 ou mais caracteres)</span><input name="pw" type="password" autocomplete="new-password" minlength="8" required></label>
+        <label class="field"><span class="field-label">Digite de novo</span><input name="pw2" type="password" autocomplete="new-password" minlength="8" required></label>
+        <p class="form-error" hidden></p><div class="form-actions"><button class="btn primary" type="submit">Salvar senha nova</button></div></form>`,
+      mount: api => {
+        const f = api.body.querySelector('form');
+        f.onsubmit = async e => {
+          e.preventDefault(); const p = api.body.querySelector('.form-error');
+          if (f.pw.value !== f.pw2.value) { p.textContent = 'As duas senhas não estão iguais.'; p.hidden = false; return; }
+          const b = f.querySelector('[type=submit]'); b.disabled = true; b.textContent = 'Salvando…';
+          try { await P.sync.completeRecovery(userId, secret, f.pw.value); api.close(); P.toast('Senha trocada ✓ Agora entre com a senha nova.'); if (P.sync.user()) setTimeout(() => P.vaultUI?.changed(), 500); }
+          catch (err) { b.disabled = false; b.textContent = 'Salvar senha nova'; p.textContent = /expired|invalid/i.test(err.message) ? 'Esse link expirou. Peça outro em “Esqueci a senha”.' : 'Não consegui salvar: ' + err.message; p.hidden = false; }
+        };
+      }
+    }), 700);
+    return true;
   };
 })();

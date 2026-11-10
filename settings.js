@@ -58,6 +58,7 @@
 
       ${P.hasFin() ? `<section class="block set">
         <h2>Finanças</h2>
+        ${P.vaultUI?.statusHTML() || ''}
         ${P.fin?.settingsHTML ? P.fin.settingsHTML() : ''}
       </section>
 
@@ -132,7 +133,7 @@
         </div>
       </section>
 
-      <p class="credits">Prisma · versão 35 · Desenvolvido por Lidiane Tavares<br><button class="link" type="button" data-act="repair">Atualizar o app (baixa a versão mais nova; seus dados ficam)</button></p>
+      <p class="credits">Prisma · versão 36 · Desenvolvido por Lidiane Tavares<br><button class="link" type="button" data-act="repair">Atualizar o app (baixa a versão mais nova; seus dados ficam)</button></p>
     </div>`;
   };
 

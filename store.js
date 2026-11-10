@@ -94,6 +94,7 @@
       return [...dirty].map(k => { const [col, ...rest] = k.split(':'); const id = rest.join(':'); return { key: k, col, id, rec: db[col]?.[id] }; }).filter(x => x.rec);
     },
     markClean(keys) { keys.forEach(k => dirty.delete(k)); persist(); },
+    markDirty(keys) { keys.forEach(k => { const [col, ...rest] = k.split(':'); if (db[col]?.[rest.join(':')]) dirty.add(k); }); persist(); },
     applyRemote(rows, remoteWins = false) {
       let changed = 0;
       rows.forEach(row => {
