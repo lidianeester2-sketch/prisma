@@ -7,11 +7,11 @@
      na hora); sem internet, usa o guardado. Ícones: usa o guardado.
    - Ao publicar uma versão nova, mude o número em VERSION.
 ============================================================ */
-const VERSION = 'prisma-v39';
+const VERSION = 'prisma-v42';
 const SHELL = [
   './', './index.html', './manifest.json', './app.css',
   './config.js', './util.js', './store.js', './views.js', './forms.js',
-  './settings.js', './fin-core.js', './fin.js', './fin-forms.js', './fin-views.js', './fin-plan.js', './fin-report.js', './fin-ai.js', './onboarding.js', './vault.js', './sync.js', './notify.js', './tour.js', './app.js',
+  './settings.js', './fin-core.js', './fin.js', './fin-forms.js', './fin-views.js', './fin-plan.js', './fin-report.js', './fin-ai.js', './fin-mirror.js', './onboarding.js', './premium.js', './legal.js', './vault.js', './sync.js', './notify.js', './tour.js', './app.js',
   './icon-192.png', './icon-512.png', './favicon-64.png',
   './apple-touch-icon.png', './notification-icon.png'
 ];

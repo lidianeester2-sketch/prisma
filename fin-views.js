@@ -133,6 +133,7 @@
       <button type="button" class="smart k-ok" data-act="finAccounts"><span class="sm-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10l9-6 9 6M5 10v8M19 10v8M9 10v8M15 10v8M3 20h18"/></svg></span><b>${F.money(s.real)}</b><small>Nas contas</small></button>
       <button type="button" class="smart k-orange" data-act="go" data-to="fin-orcamento"><span class="sm-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg></span><b>${F.money(s.committed)}</b><small>Contas até o salário</small></button>
     </div>
+    <button type="button" class="mir-entry" data-act="finMirror"><span><b>Espelho do mês</b><small>Como o mês termina, limite do cartão e “e se eu comprar?”</small></span><span aria-hidden="true">›</span></button>
 
     <div class="cols">
       <section class="block main-col">

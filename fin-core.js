@@ -408,6 +408,76 @@
     };
   }
 
+  /* ---------------- espelho do mês e "e se eu comprar?" ----------------
+     Fotografia de agora + como o ciclo termina, e o mesmo com compras de mentira.
+     hypo = [{ amount, desc, method: 'credito'|'debito'|'pix'|'dinheiro'|'boleto', n, cardId, categoryId }]
+     Nada é gravado: tudo acontece em cópias. */
+  function mirrorOf(state, today) {
+    const s = snapshot(state, today);
+    const { accounts = [], txs = [], parcs = [] } = state;
+    const cards = accounts.filter(a => !a.deleted && !a.archived && a.type === 'cartao');
+    const curYm = today.slice(0, 7);
+    const invoices = txs.filter(t => live(t) && t.autoInvoice && t.status === 'previsto');
+    const cardInfo = cards.map(card => {
+      const own = invoices.filter(t => t.cardId === card.id).sort((a, b) => a.date.localeCompare(b.date));
+      const paidMonths = new Set(txs.filter(t => live(t) && t.autoInvoice && t.cardId === card.id && t.status === 'realizado').map(t => t.invoiceMonth));
+      // usado do limite = parcelas ainda não pagas + o que você digitou a mais numa fatura em aberto
+      let used = 0;
+      parcs.filter(p => !p.deleted && !p.canceled && p.type === 'cartao' && p.accountId === card.id)
+        .forEach(p => installments(p, txs).forEach(i => { if (!paidMonths.has(i.month) && i.month >= addMonths(curYm, -1)) used += i.amount; }));
+      own.forEach(t => { const parts = invoiceParts(card.id, t.invoiceMonth, parcs, txs).reduce((a, x) => a + x.amount, 0); if (t.amount > parts) used += t.amount - parts; });
+      const months = {};
+      own.forEach(t => { months[t.invoiceMonth] = (months[t.invoiceMonth] || 0) + t.amount; });
+      parcs.filter(p => !p.deleted && !p.canceled && p.type === 'cartao' && p.accountId === card.id)
+        .forEach(p => installments(p, txs).forEach(i => { if (!paidMonths.has(i.month) && !own.some(t => t.invoiceMonth === i.month) && i.month >= curYm) months[i.month] = (months[i.month] || 0) + i.amount; }));
+      const next = own[0] ? { month: own[0].invoiceMonth, amount: own[0].amount, due: own[0].date } : null;
+      // a fatura que recebe as compras de hoje (fecha no dia do fechamento)
+      const openMonth = invoiceMonth(today, card), openAmount = months[openMonth] || 0;
+      const target = card.target || 0;                                          // meta que você escolheu para a fatura
+      const ideal = state.profile?.income ? Math.round(state.profile.income * 0.3 / 100) * 100 : null;   // referência: até 30% da renda
+      const goal = target || ideal || 0;
+      return { id: card.id, name: card.name, limit: card.limit || 0, used, free: card.limit ? card.limit - used : null, next, months,
+        openMonth, openDue: card.dueDay ? invoiceDue(openMonth, card) : null, closingDay: card.closingDay || null, openAmount,
+        target, ideal, goal, room: goal ? goal - openAmount : null };
+    });
+    const ahead = s.weeks.filter(w => w.end >= today).reduce((a, w) => a + Math.max(0, w.limit - w.spent), 0);
+    const endNoMore = s.real + s.toReceive - s.committed;            // se não gastar mais nada além das contas
+    const endWithPlan = endNoMore - ahead;                             // se usar todo o dia a dia planejado
+    return { real: s.real, canSpend: s.canSpend, perDay: s.perDay, daysLeft: s.daysLeft, committed: s.committed, toReceive: s.toReceive,
+      week: s.week ? { label: s.week.label, left: s.week.limit - s.week.spent } : null, ahead, endNoMore, endWithPlan, cycle: s.cycle, cards: cardInfo };
+  }
+  function mirror(state, today, hypo = []) {
+    const before = mirrorOf(state, today);
+    if (!hypo.length) return { before, after: before, hypo: [] };
+    const txs = state.txs.map(t => ({ ...t })), parcs = (state.parcs || []).slice();
+    const accounts = state.accounts || [];
+    const avail = accounts.find(a => !a.deleted && !a.archived && a.type !== 'cartao' && a.inAvailable !== false);
+    const weeklyCat = (state.categories || []).find(c => c.kind === 'despesa' && c.weekly !== false && !c.deleted);
+    hypo.forEach((h, k) => {
+      const n = Math.max(1, h.n || 1), cat = h.categoryId || weeklyCat?.id || null, base = { kind: 'despesa', desc: h.desc || 'Simulação', categoryId: cat, certainty: 'confirmado', sim: true };
+      if (h.method === 'credito') {
+        const card = accounts.find(a => a.id === h.cardId) || accounts.find(a => a.type === 'cartao' && !a.deleted);
+        if (!card) return;
+        const p = { id: `sim-${k}`, type: 'cartao', total: h.amount, n, firstMonth: invoiceMonth(today, card), accountId: card.id, purchaseDate: today, desc: base.desc };
+        parcs.push(p);
+        installments(p).forEach(i => {
+          const inv = txs.find(t => t.autoInvoice && t.cardId === card.id && t.invoiceMonth === i.month && t.status === 'previsto' && !t.deleted);
+          if (inv) inv.amount += i.amount;
+          else if (card.dueDay) txs.push({ id: `sim-fat-${k}-${i.month}`, ...base, desc: `Fatura ${card.name}`, amount: i.amount, date: invoiceDue(i.month, card), status: 'previsto', method: 'boleto', accountId: avail?.id || null, autoInvoice: true, cardId: card.id, invoiceMonth: i.month });
+        });
+      } else {
+        const parts = allocate(h.amount, Array(n).fill(1));
+        parts.forEach((amt, i) => {
+          const [y, m] = addMonths(today.slice(0, 7), i).split('-').map(Number);
+          const date = i ? toISO(y, m, Math.min(Number(today.slice(8, 10)), daysInMonth(y, m))) : today;
+          txs.push({ id: `sim-${k}-${i}`, ...base, amount: amt, date, paidDate: i ? undefined : today, status: i ? 'previsto' : 'realizado', method: h.method || 'debito', accountId: avail?.id || null });
+        });
+      }
+    });
+    const after = mirrorOf({ ...state, txs, parcs }, today);
+    return { before, after, hypo };
+  }
+
   // Plano do ciclo ao registrar o salário (mostrado para confirmar antes de salvar).
   function cyclePlan(state, start, reserveCents, nextPayOverride) {
     const { accounts = [], txs = [], profile = {} } = state;
@@ -526,7 +596,7 @@
     addDays, diffDays, weekday, easter, bankHolidays, isBusinessDay, shiftBusiness,
     paydayIn, nextPayday, prevPayday, cycleFor, earlyCycle, weekRanges, splitWeeks,
     occurrences, effectOn, balance, snapshot, cyclePlan, parsePhrase, diff,
-    addMonths, installments, parcProgress, pendingAmount, envUsed, cycleSummary, cycleReport, invoiceMonth, invoiceDue, invoiceParts, rebalanceWeeks, coverOverspend
+    addMonths, installments, parcProgress, pendingAmount, envUsed, cycleSummary, cycleReport, invoiceMonth, invoiceDue, invoiceParts, rebalanceWeeks, coverOverspend, mirror
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) { root.P = root.P || {}; root.P.finCore = api; }

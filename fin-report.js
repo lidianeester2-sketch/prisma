@@ -107,7 +107,7 @@
   F.gate('fin-relatorio');
 
   Object.assign(P.actions, {
-    finRep: el => { const d = +el.dataset.d; P.ui.finRepOfs = Math.min(0, Math.max(-24, (P.ui.finRepOfs ?? defaultOfs()) + d)); P.render(); window.scrollTo(0, 0); },
+    finRep: el => { const d = +el.dataset.d; if (d < 0 && !P.premium?.gate('reports')) return; P.ui.finRepOfs = Math.min(0, Math.max(-24, (P.ui.finRepOfs ?? defaultOfs()) + d)); P.render(); window.scrollTo(0, 0); },
     finReport: () => { P.ui.finRepOfs = undefined; P.go('fin-relatorio'); }
   });
 })();

@@ -317,6 +317,30 @@
       return out;
     },
     savePush, removePush,
+    /* Excluir minha conta: apaga todas as linhas da pessoa na nuvem, pede ao robô para remover o login
+       e limpa este aparelho. Não tem volta. */
+    async deleteAccount(onProgress = () => {}) {
+      if (!db || !user) throw new Error('Entre na sua conta para excluir.');
+      let total = 0;
+      for (let round = 0; round < 60; round++) {
+        const res = await retry(() => db.listDocuments(DB, TABLE, [A.Query.limit(100)]));
+        const docs = res.documents || [];
+        if (!docs.length) break;
+        for (let i = 0; i < docs.length; i += 5) {
+          await Promise.all(docs.slice(i, i + 5).map(d => retry(() => db.deleteDocument(DB, TABLE, d.$id)).catch(() => {})));
+          total += Math.min(5, docs.length - i); onProgress(total);
+        }
+      }
+      let removed = false;
+      try { const r = await P.sync.execute(P.CONFIG?.roboFunction || 'prisma-robo', { excluirConta: true }); removed = !!r.contaRemovida; } catch (e) {}
+      if (!removed) { try { await account.updateStatus(); removed = true; } catch (e) {} }   // sem o robô: bloqueia o login
+      try { const reg = await navigator.serviceWorker?.ready; const sub = await reg?.pushManager?.getSubscription(); await sub?.unsubscribe(); } catch (e) {}
+      try { await account.deleteSession('current'); } catch (e) {}
+      user = null; noSession = true; vstate = 'off'; setStatus('idle');
+      await V.forget(); S.resetDevice(); clearPersonal(); P.ls.del(OWNER_KEY);
+      try { Object.keys(localStorage).filter(k => k.startsWith('prisma2:')).forEach(k => localStorage.removeItem(k)); } catch (e) {}
+      return { ok: true, total, removed };
+    },
     // recuperação de senha pelo e-mail (o Appwrite manda o link)
     async recover(email) {
       if (!account) await init();

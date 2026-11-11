@@ -716,6 +716,8 @@
       ${field('Nome', `<input name="name" required value="${esc(card?.name || '')}" placeholder="ex.: Caixa crédito">`)}
       <div class="row-fields">${field('Dia do fechamento', `<input name="closingDay" type="number" min="1" max="31" value="${card?.closingDay || ''}" placeholder="ex.: 3">`, 'Compras a partir desse dia vão para a fatura seguinte.')}
       ${field('Dia do vencimento', `<input name="dueDay" type="number" min="1" max="31" value="${card?.dueDay || ''}" placeholder="ex.: 10">`, 'Dia em que você paga a fatura.')}</div>
+      <div class="row-fields">${field('Limite total', `<input name="limit" inputmode="decimal" class="money-input" value="${card?.limit ? inMoney(card.limit) : ''}" placeholder="opcional, ex.: 2.000,00">`, 'Para mostrar quanto ainda está disponível.')}
+      ${field('Meta de fatura por mês', `<input name="target" inputmode="decimal" class="money-input" value="${card?.target ? inMoney(card.target) : ''}" placeholder="opcional, ex.: 800,00">`, 'Quanto você quer gastar no máximo por fatura.')}</div>
       <p class="form-error" hidden></p>
       <div class="form-actions"><button class="btn primary" type="submit">Salvar</button></div></form>`,
     mount: api => {
@@ -727,7 +729,7 @@
         if (f.closingDay.value && !(cd >= 1 && cd <= 31)) return err('O fechamento é um dia entre 1 e 31.');
         if (f.dueDay.value && !(dd >= 1 && dd <= 31)) return err('O vencimento é um dia entre 1 e 31.');
         if ((cd && !dd) || (!cd && dd)) return err('Preencha os dois dias, fechamento e vencimento.');
-        F.save('fin_conta', { ...(card || { type: 'cartao', inAvailable: false, opening: 0, openingSet: true, openingDate: P.today(), order: 9 }), name, closingDay: cd || null, dueDay: dd || null }, card ? `Alterou o cartão “${name}”` : `Criou o cartão “${name}”`);
+        F.save('fin_conta', { ...(card || { type: 'cartao', inAvailable: false, opening: 0, openingSet: true, openingDate: P.today(), order: 9 }), name, closingDay: cd || null, dueDay: dd || null, limit: C.parseMoney(f.limit.value) || null, target: C.parseMoney(f.target.value) || null }, card ? `Alterou o cartão “${name}”` : `Criou o cartão “${name}”`);
         api.close(); P.toast(cd ? `${name}: fecha dia ${cd}, vence dia ${dd}.` : 'Cartão salvo.');
       };
     }

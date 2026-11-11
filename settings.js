@@ -47,7 +47,13 @@
           </div>
           <div class="data-actions">
             <button type="button" class="data-btn" data-act="invite"><strong>Convidar alguém</strong><small>Gera um link para outra pessoa usar o Prisma com a conta dela. Cada conta só vê os próprios dados.</small></button>
+            <button type="button" class="data-btn danger" data-act="deleteAccount"><strong>Excluir minha conta</strong><small>Apaga a conta e todos os seus dados da nuvem. Não dá para desfazer.</small></button>
           </div>`}
+      </section>
+
+      <section class="block set">
+        <h2>Seu plano</h2>
+        ${P.premium?.statusHTML() || ''}
       </section>
 
       <section class="block set">
@@ -134,7 +140,7 @@
         </div>
       </section>
 
-      <p class="credits">Prisma · versão 39 · Desenvolvido por Lidiane Tavares<br><button class="link" type="button" data-act="repair">Atualizar o app (baixa a versão mais nova; seus dados ficam)</button></p>
+      <p class="credits">Prisma · versão 42 · Desenvolvido por Lidiane Ester Pereira Florêncio<br><a href="#privacidade">Privacidade</a> · <a href="#termos">Termos de uso</a><br><button class="link" type="button" data-act="repair">Atualizar o app (baixa a versão mais nova; seus dados ficam)</button></p>
     </div>`;
   };
 
@@ -177,7 +183,7 @@
   /* ---------- ações dos ajustes ---------- */
   Object.assign(P.actions, {
     setTextSize: el => { S.setSettings({ textSize: el.dataset.z }); P.applyTheme(); P.render(); },
-    setTheme: el => { S.setSettings({ theme: el.dataset.t }); P.applyTheme(); },
+    setTheme: el => { if (!P.premium?.FREE_THEMES.includes(el.dataset.t) && !P.premium?.gate('themes')) return; S.setSettings({ theme: el.dataset.t }); P.applyTheme(); },
     notifDay: el => { const d = +el.dataset.d; const n = S.settings().notify; const days = n.daysBefore.includes(d) ? n.daysBefore.filter(x => x !== d) : [...n.daysBefore, d].sort((a, b) => a - b); S.setSettings({ notify: { ...n, daysBefore: days } }); },
     notifFin: el => S.setSettings({ notify: { ...S.settings().notify, fin: el.checked } }),
     testNotifRemote: () => P.push.remoteTest(),

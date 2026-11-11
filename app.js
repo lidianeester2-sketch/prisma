@@ -3,7 +3,8 @@
 ============================================================ */
 (function () {
   const S = P.store;
-  const ROUTES = { hoje: 'Hoje', agenda: 'Agenda', areas: 'Pastas', notas: 'Notas', ajustes: 'Ajustes', fin: 'Financeiro+', 'fin-orcamento': 'Orçamento', 'fin-lanc': 'Lançamentos', 'fin-mais': 'Configurações de finanças', 'fin-relatorio': 'Relatório', 'fin-assistente': 'Assistente', boasvindas: 'Bem-vindo', entrar: 'Entrar' };
+  const ROUTES = { hoje: 'Hoje', agenda: 'Agenda', areas: 'Pastas', notas: 'Notas', ajustes: 'Ajustes', fin: 'Financeiro+', 'fin-orcamento': 'Orçamento', 'fin-lanc': 'Lançamentos', 'fin-mais': 'Configurações de finanças', 'fin-relatorio': 'Relatório', 'fin-espelho': 'Espelho do mês', 'fin-assistente': 'Assistente', boasvindas: 'Bem-vindo', entrar: 'Entrar', privacidade: 'Privacidade', termos: 'Termos de uso', 'excluir-conta': 'Excluir conta' };
+  const LEGAL_ROUTES = ['privacidade', 'termos', 'excluir-conta'];   // abrem para qualquer pessoa, logada ou não
   const PRISMA_ROUTES = ['hoje', 'agenda', 'areas', 'notas'];
   let route = 'hoje', spaceNow = 'prisma';
   // Ajustes fica no espaço em que a pessoa estava (assim quem usa só o Financeiro+ também chega nele)
@@ -59,19 +60,21 @@
   P.go = to => {
     if (!ROUTES[to]) to = P.home();
     // primeira vez no app: fluxo de boas-vindas
-    if (!S.settings().onboarded && to !== 'boasvindas') to = 'boasvindas';
+    const legal = LEGAL_ROUTES.includes(to);
+    if (!legal && !S.settings().onboarded && to !== 'boasvindas') to = 'boasvindas';
     if (S.settings().onboarded && to === 'boasvindas') to = P.home();
     // app com conta: sem login (sessão expirou ou saiu), mostra a tela de entrar
-    if (S.settings().onboarded && P.sync?.needsLogin()) to = 'entrar';
+    if (!legal && S.settings().onboarded && P.sync?.needsLogin()) to = 'entrar';
     else if (to === 'entrar') to = P.home();
     // o app mostra só o que a pessoa escolheu usar
     if (to.startsWith('fin') && !P.hasFin()) to = P.home();
     if (PRISMA_ROUTES.includes(to) && !P.hasPrisma()) to = P.home();
     if (location.hash !== '#' + to) { location.hash = to; return; }
+    document.body.classList.toggle('legal-page', legal);
     if (to.startsWith('fin')) spaceNow = 'fin'; else if (to !== 'ajustes') spaceNow = 'prisma';
     route = to;
     document.body.dataset.space = P.space();
-    document.body.classList.toggle('onboarding', to === 'boasvindas' || to === 'entrar');
+    document.body.classList.toggle('onboarding', to === 'boasvindas' || to === 'entrar' || (legal && !S.settings().onboarded));
     document.body.classList.toggle('on-ai', to === 'fin-assistente');
     P.applyFocus();
     // lembra a última tela de cada espaço (Ajustes não conta: ele não é de nenhum dos dois)

@@ -68,6 +68,7 @@
           <label class="ob-field">${I.lock}<input name="pw" type="${showPw ? 'text' : 'password'}" autocomplete="${st.mode === 'login' ? 'current-password' : 'new-password'}" placeholder="Senha${st.mode === 'login' ? '' : ' (8 ou mais caracteres)'}" minlength="8" required>
             <button class="ob-eye" type="button" data-ob-eye aria-label="${showPw ? 'Esconder senha' : 'Mostrar senha'}">${showPw ? I.eye : I.eyeOff}</button></label>
           <button class="ob-main" type="submit" ${st.busy ? 'disabled' : ''}>${st.busy ? 'Um instante…' : st.mode === 'login' ? 'Entrar' : 'Criar conta'}</button>
+          ${st.mode === 'login' ? '' : '<p class="ob-legal">Ao criar a conta, você concorda com os <a href="#termos">Termos de uso</a> e a <a href="#privacidade">Política de Privacidade</a>.</p>'}
         </form>
         ${st.mode === 'login' ? '<button class="ob-link small" type="button" data-forgot>Esqueci a senha</button>' : ''}
         <div class="ob-or"><span>ou</span></div>
@@ -75,7 +76,7 @@
         : `<div class="notice">A conta ainda não está ligada neste endereço. Você pode começar agora e ligar depois em Ajustes.</div>
         <button class="ob-main" type="button" data-ob-skip>Começar</button>`}
       </div>`;
-    return `<div class="ob2">${head()}${body}<p class="ob-credits">Prisma · Desenvolvido por Lidiane Tavares</p></div>`;
+    return `<div class="ob2">${head()}${body}<p class="ob-credits">Prisma · Desenvolvido por Lidiane Ester Pereira Florêncio</p></div>`;
   };
 
   const finish = () => {
@@ -132,7 +133,7 @@
         <div class="ob-or"><span>ou</span></div>
         <button class="ob-link" type="button" data-new-account>Criar uma conta nova</button>
       </div>
-      <p class="ob-credits">Prisma · Desenvolvido por Lidiane Tavares</p></div>`;
+      <p class="ob-credits">Prisma · Desenvolvido por Lidiane Ester Pereira Florêncio</p></div>`;
   P.mounts.entrar = root => {
     const f = root.querySelector('[data-login]');
     f.onsubmit = async e => {

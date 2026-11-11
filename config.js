@@ -10,5 +10,12 @@ P.CONFIG = {
   appwriteEndpoint: 'https://nyc.cloud.appwrite.io/v1',
   appwriteProject: '6ae688590001378b6f42',
   // ID da função do robô de notificações (Appwrite → Functions → Prisma Robô)
-  roboFunction: '6ae69619001fca9407c7'
+  roboFunction: '6ae69619001fca9407c7',
+  // planos: durante o beta, todo mundo tem o Premium liberado
+  betaPremium: true,
+  // aparecem na Política de Privacidade e nos Termos (preencha antes da Play Store)
+  responsavel: 'Lidiane Ester Pereira Florêncio',
+  cnpj: '',
+  cidade: '',
+  contatoEmail: ''
 };
