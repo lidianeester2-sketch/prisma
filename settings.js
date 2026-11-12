@@ -140,7 +140,7 @@
         </div>
       </section>
 
-      <p class="credits">Prisma · versão 42 · Desenvolvido por Lidiane Ester Pereira Florêncio<br><a href="#privacidade">Privacidade</a> · <a href="#termos">Termos de uso</a><br><button class="link" type="button" data-act="repair">Atualizar o app (baixa a versão mais nova; seus dados ficam)</button></p>
+      <p class="credits">Prisma · versão 43 · Desenvolvido por Lidiane Ester Pereira Florêncio<br><a href="#privacidade">Privacidade</a> · <a href="#termos">Termos de uso</a><br><button class="link" type="button" data-act="repair">Atualizar o app (baixa a versão mais nova; seus dados ficam)</button></p>
     </div>`;
   };
 

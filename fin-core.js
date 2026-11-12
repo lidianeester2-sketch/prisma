@@ -426,6 +426,7 @@
       parcs.filter(p => !p.deleted && !p.canceled && p.type === 'cartao' && p.accountId === card.id)
         .forEach(p => installments(p, txs).forEach(i => { if (!paidMonths.has(i.month) && i.month >= addMonths(curYm, -1)) used += i.amount; }));
       own.forEach(t => { const parts = invoiceParts(card.id, t.invoiceMonth, parcs, txs).reduce((a, x) => a + x.amount, 0); if (t.amount > parts) used += t.amount - parts; });
+      used = Math.max(0, used + (card.usedAdj || 0));                           // acerto com o limite que o banco mostra
       const months = {};
       own.forEach(t => { months[t.invoiceMonth] = (months[t.invoiceMonth] || 0) + t.amount; });
       parcs.filter(p => !p.deleted && !p.canceled && p.type === 'cartao' && p.accountId === card.id)

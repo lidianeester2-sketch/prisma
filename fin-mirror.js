@@ -40,6 +40,7 @@
           : '<p class="hint">Informe sua renda no perfil financeiro ou uma meta de fatura no cartão para ver o ideal.</p>'}
         ${!c.target ? '<button class="link" type="button" data-act="finCardsCfg">Definir minha meta de fatura →</button>' : ''}
       </div>
+      ${after ? '' : `<button class="link" type="button" data-cardfix="${c.id}">O banco mostra outro valor? Corrigir limite e fatura →</button>`}
       ${monthsList.length ? `<div class="mir-months">${monthsList.map(([m, v]) => `<div><span>Fatura ${ym(m)}</span><b>${M(v)}</b>${after && (c.months[m] || 0) !== v ? `<small>${delta(c.months[m] || 0, v, true)}</small>` : ''}</div>`).join('')}</div>` : ''}
     </div>`;
   };
@@ -115,7 +116,62 @@
     </section>`;
   };
 
+  // Acertar com o app do banco: a fatura aberta e o limite disponível.
+  // Fatura: a diferença para as parcelas do app vira "compras fora do app" (extraOut) e continua
+  // somando com o que você lançar depois. Limite: a diferença vira um acerto fixo (usedAdj).
+  F.cardFix = cardId => {
+    const card = F.acc(cardId); if (!card) return;
+    const info = () => C.mirror(F.state(), P.today()).before.cards.find(x => x.id === cardId);
+    const c0 = info(), inM = v => (Number.isInteger(v) ? (v / 100).toFixed(2).replace('.', ',') : '');
+    P.sheet({ title: 'Conferir com o banco', kicker: card.name,
+      render: () => `<form class="form">
+        <p class="hint">Abra o app do banco e copie os valores de hoje. O Prisma guarda a diferença como “compras fora do app”; o que você lançar depois continua somando.</p>
+        <label class="field"><span class="field-label">Fatura atual (${ym(c0.openMonth)}) no banco</span><input name="fatura" inputmode="decimal" class="money-input" value="${inM(c0.openAmount)}" placeholder="0,00"><span class="hint">No app agora: ${M(c0.openAmount)}</span></label>
+        ${card.dueDay ? '' : '<label class="field"><span class="field-label">Dia do vencimento</span><input name="dueDay" type="number" min="1" max="31" placeholder="ex.: 10" required><span class="hint">Precisa dele para a fatura virar conta a pagar.</span></label>'}
+        <div class="row-fields">
+          <label class="field"><span class="field-label">Limite total</span><input name="limit" inputmode="decimal" class="money-input" value="${inM(card.limit)}" placeholder="ex.: 2.000,00"></label>
+          <label class="field"><span class="field-label">Limite disponível no banco</span><input name="free" inputmode="decimal" class="money-input" value="${c0.limit ? inM(c0.free) : ''}" placeholder="ex.: 1.250,00"></label>
+        </div>
+        ${card.usedAdjAt ? `<p class="hint">Último acerto do limite: ${F.date(card.usedAdjAt)}.</p>` : ''}
+        <p class="form-error" hidden></p>
+        <div class="form-actions"><button class="btn primary" type="submit">Salvar</button></div></form>`,
+      mount: api => {
+        api.body.querySelector('form').onsubmit = e => {
+          e.preventDefault(); const f = e.target;
+          const err = m => { const p = api.body.querySelector('.form-error'); p.textContent = m; p.hidden = false; };
+          const fat = f.fatura.value.trim() ? C.parseMoney(f.fatura.value) : null;
+          const limit = f.limit.value.trim() ? C.parseMoney(f.limit.value) : null;
+          const free = f.free.value.trim() ? C.parseMoney(f.free.value) : null;
+          if (f.fatura.value.trim() && !(fat >= 0)) return err('Digite a fatura assim: 1.234,56.');
+          if (f.limit.value.trim() && !(limit > 0)) return err('Digite o limite total assim: 2.000,00.');
+          if (f.free.value.trim() && !(free >= 0)) return err('Digite o limite disponível assim: 1.250,00.');
+          if (free !== null && !limit) return err('Para acertar o disponível, preencha também o limite total.');
+          if (free !== null && free > limit) return err('O disponível não pode ser maior que o limite total.');
+          let cardNow = { ...card };
+          if (f.dueDay) { const dd = parseInt(f.dueDay.value, 10); if (!(dd >= 1 && dd <= 31)) return err('O vencimento é um dia entre 1 e 31.'); cardNow.dueDay = dd; }
+          if (limit) cardNow.limit = limit;
+          if (free !== null) cardNow.usedAdj = 0;
+          F.save('fin_conta', cardNow, `Conferiu “${card.name}” com o banco`);
+          // 1) fatura aberta
+          if (fat !== null && fat !== c0.openAmount) {
+            const month = c0.openMonth, id = `fatura-${card.id}-${month}`;
+            const parts = C.invoiceParts(card.id, month, F.parcs(), F.txs()).reduce((a, x) => a + x.amount, 0);
+            const ex = P.store.raw().fin_lanc[id];
+            const base = ex && !ex.deleted ? { ...ex } : { id, kind: 'despesa', desc: `Fatura ${card.name} · ${ym(month)}`, date: C.invoiceDue(month, cardNow), status: 'previsto', certainty: 'estimado', method: 'boleto', accountId: F.accounts()[0]?.id || null, categoryId: 'cat-cartao', origin: 'fatura', autoInvoice: true, cardId: card.id, invoiceMonth: month };
+            F.save('fin_lanc', { ...base, deleted: false, status: 'previsto', amount: fat, extraOut: fat - parts, manualAmount: false }, `Fatura ${card.name} · ${ym(month)} conferida com o banco (${M(fat)})`);
+          }
+          // 2) limite disponível: o acerto é a diferença entre o "usado" do banco e o do app
+          if (free !== null) {
+            const now = info(), adj = (limit - free) - now.used;
+            F.save('fin_conta', { ...F.acc(card.id), usedAdj: adj, usedAdjAt: P.today() }, `Limite de “${card.name}” conferido com o banco`);
+          }
+          api.close(); P.render(); P.toast('Pronto: valores conferidos com o banco.');
+        };
+      } });
+  };
+
   P.mounts['fin-espelho'] = root => {
+    P.$$('[data-cardfix]', root).forEach(b => b.onclick = () => F.cardFix(b.dataset.cardfix));
     const f = root.querySelector('[data-sim]'); if (!f) return;
     const keep = () => { form.amount = C.parseMoney(f.amount.value); form.desc = f.desc.value; form.n = +f.n.value; if (f.cardId) form.cardId = f.cardId.value; };
     P.$$('[data-simm]', root).forEach(b => b.onclick = () => { keep(); form.method = b.dataset.simm; P.render(); });

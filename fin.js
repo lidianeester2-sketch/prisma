@@ -103,6 +103,8 @@
         const id = `fatura-${card.id}-${ym}`, ex = raw[id];
         if (!ex) { if (total > 0) S.seed('fin_lanc', { id, kind: 'despesa', desc: `Fatura ${card.name} · ${F.ymTxt(ym)}`, amount: total, date: due, status: 'previsto', certainty: 'estimado', method: 'boleto', accountId: F.accounts()[0]?.id || null, categoryId: 'cat-cartao', origin: 'fatura', autoInvoice: true, cardId: card.id, invoiceMonth: ym }); continue; }
         if (ex.deleted || ex.status !== 'previsto' || ex.manualAmount) continue;
+        // extraOut = compras fora do app que você conferiu no app do banco (Espelho → Corrigir com o banco)
+        if (ex.extraOut) { const t2 = Math.max(0, total + ex.extraOut); if (ex.amount !== t2 || ex.date !== due) F.save('fin_lanc', { ...ex, amount: t2, date: due }, `Fatura ${card.name} · ${F.ymTxt(ym)} atualizada (${C.formatMoney(t2)})`); continue; }
         if (total > 0 && (ex.amount !== total || ex.date !== due)) F.save('fin_lanc', { ...ex, amount: total, date: due, status: 'previsto' }, `Fatura ${card.name} · ${F.ymTxt(ym)} recalculada pelas parcelas (${C.formatMoney(total)})`);
         if (total === 0 && ex.updatedAt) F.save('fin_lanc', { ...ex, status: 'cancelado' }, `Fatura ${card.name} · ${F.ymTxt(ym)} sem parcelas: saiu dos compromissos`);
       }
